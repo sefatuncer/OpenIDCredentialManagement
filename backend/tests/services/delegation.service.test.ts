@@ -9,7 +9,6 @@ import {
   revokeDelegation,
   verifyDelegation,
   CreateDelegationInput,
-  Delegation,
 } from '../../src/services/delegation.service'
 import { query, queryOne } from '../../src/database/connection'
 import { getAgentByDid, logAgentActivity } from '../../src/services/agent.service'
@@ -29,6 +28,10 @@ const mockQuery = query as jest.MockedFunction<typeof query>
 const mockQueryOne = queryOne as jest.MockedFunction<typeof queryOne>
 const mockGetAgentByDid = getAgentByDid as jest.MockedFunction<typeof getAgentByDid>
 const mockLogAgentActivity = logAgentActivity as jest.MockedFunction<typeof logAgentActivity>
+
+// Helper to create mock QueryResult
+const mockQueryResult = (rows: any[], rowCount?: number) =>
+  ({ rows, rowCount: rowCount ?? rows.length, command: '', oid: 0, fields: [] } as any)
 
 describe('DelegationService', () => {
   const testDelegatorDid = 'did:example:delegator123'
@@ -56,7 +59,7 @@ describe('DelegationService', () => {
         did: testDelegatorDid,
         name: 'Test Agent',
       } as any)
-      mockQuery.mockResolvedValue({ rows: [], rowCount: 1 })
+      mockQuery.mockResolvedValue(mockQueryResult([], 1))
       mockLogAgentActivity.mockResolvedValue(undefined)
 
       const result = await createDelegation(testDelegatorDid, validInput)
@@ -91,7 +94,7 @@ describe('DelegationService', () => {
 
     it('should calculate expiration for days (P30D)', async () => {
       mockGetAgentByDid.mockResolvedValue({ id: testAgentId } as any)
-      mockQuery.mockResolvedValue({ rows: [], rowCount: 1 })
+      mockQuery.mockResolvedValue(mockQueryResult([], 1))
       mockLogAgentActivity.mockResolvedValue(undefined)
 
       const result = await createDelegation(testDelegatorDid, {
@@ -108,7 +111,7 @@ describe('DelegationService', () => {
 
     it('should calculate expiration for weeks (P2W)', async () => {
       mockGetAgentByDid.mockResolvedValue({ id: testAgentId } as any)
-      mockQuery.mockResolvedValue({ rows: [], rowCount: 1 })
+      mockQuery.mockResolvedValue(mockQueryResult([], 1))
       mockLogAgentActivity.mockResolvedValue(undefined)
 
       const result = await createDelegation(testDelegatorDid, {
@@ -124,7 +127,7 @@ describe('DelegationService', () => {
 
     it('should calculate expiration for months (P3M)', async () => {
       mockGetAgentByDid.mockResolvedValue({ id: testAgentId } as any)
-      mockQuery.mockResolvedValue({ rows: [], rowCount: 1 })
+      mockQuery.mockResolvedValue(mockQueryResult([], 1))
       mockLogAgentActivity.mockResolvedValue(undefined)
 
       const result = await createDelegation(testDelegatorDid, {
@@ -140,7 +143,7 @@ describe('DelegationService', () => {
 
     it('should default to 30 days for invalid duration', async () => {
       mockGetAgentByDid.mockResolvedValue({ id: testAgentId } as any)
-      mockQuery.mockResolvedValue({ rows: [], rowCount: 1 })
+      mockQuery.mockResolvedValue(mockQueryResult([], 1))
       mockLogAgentActivity.mockResolvedValue(undefined)
 
       const result = await createDelegation(testDelegatorDid, {
@@ -188,8 +191,8 @@ describe('DelegationService', () => {
       ]
 
       mockQuery
-        .mockResolvedValueOnce({ rows: givenDelegations })
-        .mockResolvedValueOnce({ rows: receivedDelegations })
+        .mockResolvedValueOnce(mockQueryResult(givenDelegations))
+        .mockResolvedValueOnce(mockQueryResult(receivedDelegations))
 
       const result = await getDelegations(testDelegatorDid)
 
@@ -200,7 +203,7 @@ describe('DelegationService', () => {
     })
 
     it('should return empty arrays when no delegations exist', async () => {
-      mockQuery.mockResolvedValue({ rows: [] })
+      mockQuery.mockResolvedValue(mockQueryResult([]))
 
       const result = await getDelegations(testDelegatorDid)
 
@@ -258,7 +261,7 @@ describe('DelegationService', () => {
 
     it('should revoke a delegation successfully', async () => {
       mockQueryOne.mockResolvedValue(mockDelegation)
-      mockQuery.mockResolvedValue({ rows: [{ id: 'del-123' }] })
+      mockQuery.mockResolvedValue(mockQueryResult([{ id: 'del-123' }]))
       mockGetAgentByDid.mockResolvedValue({ id: testAgentId } as any)
       mockLogAgentActivity.mockResolvedValue(undefined)
 

@@ -11,9 +11,6 @@ import {
   unrevokeCredential,
   isCredentialRevoked,
   checkStatusListEntry,
-  getCredentialStatus,
-  getStatusList,
-  getStatusListsForIssuer,
   getRevocationStats,
   exportRevocationData,
   importRevocationData,
@@ -51,8 +48,8 @@ describe('RevocationService', () => {
   const testCredentialId = 'urn:uuid:credential-123'
 
   // Mock storage adapters
-  let mockStatusListsStorage: jest.Mocked<IStorageAdapter<StatusList>>
-  let mockCredentialStatusesStorage: jest.Mocked<IStorageAdapter<CredentialStatus>>
+  let mockStatusListsStorage: any
+  let mockCredentialStatusesStorage: any
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -65,6 +62,10 @@ describe('RevocationService', () => {
       list: jest.fn().mockResolvedValue([]),
       query: jest.fn().mockResolvedValue({ data: [], total: 0 }),
       clear: jest.fn().mockResolvedValue(undefined),
+      count: jest.fn().mockResolvedValue(0),
+      exists: jest.fn().mockResolvedValue(false),
+      update: jest.fn().mockResolvedValue(undefined),
+      getAdapterType: jest.fn().mockReturnValue('memory'),
     }
 
     mockCredentialStatusesStorage = {
@@ -74,6 +75,10 @@ describe('RevocationService', () => {
       list: jest.fn().mockResolvedValue([]),
       query: jest.fn().mockResolvedValue({ data: [], total: 0 }),
       clear: jest.fn().mockResolvedValue(undefined),
+      count: jest.fn().mockResolvedValue(0),
+      exists: jest.fn().mockResolvedValue(false),
+      update: jest.fn().mockResolvedValue(undefined),
+      getAdapterType: jest.fn().mockReturnValue('memory'),
     }
 
     mockCreateStorageAdapter.mockImplementation((name: string) => {
