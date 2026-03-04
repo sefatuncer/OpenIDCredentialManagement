@@ -50,7 +50,7 @@ async function request<T>(
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(token && { 'X-API-Key': token }),
+    ...(token && { 'Authorization': `Bearer ${token}` }),
     ...options.headers,
   };
 

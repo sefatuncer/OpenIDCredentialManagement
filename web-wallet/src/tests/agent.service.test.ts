@@ -101,7 +101,7 @@ describe('Agent Service', () => {
     })
 
     it('should request basic credential successfully', async () => {
-      const bvc = await agentService.requestBasicCredential('enterprise-domain')
+      const bvc = await agentService.requestBasicCredential('did:key:z6MkTest123', 'enterprise-domain')
 
       expect(bvc.type).toContain('BasicAgentCredential')
       expect(bvc.credentialSubject.isAgent).toBe(true)
@@ -111,13 +111,13 @@ describe('Agent Service', () => {
     })
 
     it('should set default security domain if not provided', async () => {
-      const bvc = await agentService.requestBasicCredential()
+      const bvc = await agentService.requestBasicCredential('did:key:z6MkTest123')
 
       expect(bvc.credentialSubject.securityDomain).toBe('default-domain')
     })
 
     it('should set expiration to 1 year from now', async () => {
-      const bvc = await agentService.requestBasicCredential()
+      const bvc = await agentService.requestBasicCredential('did:key:z6MkTest123')
 
       const issuance = new Date(bvc.issuanceDate)
       const expiration = new Date(bvc.expirationDate)
@@ -145,7 +145,7 @@ describe('Agent Service', () => {
       const roles = ['data-analyst', 'report-generator']
       const capabilities = ['read-data', 'generate-reports', 'send-emails']
 
-      const rvc = await agentService.requestRichCredential(roles, capabilities)
+      const rvc = await agentService.requestRichCredential('did:key:z6MkTest123', roles, capabilities)
 
       expect(rvc.type).toContain('RichAgentCredential')
       expect(rvc.credentialSubject.roles).toEqual(roles)
@@ -155,6 +155,7 @@ describe('Agent Service', () => {
 
     it('should generate capabilities with correct structure', async () => {
       const rvc = await agentService.requestRichCredential(
+        'did:key:z6MkTest123',
         ['admin'],
         ['manage-users', 'view-logs']
       )
@@ -168,6 +169,7 @@ describe('Agent Service', () => {
 
     it('should generate authorizations for each role', async () => {
       const rvc = await agentService.requestRichCredential(
+        'did:key:z6MkTest123',
         ['editor', 'viewer'],
         ['edit-content']
       )
@@ -498,7 +500,7 @@ describe('Agent Service', () => {
         capabilities: ['data-processing'],
       })
 
-      const wallet = await agentService.getMyWallet()
+      const wallet = await agentService.getWallet('did:key:z6MkTest123')
 
       expect(wallet).not.toBeNull()
       expect(wallet?.identity.name).toBe('Wallet Agent')
@@ -509,16 +511,16 @@ describe('Agent Service', () => {
     it('should update credentials in wallet', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
-      await agentService.registerAgent({
+      const agent = await agentService.registerAgent({
         name: 'Cred Agent',
         type: 'service',
         capabilities: [],
       })
 
-      await agentService.requestBasicCredential('test-domain')
-      await agentService.requestRichCredential(['admin'], ['manage'])
+      await agentService.requestBasicCredential(agent.did, 'test-domain')
+      await agentService.requestRichCredential(agent.did, ['admin'], ['manage'])
 
-      const wallet = await agentService.getMyWallet()
+      const wallet = await agentService.getWallet(agent.did)
 
       expect(wallet?.credentials.basic).not.toBeNull()
       expect(wallet?.credentials.rich).toHaveLength(1)

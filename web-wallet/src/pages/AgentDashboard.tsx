@@ -2,8 +2,20 @@ import { useState, useEffect } from 'react';
 import type { AgentWallet, AgentIdentity, TrustLevel } from '../types/agent.types';
 import * as agentService from '../services/agent.service';
 
+// Store current agent DID in session
+const AGENT_DID_KEY = 'current_agent_did';
+
+function getStoredAgentDid(): string | null {
+  return sessionStorage.getItem(AGENT_DID_KEY);
+}
+
+function setStoredAgentDid(did: string): void {
+  sessionStorage.setItem(AGENT_DID_KEY, did);
+}
+
 function AgentDashboard() {
   const [wallet, setWallet] = useState<AgentWallet | null>(null);
+  const [agentDid, setAgentDid] = useState<string | null>(getStoredAgentDid());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
@@ -21,12 +33,18 @@ function AgentDashboard() {
 
   useEffect(() => {
     loadWallet();
-  }, []);
+  }, [agentDid]);
 
   async function loadWallet() {
+    if (!agentDid) {
+      setShowRegisterForm(true);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const walletData = await agentService.getMyWallet();
+      const walletData = await agentService.getWallet(agentDid);
       setWallet(walletData);
       if (!walletData) {
         setShowRegisterForm(true);
@@ -64,8 +82,9 @@ function AgentDashboard() {
         },
       });
 
-      // Reload wallet after registration
-      await loadWallet();
+      // Store the new agent DID and reload wallet
+      setStoredAgentDid(identity.did);
+      setAgentDid(identity.did);
       setShowRegisterForm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -73,9 +92,13 @@ function AgentDashboard() {
   }
 
   async function handleRequestBasicCredential() {
+    if (!agentDid) {
+      setError('No agent registered');
+      return;
+    }
     try {
       setError(null);
-      await agentService.requestBasicCredential();
+      await agentService.requestBasicCredential(agentDid);
       // Reload wallet to show the new credential
       await loadWallet();
     } catch (err) {
@@ -84,11 +107,15 @@ function AgentDashboard() {
   }
 
   async function handleRequestRichCredential() {
+    if (!agentDid) {
+      setError('No agent registered');
+      return;
+    }
     try {
       setError(null);
       const roles = ['data-analyst', 'api-consumer'];
       const capabilities = ['data-read', 'data-write', 'api-access'];
-      await agentService.requestRichCredential(roles, capabilities);
+      await agentService.requestRichCredential(agentDid, roles, capabilities);
       await loadWallet();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to request rich credential');

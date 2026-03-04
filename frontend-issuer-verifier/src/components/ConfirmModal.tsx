@@ -16,8 +16,8 @@ export function ConfirmModal({
   isOpen,
   title,
   message,
-  confirmText = 'Onayla',
-  cancelText = 'İptal',
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
   confirmVariant = 'primary',
   onConfirm,
   onCancel,
@@ -58,7 +58,7 @@ export function ConfirmModal({
             onClick={onConfirm}
             disabled={isLoading}
           >
-            {isLoading ? 'İşleniyor...' : confirmText}
+            {isLoading ? 'Processing...' : confirmText}
           </button>
         </div>
       </div>

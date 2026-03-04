@@ -91,32 +91,9 @@ export const auth = {
   },
 
   async _doRefresh(): Promise<boolean> {
-    const currentToken = storage.getToken();
-    if (!currentToken) return false;
-
-    try {
-      const response = await fetch(`${env.API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${currentToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        this.logout();
-        return false;
-      }
-
-      const data = await response.json();
-      if (data.token) {
-        storage.setToken(data.token, data.expiresIn);
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
-    }
+    // Backend does not have /auth/refresh endpoint
+    // Token refresh is not supported - user must re-login
+    return false;
   },
 
   shouldRefreshToken(): boolean {

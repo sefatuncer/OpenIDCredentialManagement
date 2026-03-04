@@ -110,10 +110,10 @@ export async function getAgentIdentity(did: string): Promise<AgentIdentity | nul
 }
 
 /**
- * Get current wallet (logged-in agent)
+ * Get wallet by agent DID
  */
-export async function getMyWallet(): Promise<AgentWallet | null> {
-  const response = await authFetch(`${API_BASE}/wallet`);
+export async function getWallet(agentDid: string): Promise<AgentWallet | null> {
+  const response = await authFetch(`${API_BASE}/wallet/${encodeURIComponent(agentDid)}`);
 
   if (response.status === 404) {
     return null;
@@ -133,7 +133,7 @@ export async function updateAgentStatus(
   did: string,
   status: 'active' | 'suspended'
 ): Promise<AgentIdentity> {
-  const response = await authFetch(`${API_BASE}/agents/${encodeURIComponent(did)}/status`, {
+  const response = await authFetch(`${API_BASE}/agents/${encodeURIComponent(did)}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
@@ -153,8 +153,8 @@ export async function updateAgentStatus(
  * Request Basic Agent Credential (bVC)
  * Issued by security domain orchestrator
  */
-export async function requestBasicCredential(securityDomain?: string): Promise<BasicAgentCredential> {
-  const response = await authFetch(`${API_BASE}/agents/credentials/basic`, {
+export async function requestBasicCredential(agentDid: string, securityDomain?: string): Promise<BasicAgentCredential> {
+  const response = await authFetch(`${API_BASE}/wallet/${encodeURIComponent(agentDid)}/credentials/basic`, {
     method: 'POST',
     body: JSON.stringify({ securityDomain }),
   });
@@ -172,11 +172,12 @@ export async function requestBasicCredential(securityDomain?: string): Promise<B
  * Contains roles, capabilities, and authorizations
  */
 export async function requestRichCredential(
+  agentDid: string,
   roles: string[],
   capabilities: string[],
   attesters?: string[]
 ): Promise<RichAgentCredential> {
-  const response = await authFetch(`${API_BASE}/agents/credentials/rich`, {
+  const response = await authFetch(`${API_BASE}/wallet/${encodeURIComponent(agentDid)}/credentials/rich`, {
     method: 'POST',
     body: JSON.stringify({
       roles,
@@ -194,14 +195,14 @@ export async function requestRichCredential(
 }
 
 /**
- * Get all credentials for current agent
+ * Get all credentials for an agent
  */
-export async function getAgentCredentials(): Promise<{
+export async function getAgentCredentials(agentDid: string): Promise<{
   basic: BasicAgentCredential | null;
   rich: RichAgentCredential[];
   delegations: DelegationGrant[];
 }> {
-  const response = await authFetch(`${API_BASE}/agents/credentials`);
+  const response = await authFetch(`${API_BASE}/wallet/${encodeURIComponent(agentDid)}/credentials`);
 
   if (!response.ok) {
     throw new Error('Failed to get credentials');

@@ -38,8 +38,8 @@ export function Revocation() {
     if (statsRes.success && statsRes.data) {
       setStats(statsRes.data);
     } else {
-      // Demo data
-      setStats({ total: 12, active: 10, revoked: 2 });
+      // No demo data - show zeros on error
+      setStats({ total: 0, active: 0, revoked: 0 });
     }
 
     if (statusListRes.success && statusListRes.data) {

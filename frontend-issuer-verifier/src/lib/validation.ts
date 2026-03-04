@@ -18,7 +18,7 @@ export interface SchemaResult<T> {
 
 // Validators
 export const v = {
-  required: (value: unknown, message = 'Bu alan zorunludur'): ValidationResult => {
+  required: (value: unknown, message = 'This field is required'): ValidationResult => {
     if (value === null || value === undefined || value === '') {
       return { success: false, error: message };
     }
@@ -28,7 +28,7 @@ export const v = {
   minLength: (min: number, message?: string) => (value: unknown): ValidationResult => {
     const str = String(value || '');
     if (str.length < min) {
-      return { success: false, error: message || `En az ${min} karakter olmalı` };
+      return { success: false, error: message || `Must be at least ${min} characters` };
     }
     return { success: true };
   },
@@ -36,12 +36,12 @@ export const v = {
   maxLength: (max: number, message?: string) => (value: unknown): ValidationResult => {
     const str = String(value || '');
     if (str.length > max) {
-      return { success: false, error: message || `En fazla ${max} karakter olmalı` };
+      return { success: false, error: message || `Must be at most ${max} characters` };
     }
     return { success: true };
   },
 
-  pattern: (regex: RegExp, message = 'Geçersiz format') => (value: unknown): ValidationResult => {
+  pattern: (regex: RegExp, message = 'Invalid format') => (value: unknown): ValidationResult => {
     const str = String(value || '');
     if (!regex.test(str)) {
       return { success: false, error: message };
@@ -52,11 +52,11 @@ export const v = {
   did: (value: unknown): ValidationResult => {
     const str = String(value || '');
     if (!str.startsWith('did:')) {
-      return { success: false, error: 'Geçerli bir DID olmalı (did:method:...)' };
+      return { success: false, error: 'Must be a valid DID (did:method:...)' };
     }
     const parts = str.split(':');
     if (parts.length < 3) {
-      return { success: false, error: 'DID formatı: did:method:identifier' };
+      return { success: false, error: 'DID format: did:method:identifier' };
     }
     return { success: true };
   },
@@ -65,7 +65,7 @@ export const v = {
     const str = String(value || '');
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(str)) {
-      return { success: false, error: 'Geçerli bir email adresi girin' };
+      return { success: false, error: 'Enter a valid email address' };
     }
     return { success: true };
   },
@@ -76,13 +76,13 @@ export const v = {
       new URL(str);
       return { success: true };
     } catch {
-      return { success: false, error: 'Geçerli bir URL girin' };
+      return { success: false, error: 'Enter a valid URL' };
     }
   },
 
   oneOf: <T>(options: T[], message?: string) => (value: unknown): ValidationResult => {
     if (!options.includes(value as T)) {
-      return { success: false, error: message || `Geçerli seçenekler: ${options.join(', ')}` };
+      return { success: false, error: message || `Valid options: ${options.join(', ')}` };
     }
     return { success: true };
   },
@@ -184,7 +184,7 @@ export const schemas = {
 
   revocation: createSchema({
     credentialId: {
-      validators: [v.minLength(10, 'Credential ID en az 10 karakter olmalı')],
+      validators: [v.minLength(10, 'Credential ID must be at least 10 characters')],
     },
     reason: {
       validators: [v.maxLength(500)],

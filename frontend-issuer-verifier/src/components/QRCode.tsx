@@ -11,7 +11,7 @@ export function QRCode({ data, size = 256, label }: QRCodeProps) {
     try {
       await navigator.clipboard.writeText(data);
     } catch (err) {
-      console.error('Kopyalama hatası:', err);
+      console.error('Copy error:', err);
     }
   };
 
@@ -31,7 +31,7 @@ export function QRCode({ data, size = 256, label }: QRCodeProps) {
         onClick={copyToClipboard}
         style={{ marginTop: '1rem' }}
       >
-        📋 URI Kopyala
+        📋 Copy URI
       </button>
     </div>
   );

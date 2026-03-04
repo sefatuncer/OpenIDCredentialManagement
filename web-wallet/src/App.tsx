@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
-import Dashboard from './pages/Dashboard'
 import IssueCredential from './pages/IssueCredential'
 import Credentials from './pages/Credentials'
 import VerifyCredential from './pages/VerifyCredential'
@@ -56,7 +55,6 @@ function App() {
             <Route path="/credentials" element={<Credentials />} />
             <Route path="/issue" element={<IssueCredential />} />
             <Route path="/verify" element={<VerifyCredential />} />
-            <Route path="/legacy" element={<Dashboard />} />
           </Routes>
         </main>
 

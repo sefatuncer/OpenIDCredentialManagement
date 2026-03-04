@@ -42,8 +42,8 @@ export function VerifierDashboard() {
 
       if (auditStats.success && auditStats.data) {
         const verifyCount = auditStats.data.byAction?.['verify'] || 0;
-        const successCount = auditStats.data.byAction?.['verify_success'] || Math.floor(verifyCount * 0.85);
-        const failCount = auditStats.data.byAction?.['verify_fail'] || verifyCount - successCount;
+        const successCount = auditStats.data.byAction?.['verify_success'] || 0;
+        const failCount = auditStats.data.byAction?.['verify_fail'] || 0;
 
         newStats.totalVerifications = verifyCount;
         newStats.successfulVerifications = successCount;
