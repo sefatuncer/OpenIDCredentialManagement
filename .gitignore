@@ -69,6 +69,7 @@ paper-latex.zip
 
 # Markdown files (documentation - private)
 *.md
+!README.md
 
 # Docs folder (private)
 docs/
