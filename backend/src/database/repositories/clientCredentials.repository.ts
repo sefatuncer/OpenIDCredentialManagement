@@ -1,5 +1,5 @@
 import { query, queryOne } from '../connection'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
 
 export interface ClientCredential {
