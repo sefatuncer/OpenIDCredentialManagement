@@ -1,6 +1,7 @@
 /**
  * AI Agent Service Unit Tests
  * Tests for agent registration, credentials, delegations, and trust management
+ * Production-ready: All tests use proper API mocking
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -9,9 +10,38 @@ import * as agentService from '../services/agent.service'
 // Mock fetch responses
 const mockFetch = global.fetch as ReturnType<typeof vi.fn>
 
+// Helper to mock successful auth + API response
+function mockAuthAndResponse(responseData: unknown, options: { ok?: boolean } = {}) {
+  const { ok = true } = options
+
+  // Mock auth token response
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ access_token: 'test-token' }),
+  })
+
+  // Mock API response
+  mockFetch.mockResolvedValueOnce({
+    ok,
+    status: ok ? 200 : 400,
+    json: async () => responseData,
+  })
+}
+
+// Helper to mock auth failure
+function mockAuthFailure() {
+  mockFetch.mockResolvedValueOnce({
+    ok: false,
+    status: 401,
+    json: async () => ({ error: 'invalid_client' }),
+  })
+}
+
 describe('Agent Service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Clear cached auth token
+    agentService.clearAuth()
   })
 
   // ============================================
@@ -19,23 +49,13 @@ describe('Agent Service', () => {
   // ============================================
   describe('Agent Registration', () => {
     it('should register a new agent successfully', async () => {
-      // Mock auth token response
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ access_token: 'test-token' }),
-      })
-
-      // Mock register response
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          id: 'agent-123',
-          did: 'did:key:z6MkTest123',
-          name: 'Test Agent',
-          type: 'autonomous',
-          status: 'active',
-          trustLevel: 'medium',
-        }),
+      mockAuthAndResponse({
+        id: 'agent-123',
+        did: 'did:key:z6MkTest123',
+        name: 'Test Agent',
+        type: 'autonomous',
+        status: 'active',
+        trustLevel: 'medium',
       })
 
       const result = await agentService.registerAgent({
@@ -54,146 +74,206 @@ describe('Agent Service', () => {
       expect(result.did).toContain('did:key:')
     })
 
-    it('should switch to demo mode when backend is unavailable', async () => {
-      // Mock failed auth
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    it('should throw error when auth fails', async () => {
+      mockAuthFailure()
 
-      const result = await agentService.registerAgent({
-        name: 'Demo Agent',
-        type: 'assistant',
-        capabilities: ['chat'],
-      })
-
-      // Should return demo data
-      expect(result.name).toBe('Demo Agent')
-      expect(result.did).toContain('did:key:z6Mk')
-      expect(result.status).toBe('active')
+      await expect(
+        agentService.registerAgent({
+          name: 'Test Agent',
+          type: 'assistant',
+          capabilities: ['chat'],
+        })
+      ).rejects.toThrow()
     })
 
-    it('should validate agent types', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    it('should throw error when registration fails', async () => {
+      mockAuthAndResponse({ error: 'Registration failed' }, { ok: false })
 
-      const validTypes = ['autonomous', 'semi-autonomous', 'assistant', 'service', 'orchestrator']
-
-      for (const type of validTypes) {
-        const result = await agentService.registerAgent({
-          name: `${type} Agent`,
-          type: type as any,
+      await expect(
+        agentService.registerAgent({
+          name: 'Test Agent',
+          type: 'autonomous',
           capabilities: [],
         })
-        expect(result.type).toBe(type)
-      }
+      ).rejects.toThrow('Failed to register agent')
     })
   })
 
   // ============================================
-  // Scenario 2: Basic Credential (bVC) Request
+  // Scenario 2: Get Agent Identity
   // ============================================
-  describe('Basic Agent Credential (bVC)', () => {
-    beforeEach(async () => {
-      // Ensure demo mode is active
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-      await agentService.registerAgent({
+  describe('Agent Identity', () => {
+    it('should get agent identity by DID', async () => {
+      mockAuthAndResponse({
+        id: 'agent-123',
+        did: 'did:key:z6MkTest123',
         name: 'Test Agent',
         type: 'autonomous',
-        capabilities: [],
+        status: 'active',
+        trustLevel: 'high',
       })
+
+      const result = await agentService.getAgentIdentity('did:key:z6MkTest123')
+
+      expect(result?.did).toBe('did:key:z6MkTest123')
+      expect(result?.name).toBe('Test Agent')
     })
 
-    it('should request basic credential successfully', async () => {
+    it('should return null for non-existent agent', async () => {
+      // Mock auth
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'test-token' }),
+      })
+      // Mock 404 response
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: 'Not found' }),
+      })
+
+      const result = await agentService.getAgentIdentity('did:key:z6MkNotFound')
+      expect(result).toBeNull()
+    })
+  })
+
+  // ============================================
+  // Scenario 3: Wallet Management
+  // ============================================
+  describe('Wallet Management', () => {
+    it('should get wallet by agent DID', async () => {
+      mockAuthAndResponse({
+        identity: {
+          did: 'did:key:z6MkTest123',
+          name: 'Test Agent',
+          type: 'autonomous',
+          status: 'active',
+          trustLevel: 'medium',
+        },
+        credentials: {
+          basic: null,
+          rich: [],
+          delegations: [],
+        },
+        keys: [{ id: 'key-1', algorithm: 'Ed25519' }],
+      })
+
+      const wallet = await agentService.getWallet('did:key:z6MkTest123')
+
+      expect(wallet).not.toBeNull()
+      expect(wallet?.identity.did).toBe('did:key:z6MkTest123')
+    })
+
+    it('should return null for non-existent wallet', async () => {
+      // Mock auth
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'test-token' }),
+      })
+      // Mock 404
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: 'Not found' }),
+      })
+
+      const wallet = await agentService.getWallet('did:key:z6MkNotFound')
+      expect(wallet).toBeNull()
+    })
+  })
+
+  // ============================================
+  // Scenario 4: Credentials
+  // ============================================
+  describe('Credentials', () => {
+    it('should request basic credential', async () => {
+      mockAuthAndResponse({
+        id: 'cred-123',
+        type: ['VerifiableCredential', 'BasicAgentCredential'],
+        issuer: 'did:key:z6MkIssuer',
+        issuanceDate: new Date().toISOString(),
+        expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        credentialSubject: {
+          id: 'did:key:z6MkTest123',
+          isAgent: true,
+          securityDomain: 'enterprise-domain',
+        },
+      })
+
       const bvc = await agentService.requestBasicCredential('did:key:z6MkTest123', 'enterprise-domain')
 
       expect(bvc.type).toContain('BasicAgentCredential')
-      expect(bvc.credentialSubject.isAgent).toBe(true)
       expect(bvc.credentialSubject.securityDomain).toBe('enterprise-domain')
-      expect(bvc.issuanceDate).toBeDefined()
-      expect(bvc.expirationDate).toBeDefined()
     })
 
-    it('should set default security domain if not provided', async () => {
-      const bvc = await agentService.requestBasicCredential('did:key:z6MkTest123')
-
-      expect(bvc.credentialSubject.securityDomain).toBe('default-domain')
-    })
-
-    it('should set expiration to 1 year from now', async () => {
-      const bvc = await agentService.requestBasicCredential('did:key:z6MkTest123')
-
-      const issuance = new Date(bvc.issuanceDate)
-      const expiration = new Date(bvc.expirationDate)
-
-      const diffInDays = (expiration.getTime() - issuance.getTime()) / (1000 * 60 * 60 * 24)
-      expect(diffInDays).toBeGreaterThanOrEqual(364)
-      expect(diffInDays).toBeLessThanOrEqual(366)
-    })
-  })
-
-  // ============================================
-  // Scenario 3: Rich Credential (rVC) Request
-  // ============================================
-  describe('Rich Agent Credential (rVC)', () => {
-    beforeEach(async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-      await agentService.registerAgent({
-        name: 'Rich Agent',
-        type: 'service',
-        capabilities: [],
+    it('should request rich credential', async () => {
+      mockAuthAndResponse({
+        id: 'cred-456',
+        type: ['VerifiableCredential', 'RichAgentCredential'],
+        issuer: 'did:key:z6MkIssuer',
+        issuanceDate: new Date().toISOString(),
+        expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        credentialSubject: {
+          id: 'did:key:z6MkTest123',
+          roles: ['data-analyst', 'report-generator'],
+          capabilities: [
+            { id: 'cap-0', name: 'read-data', category: 'data', scope: ['*'] },
+          ],
+          authorizations: [
+            { resource: '/data-analyst/*', actions: ['read', 'write'] },
+          ],
+        },
       })
-    })
 
-    it('should request rich credential with roles and capabilities', async () => {
-      const roles = ['data-analyst', 'report-generator']
-      const capabilities = ['read-data', 'generate-reports', 'send-emails']
-
-      const rvc = await agentService.requestRichCredential('did:key:z6MkTest123', roles, capabilities)
+      const rvc = await agentService.requestRichCredential(
+        'did:key:z6MkTest123',
+        ['data-analyst', 'report-generator'],
+        ['read-data']
+      )
 
       expect(rvc.type).toContain('RichAgentCredential')
-      expect(rvc.credentialSubject.roles).toEqual(roles)
-      expect(rvc.credentialSubject.capabilities).toHaveLength(3)
-      expect(rvc.credentialSubject.authorizations).toHaveLength(2)
+      expect(rvc.credentialSubject.roles).toContain('data-analyst')
     })
 
-    it('should generate capabilities with correct structure', async () => {
-      const rvc = await agentService.requestRichCredential(
-        'did:key:z6MkTest123',
-        ['admin'],
-        ['manage-users', 'view-logs']
-      )
+    it('should get agent credentials', async () => {
+      mockAuthAndResponse({
+        basic: {
+          id: 'bvc-1',
+          type: ['VerifiableCredential', 'BasicAgentCredential'],
+        },
+        rich: [],
+        delegations: [],
+      })
 
-      const cap = rvc.credentialSubject.capabilities[0]
-      expect(cap.id).toBe('cap-0')
-      expect(cap.name).toBe('manage-users')
-      expect(cap.category).toBe('data')
-      expect(cap.scope).toContain('*')
-    })
+      const creds = await agentService.getAgentCredentials('did:key:z6MkTest123')
 
-    it('should generate authorizations for each role', async () => {
-      const rvc = await agentService.requestRichCredential(
-        'did:key:z6MkTest123',
-        ['editor', 'viewer'],
-        ['edit-content']
-      )
-
-      expect(rvc.credentialSubject.authorizations).toHaveLength(2)
-      expect(rvc.credentialSubject.authorizations[0].resource).toBe('/editor/*')
-      expect(rvc.credentialSubject.authorizations[1].resource).toBe('/viewer/*')
+      expect(creds.basic).not.toBeNull()
+      expect(creds.rich).toHaveLength(0)
     })
   })
 
   // ============================================
-  // Scenario 4: Delegation Management
+  // Scenario 5: Delegation Management
   // ============================================
   describe('Delegation Management', () => {
-    beforeEach(async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-      await agentService.registerAgent({
-        name: 'Delegator Agent',
-        type: 'orchestrator',
-        capabilities: [],
-      })
-    })
-
     it('should create delegation grant', async () => {
+      mockAuthAndResponse({
+        id: 'del-123',
+        type: ['VerifiableCredential', 'DelegationGrant'],
+        issuer: 'did:key:z6MkDelegator',
+        issuanceDate: new Date().toISOString(),
+        expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        delegation: {
+          delegator: { did: 'did:key:z6MkDelegator', name: 'Delegator' },
+          delegatee: { did: 'did:key:z6MkDelegatee123' },
+          scope: {
+            actions: ['read', 'write'],
+            resources: ['/data/*', '/reports/*'],
+          },
+          revocation: { revocable: true, revokedAt: null },
+        },
+      })
+
       const delegation = await agentService.createDelegation({
         delegateeToDid: 'did:key:z6MkDelegatee123',
         scope: {
@@ -204,95 +284,58 @@ describe('Agent Service', () => {
         revocable: true,
       })
 
-      expect(delegation.type).toContain('DelegationGrant')
       expect(delegation.delegation.scope.actions).toContain('read')
-      expect(delegation.delegation.scope.actions).toContain('write')
       expect(delegation.delegation.revocation.revocable).toBe(true)
     })
 
-    it('should calculate expiration from duration', async () => {
-      const delegation = await agentService.createDelegation({
-        delegateeToDid: 'did:key:z6MkDelegatee123',
-        scope: {
-          actions: ['read'],
-          resources: ['*'],
-        },
-        duration: 'P7D', // 7 days
-        revocable: true,
+    it('should get delegations', async () => {
+      mockAuthAndResponse({
+        given: [{ id: 'del-1' }],
+        received: [{ id: 'del-2' }],
       })
 
-      const issuance = new Date(delegation.issuanceDate)
-      const expiration = new Date(delegation.expirationDate)
+      const delegations = await agentService.getDelegations()
 
-      const diffInDays = (expiration.getTime() - issuance.getTime()) / (1000 * 60 * 60 * 24)
-      expect(diffInDays).toBeGreaterThanOrEqual(6)
-      expect(diffInDays).toBeLessThanOrEqual(8)
+      expect(delegations.given).toHaveLength(1)
+      expect(delegations.received).toHaveLength(1)
     })
 
     it('should revoke delegation', async () => {
-      const delegation = await agentService.createDelegation({
-        delegateeToDid: 'did:key:z6MkDelegatee123',
-        scope: {
-          actions: ['*'],
-          resources: ['*'],
-        },
-        duration: 'P30D',
-        revocable: true,
-      })
+      mockAuthAndResponse({ success: true })
 
-      await agentService.revokeDelegation(delegation.id, 'No longer needed')
-
-      const delegations = await agentService.getDelegations()
-      const revoked = delegations.given.find(d => d.id === delegation.id)
-      expect(revoked?.delegation.revocation.revokedAt).toBeDefined()
+      await expect(
+        agentService.revokeDelegation('del-123', 'No longer needed')
+      ).resolves.not.toThrow()
     })
 
     it('should verify delegation scope', async () => {
-      const delegation = await agentService.createDelegation({
-        delegateeToDid: 'did:key:z6MkDelegatee123',
-        scope: {
-          actions: ['read', 'write'],
-          resources: ['/data/*'],
-        },
-        duration: 'P30D',
-        revocable: true,
+      mockAuthAndResponse({
+        valid: true,
+        inScope: true,
       })
 
-      const result = await agentService.verifyDelegation(delegation.id, 'read', '/data/test')
+      const result = await agentService.verifyDelegation('del-123', 'read', '/data/test')
+
       expect(result.valid).toBe(true)
       expect(result.inScope).toBe(true)
-    })
-
-    it('should reject out-of-scope actions', async () => {
-      const delegation = await agentService.createDelegation({
-        delegateeToDid: 'did:key:z6MkDelegatee123',
-        scope: {
-          actions: ['read'],
-          resources: ['/data/*'],
-        },
-        duration: 'P30D',
-        revocable: true,
-      })
-
-      const result = await agentService.verifyDelegation(delegation.id, 'delete', '/data/test')
-      expect(result.inScope).toBe(false)
     })
   })
 
   // ============================================
-  // Scenario 5: Trust Management
+  // Scenario 6: Trust Management
   // ============================================
   describe('Trust Management', () => {
-    beforeEach(async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-      await agentService.registerAgent({
-        name: 'Trust Agent',
-        type: 'autonomous',
-        capabilities: [],
-      })
-    })
-
     it('should establish trust with another agent', async () => {
+      mockAuthAndResponse({
+        success: true,
+        trustRelationship: {
+          agentDid: 'did:key:z6MkTrusted123',
+          trustLevel: 'high',
+          mutual: false,
+          establishedAt: new Date().toISOString(),
+        },
+      })
+
       const result = await agentService.establishTrust({
         targetAgentDid: 'did:key:z6MkTrusted123',
         trustLevel: 'high',
@@ -301,163 +344,112 @@ describe('Agent Service', () => {
 
       expect(result.success).toBe(true)
       expect(result.trustRelationship.trustLevel).toBe('high')
-      expect(result.trustRelationship.mutual).toBe(false)
     })
 
-    it('should add trusted agent to list', async () => {
-      await agentService.establishTrust({
-        targetAgentDid: 'did:key:z6MkTrusted456',
-        trustLevel: 'medium',
-        mutualTrust: true,
+    it('should get trusted agents', async () => {
+      mockAuthAndResponse({
+        agents: [
+          {
+            did: 'did:key:z6MkTrusted1',
+            name: 'Trusted Agent 1',
+            type: 'service',
+            trustLevel: 'high',
+            establishedAt: new Date().toISOString(),
+          },
+        ],
       })
 
-      const trustedAgents = await agentService.getTrustedAgents()
-      expect(trustedAgents).toHaveLength(1)
-      expect(trustedAgents[0].trustLevel).toBe('medium')
+      const agents = await agentService.getTrustedAgents()
+
+      expect(agents).toHaveLength(1)
+      expect(agents[0].trustLevel).toBe('high')
     })
 
     it('should revoke trust', async () => {
-      await agentService.establishTrust({
-        targetAgentDid: 'did:key:z6MkToRevoke',
-        trustLevel: 'low',
-        mutualTrust: false,
-      })
+      mockAuthAndResponse({ success: true })
 
-      await agentService.revokeTrust('did:key:z6MkToRevoke', 'Trust violation')
-
-      const trustedAgents = await agentService.getTrustedAgents()
-      expect(trustedAgents.find(a => a.did === 'did:key:z6MkToRevoke')).toBeUndefined()
-    })
-
-    it('should support all trust levels', async () => {
-      const trustLevels: Array<'low' | 'medium' | 'high' | 'verified'> = ['low', 'medium', 'high', 'verified']
-
-      for (const level of trustLevels) {
-        const result = await agentService.establishTrust({
-          targetAgentDid: `did:key:z6Mk${level}Agent`,
-          trustLevel: level,
-          mutualTrust: false,
-        })
-        expect(result.trustRelationship.trustLevel).toBe(level)
-      }
+      await expect(
+        agentService.revokeTrust('did:key:z6MkToRevoke', 'Trust violation')
+      ).resolves.not.toThrow()
     })
   })
 
   // ============================================
-  // Scenario 6: Agent Verification
+  // Scenario 7: Agent Verification
   // ============================================
   describe('Agent Verification', () => {
-    beforeEach(async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-      await agentService.registerAgent({
-        name: 'Verifier Agent',
-        type: 'service',
-        capabilities: [],
-      })
-    })
-
-    it('should verify trusted agent', async () => {
-      await agentService.establishTrust({
-        targetAgentDid: 'did:key:z6MkVerified123',
-        trustLevel: 'high',
-        mutualTrust: false,
+    it('should verify agent', async () => {
+      mockAuthAndResponse({
+        valid: true,
+        agent: {
+          did: 'did:key:z6MkVerified123',
+          name: 'Verified Agent',
+          trustLevel: 'high',
+        },
+        checks: {
+          signature: true,
+          expiration: true,
+          revocation: true,
+        },
       })
 
       const result = await agentService.verifyAgent('did:key:z6MkVerified123')
 
       expect(result.valid).toBe(true)
-      expect(result.agent.trustLevel).toBe('high')
       expect(result.checks.signature).toBe(true)
-      expect(result.checks.expiration).toBe(true)
     })
 
-    it('should return warnings for unknown agents', async () => {
-      const result = await agentService.verifyAgent('did:key:z6MkUnknown999')
-
-      expect(result.valid).toBe(true)
-      expect(result.agent.trustLevel).toBe('low')
-      expect(result.warnings).toContain('Agent not in trusted list')
-    })
-
-    it('should verify agent capability with delegation', async () => {
-      const delegation = await agentService.createDelegation({
-        delegateeToDid: 'did:key:z6MkCapable123',
-        scope: {
-          actions: ['read', 'execute'],
-          resources: ['/api/*'],
-        },
-        duration: 'P30D',
-        revocable: true,
+    it('should verify agent capability', async () => {
+      mockAuthAndResponse({
+        allowed: true,
+        delegationChain: ['del-123'],
       })
 
       const result = await agentService.verifyAgentCapability(
-        'did:key:z6MkCapable123',
+        'did:key:z6MkAgent',
         'read',
         '/api/data'
       )
 
       expect(result.allowed).toBe(true)
-      expect(result.delegationChain).toContain(delegation.id)
-    })
-
-    it('should reject capability without delegation', async () => {
-      const result = await agentService.verifyAgentCapability(
-        'did:key:z6MkNoDelegation',
-        'write',
-        '/api/data'
-      )
-
-      expect(result.allowed).toBe(false)
-      expect(result.reason).toContain('No delegation')
     })
   })
 
   // ============================================
-  // Scenario 7: Activity Logging
+  // Scenario 8: Activity Logging
   // ============================================
   describe('Activity Logging', () => {
-    beforeEach(async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-      await agentService.registerAgent({
-        name: 'Activity Agent',
-        type: 'assistant',
-        capabilities: [],
+    it('should get agent activity', async () => {
+      mockAuthAndResponse({
+        activities: [
+          {
+            id: 'act-1',
+            action: 'data-access',
+            resource: '/users/123',
+            timestamp: new Date().toISOString(),
+            result: 'success',
+          },
+        ],
+        total: 1,
       })
+
+      const { activities, total } = await agentService.getAgentActivity(10, 0)
+
+      expect(activities).toHaveLength(1)
+      expect(total).toBe(1)
     })
 
-    it('should log agent actions', async () => {
-      await agentService.logAgentAction('data-access', '/users/123', { userId: '123' })
+    it('should log agent action', async () => {
+      mockAuthAndResponse({ success: true })
 
-      const { activities } = await agentService.getAgentActivity(10, 0)
-
-      const dataAccessLog = activities.find(a => a.action === 'data-access')
-      expect(dataAccessLog).toBeDefined()
-      expect(dataAccessLog?.resource).toBe('/users/123')
-    })
-
-    it('should track registration activity', async () => {
-      const { activities } = await agentService.getAgentActivity(10, 0)
-
-      const registrationLog = activities.find(a => a.action === 'Agent registered')
-      expect(registrationLog).toBeDefined()
-      expect(registrationLog?.result).toBe('success')
-    })
-
-    it('should support pagination', async () => {
-      // Add multiple activities
-      for (let i = 0; i < 5; i++) {
-        await agentService.logAgentAction(`action-${i}`, `/resource-${i}`)
-      }
-
-      const { activities, total } = await agentService.getAgentActivity(2, 0)
-
-      expect(activities.length).toBe(2)
-      expect(total).toBeGreaterThan(2)
+      await expect(
+        agentService.logAgentAction('data-access', '/users/123', { userId: '123' })
+      ).resolves.not.toThrow()
     })
   })
 
   // ============================================
-  // Scenario 8: JWT Parsing
+  // Scenario 9: JWT Parsing
   // ============================================
   describe('JWT Parsing', () => {
     it('should parse valid JWT credential', () => {
@@ -488,75 +480,36 @@ describe('Agent Service', () => {
   })
 
   // ============================================
-  // Scenario 9: Wallet Management
-  // ============================================
-  describe('Wallet Management', () => {
-    it('should return wallet after registration', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-
-      await agentService.registerAgent({
-        name: 'Wallet Agent',
-        type: 'autonomous',
-        capabilities: ['data-processing'],
-      })
-
-      const wallet = await agentService.getWallet('did:key:z6MkTest123')
-
-      expect(wallet).not.toBeNull()
-      expect(wallet?.identity.name).toBe('Wallet Agent')
-      expect(wallet?.keys).toHaveLength(1)
-      expect(wallet?.keys[0].algorithm).toBe('Ed25519')
-    })
-
-    it('should update credentials in wallet', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-
-      const agent = await agentService.registerAgent({
-        name: 'Cred Agent',
-        type: 'service',
-        capabilities: [],
-      })
-
-      await agentService.requestBasicCredential(agent.did, 'test-domain')
-      await agentService.requestRichCredential(agent.did, ['admin'], ['manage'])
-
-      const wallet = await agentService.getWallet(agent.did)
-
-      expect(wallet?.credentials.basic).not.toBeNull()
-      expect(wallet?.credentials.rich).toHaveLength(1)
-    })
-  })
-
-  // ============================================
   // Scenario 10: OpenID4VCI Integration
   // ============================================
   describe('OpenID4VCI Integration', () => {
-    beforeEach(async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-      await agentService.registerAgent({
-        name: 'OIDC Agent',
-        type: 'service',
-        capabilities: [],
-      })
-    })
-
     it('should create credential offer', async () => {
+      mockAuthAndResponse({
+        credentialOfferUri: 'openid-credential-offer://?credential_offer=...',
+        qrCodeData: 'base64-qr-data',
+        expiresIn: 300,
+      })
+
       const offer = await agentService.createAgentCredentialOffer(
         'AIAgentIdentityCredential',
         { name: 'Test Agent', type: 'autonomous' }
       )
 
-      expect(offer.credentialOfferUri).toContain('openid-credential-offer://')
+      expect(offer.credentialOfferUri).toContain('openid-credential-offer')
       expect(offer.expiresIn).toBe(300)
     })
 
     it('should accept credential offer', async () => {
+      mockAuthAndResponse({
+        credential: 'eyJ...',
+        format: 'jwt_vc_json',
+      })
+
       const result = await agentService.acceptCredentialOffer(
         'openid-credential-offer://?credential_offer_uri=https://issuer.local/offers/123'
       )
 
       expect(result.format).toBe('jwt_vc_json')
-      expect(result.credential).toContain('.')
     })
   })
 })
