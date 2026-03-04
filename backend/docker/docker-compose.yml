@@ -1,0 +1,232 @@
+name: credo-identity
+
+services:
+  # PostgreSQL - Persistent storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-identity-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-aiagent}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiagent_password}
+      - POSTGRES_DB=${POSTGRES_DB:-ai_identity}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - ai-identity-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aiagent}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: ai-identity-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ai-identity-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  # Issuer Agent - Issues credentials to AI agents
+  issuer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ai-identity-issuer
+    environment:
+      - NODE_ENV=production
+      - AGENT_ROLE=issuer
+      - AGENT_NAME=IssuerAgent
+      - AGENT_PORT=3001
+      - AGENT_ENDPOINT=http://issuer:3001
+      - WALLET_ID=issuer-wallet
+      - WALLET_KEY=${WALLET_KEY:-issuer-secret-key}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-aiagent}:${POSTGRES_PASSWORD:-aiagent_password}@postgres:5432/${POSTGRES_DB:-ai_identity}
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3001:3001"
+    volumes:
+      - issuer-data:/app/data
+      - issuer-logs:/app/logs
+    networks:
+      - ai-identity-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Verifier Agent - Verifies AI agent credentials
+  verifier:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ai-identity-verifier
+    environment:
+      - NODE_ENV=production
+      - AGENT_ROLE=verifier
+      - AGENT_NAME=VerifierAgent
+      - AGENT_PORT=3002
+      - AGENT_ENDPOINT=http://verifier:3002
+      - WALLET_ID=verifier-wallet
+      - WALLET_KEY=${WALLET_KEY:-verifier-secret-key}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-aiagent}:${POSTGRES_PASSWORD:-aiagent_password}@postgres:5432/${POSTGRES_DB:-ai_identity}
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3002:3002"
+    volumes:
+      - verifier-data:/app/data
+      - verifier-logs:/app/logs
+    networks:
+      - ai-identity-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Holder Agent - AI agent that holds credentials
+  holder:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ai-identity-holder
+    environment:
+      - NODE_ENV=production
+      - AGENT_ROLE=holder
+      - AGENT_NAME=HolderAgent
+      - AGENT_PORT=3003
+      - AGENT_ENDPOINT=http://holder:3003
+      - WALLET_ID=holder-wallet
+      - WALLET_KEY=${WALLET_KEY:-holder-secret-key}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-aiagent}:${POSTGRES_PASSWORD:-aiagent_password}@postgres:5432/${POSTGRES_DB:-ai_identity}
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3003:3003"
+    volumes:
+      - holder-data:/app/data
+      - holder-logs:/app/logs
+    networks:
+      - ai-identity-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # API Gateway - REST API for external access
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ai-identity-api
+    environment:
+      - NODE_ENV=production
+      - AGENT_ROLE=api
+      - API_PORT=3000
+      - HTTPS_PORT=3443
+      - ISSUER_URL=http://issuer:3001
+      - VERIFIER_URL=http://verifier:3002
+      - HOLDER_URL=http://holder:3003
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-aiagent}:${POSTGRES_PASSWORD:-aiagent_password}@postgres:5432/${POSTGRES_DB:-ai_identity}
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      - API_KEY=${API_KEY:-dev-api-key-12345}
+      # TLS Configuration
+      - TLS_ENABLED=${TLS_ENABLED:-false}
+      - TLS_CERT_PATH=/app/certs/server.crt
+      - TLS_KEY_PATH=/app/certs/server.key
+      - TLS_CA_PATH=/app/certs/ca.crt
+      - TLS_MIN_VERSION=${TLS_MIN_VERSION:-TLSv1.2}
+      - TLS_REQUEST_CERT=${TLS_REQUEST_CERT:-false}
+      - TLS_REJECT_UNAUTHORIZED=${TLS_REJECT_UNAUTHORIZED:-true}
+      - MTLS_CLIENT_CERT_REQUIRED=${MTLS_CLIENT_CERT_REQUIRED:-false}
+    ports:
+      - "3000:3000"
+      - "3443:3443"
+    volumes:
+      - ./certs:/app/certs:ro
+    depends_on:
+      - issuer
+      - verifier
+      - holder
+      - postgres
+      - redis
+    networks:
+      - ai-identity-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Web Wallet - Frontend UI with Agent Control & Monitoring
+  web-wallet:
+    build:
+      context: ../../web-wallet
+      dockerfile: Dockerfile
+    container_name: ai-identity-web-wallet
+    ports:
+      - "5173:5173"
+    networks:
+      - ai-identity-network
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5173/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  ai-identity-network:
+    name: ai-agent-identity-network
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  issuer-data:
+  issuer-logs:
+  verifier-data:
+  verifier-logs:
+  holder-data:
+  holder-logs:

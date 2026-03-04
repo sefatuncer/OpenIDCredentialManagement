@@ -1,0 +1,432 @@
+# Cross-Domain Identity Federation: Hyperledger Fabric + OpenID4VC
+# Docker Compose Configuration
+
+version: '3.8'
+
+networks:
+  fabric-network:
+    name: fabric-network
+    driver: bridge
+  openid-network:
+    name: openid-network
+    driver: bridge
+  bridge-network:
+    name: bridge-network
+    driver: bridge
+
+volumes:
+  orderer.crossdomain.com:
+  peer0.finance.crossdomain.com:
+  peer0.healthcare.crossdomain.com:
+  peer0.education.crossdomain.com:
+  ca.finance.crossdomain.com:
+  ca.healthcare.crossdomain.com:
+  ca.education.crossdomain.com:
+
+services:
+  # ============================================================
+  # CERTIFICATE AUTHORITIES
+  # ============================================================
+
+  ca.finance.crossdomain.com:
+    image: hyperledger/fabric-ca:1.5.7
+    container_name: ca.finance.crossdomain.com
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-finance
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=7054
+      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:17054
+    ports:
+      - "7054:7054"
+      - "17054:17054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ca.finance.crossdomain.com:/etc/hyperledger/fabric-ca-server
+      - ./fabric-network/config/fabric-ca/finance:/etc/hyperledger/fabric-ca-server/msp
+    networks:
+      - fabric-network
+
+  ca.healthcare.crossdomain.com:
+    image: hyperledger/fabric-ca:1.5.7
+    container_name: ca.healthcare.crossdomain.com
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-healthcare
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=8054
+      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:18054
+    ports:
+      - "8054:8054"
+      - "18054:18054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ca.healthcare.crossdomain.com:/etc/hyperledger/fabric-ca-server
+      - ./fabric-network/config/fabric-ca/healthcare:/etc/hyperledger/fabric-ca-server/msp
+    networks:
+      - fabric-network
+
+  ca.education.crossdomain.com:
+    image: hyperledger/fabric-ca:1.5.7
+    container_name: ca.education.crossdomain.com
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-education
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=9054
+      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:19054
+    ports:
+      - "9054:9054"
+      - "19054:19054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ca.education.crossdomain.com:/etc/hyperledger/fabric-ca-server
+      - ./fabric-network/config/fabric-ca/education:/etc/hyperledger/fabric-ca-server/msp
+    networks:
+      - fabric-network
+
+  # ============================================================
+  # ORDERER
+  # ============================================================
+
+  orderer.crossdomain.com:
+    image: hyperledger/fabric-orderer:2.5.4
+    container_name: orderer.crossdomain.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
+      - ORDERER_OPERATIONS_LISTENADDRESS=orderer.crossdomain.com:9443
+      - ORDERER_METRICS_PROVIDER=prometheus
+    working_dir: /root
+    command: orderer
+    ports:
+      - "7050:7050"
+      - "7053:7053"
+      - "9443:9443"
+    volumes:
+      - ./fabric-network/config/genesis.block:/var/hyperledger/orderer/orderer.genesis.block
+      - ./fabric-network/config/crypto-config/ordererOrganizations/crossdomain.com/orderers/orderer.crossdomain.com/msp:/var/hyperledger/orderer/msp
+      - ./fabric-network/config/crypto-config/ordererOrganizations/crossdomain.com/orderers/orderer.crossdomain.com/tls:/var/hyperledger/orderer/tls
+      - orderer.crossdomain.com:/var/hyperledger/production/orderer
+    networks:
+      - fabric-network
+
+  # ============================================================
+  # PEER NODES
+  # ============================================================
+
+  # Finance Sector Peer
+  peer0.finance.crossdomain.com:
+    image: hyperledger/fabric-peer:2.5.4
+    container_name: peer0.finance.crossdomain.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.finance.crossdomain.com
+      - CORE_PEER_ADDRESS=peer0.finance.crossdomain.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.finance.crossdomain.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.finance.crossdomain.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.finance.crossdomain.com:7051
+      - CORE_PEER_LOCALMSPID=FinanceMSP
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_OPERATIONS_LISTENADDRESS=peer0.finance.crossdomain.com:9444
+      - CORE_METRICS_PROVIDER=prometheus
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric-network
+    working_dir: /root
+    command: peer node start
+    ports:
+      - "7051:7051"
+      - "9444:9444"
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./fabric-network/config/crypto-config/peerOrganizations/finance.crossdomain.com/peers/peer0.finance.crossdomain.com:/etc/hyperledger/fabric
+      - peer0.finance.crossdomain.com:/var/hyperledger/production
+    networks:
+      - fabric-network
+
+  # Healthcare Sector Peer
+  peer0.healthcare.crossdomain.com:
+    image: hyperledger/fabric-peer:2.5.4
+    container_name: peer0.healthcare.crossdomain.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.healthcare.crossdomain.com
+      - CORE_PEER_ADDRESS=peer0.healthcare.crossdomain.com:8051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:8051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.healthcare.crossdomain.com:8052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:8052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.healthcare.crossdomain.com:8051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.healthcare.crossdomain.com:8051
+      - CORE_PEER_LOCALMSPID=HealthcareMSP
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_OPERATIONS_LISTENADDRESS=peer0.healthcare.crossdomain.com:9445
+      - CORE_METRICS_PROVIDER=prometheus
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric-network
+    working_dir: /root
+    command: peer node start
+    ports:
+      - "8051:8051"
+      - "9445:9445"
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./fabric-network/config/crypto-config/peerOrganizations/healthcare.crossdomain.com/peers/peer0.healthcare.crossdomain.com:/etc/hyperledger/fabric
+      - peer0.healthcare.crossdomain.com:/var/hyperledger/production
+    networks:
+      - fabric-network
+
+  # Education Sector Peer
+  peer0.education.crossdomain.com:
+    image: hyperledger/fabric-peer:2.5.4
+    container_name: peer0.education.crossdomain.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.education.crossdomain.com
+      - CORE_PEER_ADDRESS=peer0.education.crossdomain.com:9051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.education.crossdomain.com:9052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.education.crossdomain.com:9051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.education.crossdomain.com:9051
+      - CORE_PEER_LOCALMSPID=EducationMSP
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_OPERATIONS_LISTENADDRESS=peer0.education.crossdomain.com:9446
+      - CORE_METRICS_PROVIDER=prometheus
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric-network
+    working_dir: /root
+    command: peer node start
+    ports:
+      - "9051:9051"
+      - "9446:9446"
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./fabric-network/config/crypto-config/peerOrganizations/education.crossdomain.com/peers/peer0.education.crossdomain.com:/etc/hyperledger/fabric
+      - peer0.education.crossdomain.com:/var/hyperledger/production
+    networks:
+      - fabric-network
+
+  # ============================================================
+  # COUCHDB FOR STATE DATABASE
+  # ============================================================
+
+  couchdb.finance:
+    image: couchdb:3.3.2
+    container_name: couchdb.finance
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - "5984:5984"
+    networks:
+      - fabric-network
+
+  couchdb.healthcare:
+    image: couchdb:3.3.2
+    container_name: couchdb.healthcare
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - "6984:5984"
+    networks:
+      - fabric-network
+
+  couchdb.education:
+    image: couchdb:3.3.2
+    container_name: couchdb.education
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - "7984:5984"
+    networks:
+      - fabric-network
+
+  # ============================================================
+  # OPENID4VC LAYER - CREDO AGENTS
+  # ============================================================
+
+  issuer-agent-finance:
+    build:
+      context: ./openid4vc-layer
+      dockerfile: Dockerfile.agent
+    container_name: issuer-agent-finance
+    environment:
+      - AGENT_TYPE=issuer
+      - AGENT_LABEL=Finance Issuer Agent
+      - AGENT_PORT=3001
+      - AGENT_ENDPOINT=http://issuer-agent-finance:3001
+      - WALLET_ID=finance-issuer-wallet
+      - WALLET_KEY=finance-issuer-key-secure
+      - FABRIC_PEER_ENDPOINT=peer0.finance.crossdomain.com:7051
+      - BRIDGE_SERVICE_URL=http://bridge-service:4000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - peer0.finance.crossdomain.com
+      - bridge-service
+    networks:
+      - openid-network
+      - bridge-network
+
+  issuer-agent-healthcare:
+    build:
+      context: ./openid4vc-layer
+      dockerfile: Dockerfile.agent
+    container_name: issuer-agent-healthcare
+    environment:
+      - AGENT_TYPE=issuer
+      - AGENT_LABEL=Healthcare Issuer Agent
+      - AGENT_PORT=3002
+      - AGENT_ENDPOINT=http://issuer-agent-healthcare:3002
+      - WALLET_ID=healthcare-issuer-wallet
+      - WALLET_KEY=healthcare-issuer-key-secure
+      - FABRIC_PEER_ENDPOINT=peer0.healthcare.crossdomain.com:8051
+      - BRIDGE_SERVICE_URL=http://bridge-service:4000
+    ports:
+      - "3002:3002"
+    depends_on:
+      - peer0.healthcare.crossdomain.com
+      - bridge-service
+    networks:
+      - openid-network
+      - bridge-network
+
+  issuer-agent-education:
+    build:
+      context: ./openid4vc-layer
+      dockerfile: Dockerfile.agent
+    container_name: issuer-agent-education
+    environment:
+      - AGENT_TYPE=issuer
+      - AGENT_LABEL=Education Issuer Agent
+      - AGENT_PORT=3003
+      - AGENT_ENDPOINT=http://issuer-agent-education:3003
+      - WALLET_ID=education-issuer-wallet
+      - WALLET_KEY=education-issuer-key-secure
+      - FABRIC_PEER_ENDPOINT=peer0.education.crossdomain.com:9051
+      - BRIDGE_SERVICE_URL=http://bridge-service:4000
+    ports:
+      - "3003:3003"
+    depends_on:
+      - peer0.education.crossdomain.com
+      - bridge-service
+    networks:
+      - openid-network
+      - bridge-network
+
+  holder-agent:
+    build:
+      context: ./openid4vc-layer
+      dockerfile: Dockerfile.agent
+    container_name: holder-agent
+    environment:
+      - AGENT_TYPE=holder
+      - AGENT_LABEL=Holder Wallet Agent
+      - AGENT_PORT=3004
+      - AGENT_ENDPOINT=http://holder-agent:3004
+      - WALLET_ID=holder-wallet
+      - WALLET_KEY=holder-wallet-key-secure
+      - BRIDGE_SERVICE_URL=http://bridge-service:4000
+    ports:
+      - "3004:3004"
+    depends_on:
+      - bridge-service
+    networks:
+      - openid-network
+      - bridge-network
+
+  verifier-agent:
+    build:
+      context: ./openid4vc-layer
+      dockerfile: Dockerfile.agent
+    container_name: verifier-agent
+    environment:
+      - AGENT_TYPE=verifier
+      - AGENT_LABEL=Cross-Domain Verifier Agent
+      - AGENT_PORT=3005
+      - AGENT_ENDPOINT=http://verifier-agent:3005
+      - WALLET_ID=verifier-wallet
+      - WALLET_KEY=verifier-wallet-key-secure
+      - BRIDGE_SERVICE_URL=http://bridge-service:4000
+    ports:
+      - "3005:3005"
+    depends_on:
+      - bridge-service
+    networks:
+      - openid-network
+      - bridge-network
+
+  # ============================================================
+  # BRIDGE SERVICE
+  # ============================================================
+
+  bridge-service:
+    build:
+      context: ./bridge-service
+      dockerfile: Dockerfile
+    container_name: bridge-service
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - FABRIC_GATEWAY_PEER=peer0.finance.crossdomain.com:7051
+      - FABRIC_CHANNEL_NAME=crossdomain-channel
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "4000:4000"
+    depends_on:
+      - redis
+      - peer0.finance.crossdomain.com
+      - peer0.healthcare.crossdomain.com
+      - peer0.education.crossdomain.com
+    networks:
+      - fabric-network
+      - openid-network
+      - bridge-network
+
+  # ============================================================
+  # SUPPORTING SERVICES
+  # ============================================================
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - bridge-network
+

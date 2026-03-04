@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credential System Admin Dashboard</title>
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1>Credential System Dashboard</h1>
+            <div class="api-key-section">
+                <label for="api-key">API Key:</label>
+                <input type="password" id="api-key" placeholder="Enter API key for audit logs">
+                <button id="save-api-key" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <!-- System Health Section -->
+        <section class="card health-card">
+            <div class="card-header">
+                <h2>System Health</h2>
+                <button id="refresh-health" class="btn btn-small">Refresh</button>
+            </div>
+            <div class="card-body">
+                <div id="health-status" class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Loading...</span>
+                </div>
+                <div id="health-details" class="health-details">
+                    <div class="health-item">
+                        <span class="label">Uptime:</span>
+                        <span id="uptime" class="value">--</span>
+                    </div>
+                    <div class="health-item">
+                        <span class="label">Last Checked:</span>
+                        <span id="last-checked" class="value">--</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Agent Status Section -->
+        <section class="card agent-card">
+            <div class="card-header">
+                <h2>Agent Status</h2>
+                <button id="refresh-agents" class="btn btn-small">Refresh</button>
+            </div>
+            <div class="card-body">
+                <div id="agent-list" class="agent-list">
+                    <p class="loading-text">Loading agent status...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Credentials Section -->
+        <section class="card credentials-card">
+            <div class="card-header">
+                <h2>Credential Configurations</h2>
+                <button id="refresh-credentials" class="btn btn-small">Refresh</button>
+            </div>
+            <div class="card-body">
+                <div id="credentials-list" class="credentials-list">
+                    <p class="loading-text">Loading credential configurations...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Audit Logs Section -->
+        <section class="card audit-card full-width">
+            <div class="card-header">
+                <h2>Recent Audit Logs</h2>
+                <div class="audit-controls">
+                    <select id="audit-filter">
+                        <option value="">All Events</option>
+                        <option value="credential.issued">Credential Issued</option>
+                        <option value="credential.verified">Credential Verified</option>
+                        <option value="credential.revoked">Credential Revoked</option>
+                        <option value="auth.login">Auth Login</option>
+                        <option value="auth.failed">Auth Failed</option>
+                    </select>
+                    <button id="refresh-audit" class="btn btn-small">Refresh</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="audit-logs" class="audit-logs">
+                    <p class="loading-text">Enter API key to view audit logs...</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>Credential System Admin Dashboard - Version 1.0.0</p>
+    </footer>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

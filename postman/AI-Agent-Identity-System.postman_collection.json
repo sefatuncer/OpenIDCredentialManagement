@@ -1,0 +1,1757 @@
+{
+	"info": {
+		"_postman_id": "ai-agent-identity-system-v1",
+		"name": "AI Agent Identity System - Complete E2E Test Suite",
+		"description": "Comprehensive Postman collection for testing the AI Agent Identity System.\n\n## Version: 2.0 (Phase 2)\n\n## Phase 2 Updates:\n- Storage Adapter Pattern (PostgreSQL/Redis/In-Memory)\n- Detailed Health Endpoint with storage/features info\n- Trust Registry Stats with storageType\n- Revocation Stats endpoint\n- Audit Stats endpoint\n- API Key authentication support\n\n## Test Flow Order:\n1. Health & Setup ✅\n2. Authentication ✅\n3. Issuer Operations ✅\n4. Holder Operations ✅\n5. Verifier Operations ✅\n6. Trust Registry ✅\n7. Revocation ✅\n8. Audit Logs ✅\n9. Backup & Restore ✅\n10. SD-JWT ✅\n11. Metrics ✅\n\n## E2E Flow Test:\nAuth → Offer → Token → Credential → VP → Verified ✅\n\n## Authentication Methods:\n- Bearer Token: `Authorization: Bearer {{auth_token}}`\n- API Key: `X-API-Key: {{api_key}}`\n\n## Environment Variables:\n- `base_url`: API base URL (default: http://localhost:3000)\n- `api_key`: API Key for authentication\n- `auth_token`: JWT token (auto-set after login)\n- `pre_auth_code`: Pre-authorized code (auto-set)\n- `vci_access_token`: VCI access token (auto-set)\n- `credential_jwt`: Issued credential (auto-set)\n- `session_id`: Verification session ID (auto-set)\n- `vp_state`: Verification state (auto-set)\n- `vp_nonce`: Verification nonce (auto-set)\n- `sdjwt_credential`: SD-JWT credential (auto-set)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Health & Setup",
+			"item": [
+				{
+					"name": "1.1 Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('System is healthy', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql('healthy');",
+									"});",
+									"",
+									"console.log('System is healthy, ready for testing');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": ["{{base_url}}"],
+							"path": ["health"]
+						},
+						"description": "Check if the system is healthy and ready for testing."
+					},
+					"response": []
+				},
+				{
+					"name": "1.2 Get Issuer Metadata",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has credential_issuer', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('credential_issuer');",
+									"});",
+									"",
+									"pm.test('Has credential_configurations_supported', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('credential_configurations_supported');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/.well-known/openid-credential-issuer",
+							"host": ["{{base_url}}"],
+							"path": [".well-known", "openid-credential-issuer"]
+						},
+						"description": "Get OpenID4VCI Issuer Metadata"
+					},
+					"response": []
+				},
+				{
+					"name": "1.3 Detailed Health Check (Phase 2)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('System is healthy', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql('healthy');",
+									"});",
+									"",
+									"pm.test('Has storage info (Phase 2)', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('storage');",
+									"    pm.expect(jsonData.storage).to.have.property('primary');",
+									"    pm.expect(jsonData.storage).to.have.property('databaseConnected');",
+									"});",
+									"",
+									"pm.test('Has feature flags (Phase 2)', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('features');",
+									"    pm.expect(jsonData.features).to.have.property('enabled');",
+									"});",
+									"",
+									"pm.test('Has event bus info (Phase 2)', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('events');",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"console.log('Storage Type:', jsonData.storage.primary);",
+									"console.log('Database Connected:', jsonData.storage.databaseConnected);",
+									"console.log('Features Enabled:', jsonData.features.enabled);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health/detailed",
+							"host": ["{{base_url}}"],
+							"path": ["health", "detailed"]
+						},
+						"description": "Get detailed health information including storage, features, and events (Phase 2)"
+					},
+					"response": []
+				},
+				{
+					"name": "1.4 Get OAuth Server Metadata",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has token_endpoint', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('token_endpoint');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/.well-known/oauth-authorization-server",
+							"host": ["{{base_url}}"],
+							"path": [".well-known", "oauth-authorization-server"]
+						},
+						"description": "Get OAuth Authorization Server Metadata"
+					},
+					"response": []
+				}
+			],
+			"description": "Initial health checks and metadata discovery"
+		},
+		{
+			"name": "2. Authentication",
+			"item": [
+				{
+					"name": "2.1 Get Auth Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has access_token', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('access_token');",
+									"});",
+									"",
+									"// Save token for subsequent requests",
+									"var jsonData = pm.response.json();",
+									"pm.environment.set('auth_token', jsonData.access_token);",
+									"console.log('Auth token saved to environment');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"clientId\": \"demo-client\",\n    \"clientSecret\": \"demo-secret-12345\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/token",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "auth", "token"]
+						},
+						"description": "Get JWT auth token using client credentials"
+					},
+					"response": []
+				},
+				{
+					"name": "2.2 Introspect Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Token is active', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.active).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"token\": \"{{auth_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/auth/introspect",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "auth", "introspect"]
+						},
+						"description": "Verify that the auth token is valid"
+					},
+					"response": []
+				}
+			],
+			"description": "Authentication and token management"
+		},
+		{
+			"name": "3. Issuer Operations",
+			"item": [
+				{
+					"name": "3.1 Get Issuer DID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has DID', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('did');",
+									"    pm.expect(jsonData.did).to.include('did:key:');",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.environment.set('issuer_did', jsonData.did);",
+									"console.log('Issuer DID:', jsonData.did);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/issuer/did",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "issuer", "did"]
+						},
+						"description": "Get the Issuer's DID"
+					},
+					"response": []
+				},
+				{
+					"name": "3.2 Create Credential Offer - Agent Identity",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has offerId', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('offerId');",
+									"});",
+									"",
+									"pm.test('Has pre-authorized_code', function () {",
+									"    var jsonData = pm.response.json();",
+									"    var preAuthCode = jsonData.credentialOffer.grants['urn:ietf:params:oauth:grant-type:pre-authorized_code']['pre-authorized_code'];",
+									"    pm.expect(preAuthCode).to.be.a('string');",
+									"});",
+									"",
+									"// Save values for next steps",
+									"var jsonData = pm.response.json();",
+									"pm.environment.set('offer_id', jsonData.offerId);",
+									"pm.environment.set('pre_auth_code', jsonData.credentialOffer.grants['urn:ietf:params:oauth:grant-type:pre-authorized_code']['pre-authorized_code']);",
+									"pm.environment.set('credential_offer_uri', jsonData.credentialOfferUri);",
+									"",
+									"console.log('Offer ID:', jsonData.offerId);",
+									"console.log('Pre-auth code saved');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"credentialTypes\": [\"AIAgentIdentityCredential\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vci/credential-offer",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vci", "credential-offer"]
+						},
+						"description": "Create a credential offer for AI Agent Identity"
+					},
+					"response": []
+				},
+				{
+					"name": "3.3 Create Credential Offer - Delegation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has offerId', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('offerId');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"credentialTypes\": [\"DelegationCredential\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vci/credential-offer",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vci", "credential-offer"]
+						},
+						"description": "Create a credential offer for Delegation"
+					},
+					"response": []
+				},
+				{
+					"name": "3.4 Create Credential Offer - Capability",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has offerId', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('offerId');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"credentialTypes\": [\"CapabilityCredential\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vci/credential-offer",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vci", "credential-offer"]
+						},
+						"description": "Create a credential offer for Capability"
+					},
+					"response": []
+				},
+				{
+					"name": "3.5 List Credential Offers",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has offers array', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('offers');",
+									"    pm.expect(jsonData.offers).to.be.an('array');",
+									"});",
+									"",
+									"console.log('Total offers:', pm.response.json().offers.length);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vci/credential-offers",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vci", "credential-offers"]
+						},
+						"description": "List all credential offers"
+					},
+					"response": []
+				},
+				{
+					"name": "3.6 Get Credential Offer by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has offer with credential_issuer', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('offer');",
+									"    pm.expect(jsonData.offer).to.have.property('credential_issuer');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vci/credential-offer/{{offer_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vci", "credential-offer", "{{offer_id}}"]
+						},
+						"description": "Get a specific credential offer by ID"
+					},
+					"response": []
+				}
+			],
+			"description": "Issuer operations - creating and managing credential offers"
+		},
+		{
+			"name": "4. Holder Operations (Token & Credential)",
+			"item": [
+				{
+					"name": "4.1 Exchange Pre-Auth Code for Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has access_token', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('access_token');",
+									"});",
+									"",
+									"pm.test('Has c_nonce', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('c_nonce');",
+									"});",
+									"",
+									"// Save values for next step",
+									"var jsonData = pm.response.json();",
+									"pm.environment.set('vci_access_token', jsonData.access_token);",
+									"pm.environment.set('c_nonce', jsonData.c_nonce);",
+									"",
+									"console.log('VCI Access token saved');",
+									"console.log('c_nonce:', jsonData.c_nonce);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "grant_type",
+									"value": "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+									"type": "text"
+								},
+								{
+									"key": "pre-authorized_code",
+									"value": "{{pre_auth_code}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/token",
+							"host": ["{{base_url}}"],
+							"path": ["token"]
+						},
+						"description": "Exchange pre-authorized code for access token (OpenID4VCI)"
+					},
+					"response": []
+				},
+				{
+					"name": "4.2 Claim Credential (Agent Identity)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has credential', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('credential');",
+									"});",
+									"",
+									"pm.test('Format is jwt_vc_json', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.format).to.eql('jwt_vc_json');",
+									"});",
+									"",
+									"pm.test('Credential is valid JWT', function () {",
+									"    var jsonData = pm.response.json();",
+									"    var parts = jsonData.credential.split('.');",
+									"    pm.expect(parts.length).to.eql(3);",
+									"});",
+									"",
+									"// Save credential for verification",
+									"var jsonData = pm.response.json();",
+									"pm.environment.set('credential_jwt', jsonData.credential);",
+									"",
+									"// Decode and log credential content",
+									"try {",
+									"    var payload = JSON.parse(atob(jsonData.credential.split('.')[1]));",
+									"    console.log('Credential Subject:', JSON.stringify(payload.vc.credentialSubject, null, 2));",
+									"    pm.environment.set('holder_did', payload.sub);",
+									"} catch (e) {",
+									"    console.log('Could not decode credential');",
+									"}",
+									"",
+									"console.log('Credential JWT saved');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{vci_access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"format\": \"jwt_vc_json\",\n    \"credential_definition\": {\n        \"type\": [\"VerifiableCredential\", \"AIAgentIdentityCredential\"]\n    },\n    \"proof\": {\n        \"proof_type\": \"jwt\",\n        \"jwt\": \"eyJhbGciOiJFUzI1NiIsInR5cCI6Im9wZW5pZDR2Y2ktcHJvb2Yrand0In0.eyJpc3MiOiJkaWQ6a2V5OndhbGxldCIsImF1ZCI6Imh0dHA6Ly9sb2NhbGhvc3Q6MzAwMCIsImlhdCI6MTcwOTAwMDAwMCwibm9uY2UiOiJ0ZXN0In0.test\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/credential",
+							"host": ["{{base_url}}"],
+							"path": ["credential"]
+						},
+						"description": "Claim the credential using the access token (OpenID4VCI)"
+					},
+					"response": []
+				}
+			],
+			"description": "Holder operations - exchanging tokens and claiming credentials"
+		},
+		{
+			"name": "5. Verifier Operations",
+			"item": [
+				{
+					"name": "5.1 Get Presentation Definitions",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has definitions', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('definitions');",
+									"});",
+									"",
+									"console.log('Available definitions:', Object.keys(pm.response.json().definitions));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vp/presentation-definitions",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vp", "presentation-definitions"]
+						},
+						"description": "Get available presentation definitions"
+					},
+					"response": []
+				},
+				{
+					"name": "5.2 Get Agent Identity Definition",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has input_descriptors', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('input_descriptors');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vp/presentation-definitions/agent-identity",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vp", "presentation-definitions", "agent-identity"]
+						},
+						"description": "Get the agent-identity presentation definition"
+					},
+					"response": []
+				},
+				{
+					"name": "5.3 Create Authorization Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has sessionId', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('sessionId');",
+									"});",
+									"",
+									"pm.test('Has authorizationRequest', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('authorizationRequest');",
+									"});",
+									"",
+									"pm.test('Has nonce', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.authorizationRequest).to.have.property('nonce');",
+									"});",
+									"",
+									"pm.test('Has state', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.authorizationRequest).to.have.property('state');",
+									"});",
+									"",
+									"// Save values for VP submission",
+									"var jsonData = pm.response.json();",
+									"pm.environment.set('session_id', jsonData.sessionId);",
+									"pm.environment.set('vp_state', jsonData.authorizationRequest.state);",
+									"pm.environment.set('vp_nonce', jsonData.authorizationRequest.nonce);",
+									"pm.environment.set('client_id', jsonData.authorizationRequest.client_id);",
+									"",
+									"console.log('Session ID:', jsonData.sessionId);",
+									"console.log('State:', jsonData.authorizationRequest.state);",
+									"console.log('Nonce:', jsonData.authorizationRequest.nonce);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"presentationDefinitionId\": \"agent-identity\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vp/authorization-request",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vp", "authorization-request"]
+						},
+						"description": "Create an authorization request for credential verification"
+					},
+					"response": []
+				},
+				{
+					"name": "5.4 Submit VP (Direct Post)",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Create VP token with nonce",
+									"var credentialJwt = pm.environment.get('credential_jwt');",
+									"var nonce = pm.environment.get('vp_nonce');",
+									"var clientId = pm.environment.get('client_id');",
+									"",
+									"// Create VP payload",
+									"var header = {",
+									"    alg: 'none',",
+									"    typ: 'JWT'",
+									"};",
+									"",
+									"var payload = {",
+									"    iss: 'did:key:wallet',",
+									"    aud: clientId,",
+									"    nonce: nonce,",
+									"    iat: Math.floor(Date.now() / 1000),",
+									"    exp: Math.floor(Date.now() / 1000) + 300,",
+									"    vp: {",
+									"        '@context': ['https://www.w3.org/2018/credentials/v1'],",
+									"        type: ['VerifiablePresentation'],",
+									"        holder: 'did:key:wallet',",
+									"        verifiableCredential: [credentialJwt]",
+									"    }",
+									"};",
+									"",
+									"// Base64url encode",
+									"function base64url(obj) {",
+									"    return btoa(JSON.stringify(obj))",
+									"        .replace(/\\+/g, '-')",
+									"        .replace(/\\//g, '_')",
+									"        .replace(/=+$/, '');",
+									"}",
+									"",
+									"var vpToken = base64url(header) + '.' + base64url(payload) + '.';",
+									"pm.environment.set('vp_token', vpToken);",
+									"",
+									"console.log('VP Token created with nonce:', nonce);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Status is received', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql('received');",
+									"});",
+									"",
+									"console.log('VP submitted successfully');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "vp_token",
+									"value": "{{vp_token}}",
+									"type": "text"
+								},
+								{
+									"key": "state",
+									"value": "{{vp_state}}",
+									"type": "text"
+								},
+								{
+									"key": "presentation_submission",
+									"value": "{\"id\":\"submission-1\",\"definition_id\":\"agent-identity-verification\",\"descriptor_map\":[{\"id\":\"agent_identity_credential\",\"format\":\"jwt_vp\",\"path\":\"$.vp.verifiableCredential[0]\"}]}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/direct_post",
+							"host": ["{{base_url}}"],
+							"path": ["direct_post"]
+						},
+						"description": "Submit Verifiable Presentation to direct_post endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "5.5 Get Verification Session Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has sessionId', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('sessionId');",
+									"});",
+									"",
+									"pm.test('Status is verified', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql('verified');",
+									"});",
+									"",
+									"console.log('Session status:', pm.response.json().status);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vp/sessions/{{session_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vp", "sessions", "{{session_id}}"]
+						},
+						"description": "Get the status of a verification session"
+					},
+					"response": []
+				},
+				{
+					"name": "5.6 Get Verification Result",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Verified is true', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.verified).to.eql(true);",
+									"});",
+									"",
+									"console.log('Verification result:', pm.response.json().verified);",
+									"if (pm.response.json().warnings) {",
+									"    console.log('Warnings:', pm.response.json().warnings);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vp/sessions/{{session_id}}/result",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vp", "sessions", "{{session_id}}", "result"]
+						},
+						"description": "Get the verification result for a session"
+					},
+					"response": []
+				},
+				{
+					"name": "5.7 List All Sessions",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has sessions array', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('sessions');",
+									"});",
+									"",
+									"console.log('Total sessions:', pm.response.json().sessions.length);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/openid4vp/sessions",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "openid4vp", "sessions"]
+						},
+						"description": "List all verification sessions"
+					},
+					"response": []
+				}
+			],
+			"description": "Verifier operations - creating verification requests and validating presentations"
+		},
+		{
+			"name": "6. Trust Registry",
+			"item": [
+				{
+					"name": "6.1 List Trusted Entities",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has entities array', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('entities');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/trust/entities",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "trust", "entities"]
+						},
+						"description": "List all trusted entities in the registry"
+					},
+					"response": []
+				},
+				{
+					"name": "6.2 Add Trusted Entity",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 or 201', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+									"});",
+									"",
+									"pm.test('Entity created successfully', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success');",
+									"    pm.expect(jsonData).to.have.property('entity');",
+									"    pm.expect(jsonData.entity).to.have.property('did');",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.entity && jsonData.entity.did) {",
+									"    pm.environment.set('trust_entity_did', jsonData.entity.did);",
+									"    console.log('Entity DID:', jsonData.entity.did);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"did\": \"{{issuer_did}}\",\n    \"name\": \"Test Trusted Issuer\",\n    \"type\": \"issuer\",\n    \"trustLevel\": \"high\",\n    \"credentialTypes\": [\"AIAgentIdentityCredential\", \"DelegationCredential\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/trust/entities",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "trust", "entities"]
+						},
+						"description": "Add a new trusted entity to the registry"
+					},
+					"response": []
+				},
+				{
+					"name": "6.3 Get Trust Registry Stats (Phase 2)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has storageType (Phase 2)', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('storageType');",
+									"});",
+									"",
+									"pm.test('Has entity counts', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('totalEntities');",
+									"    pm.expect(jsonData).to.have.property('trustedIssuers');",
+									"    pm.expect(jsonData).to.have.property('trustedVerifiers');",
+									"});",
+									"",
+									"console.log('Storage Type:', pm.response.json().storageType);",
+									"console.log('Total Entities:', pm.response.json().totalEntities);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/trust/stats",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "trust", "stats"]
+						},
+						"description": "Get trust registry statistics including storage type (Phase 2)"
+					},
+					"response": []
+				},
+				{
+					"name": "6.4 Check Entity Trust Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has trusted property', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('trusted');",
+									"});",
+									"",
+									"pm.test('Entity is trusted', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.trusted).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/trust/check/{{issuer_did}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "trust", "check", "{{issuer_did}}"]
+						},
+						"description": "Check if a DID is trusted"
+					},
+					"response": []
+				}
+			],
+			"description": "Trust Registry operations - managing trusted issuers and verifiers"
+		},
+		{
+			"name": "7. Revocation",
+			"item": [
+				{
+					"name": "7.1 Get Status List",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/revocation/status-list",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "revocation", "status-list"]
+						},
+						"description": "Get the credential status list"
+					},
+					"response": []
+				},
+				{
+					"name": "7.2 Revoke Credential",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 or 404', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"credentialId\": \"test-credential-id\",\n    \"reason\": \"Testing revocation\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/revocation/revoke",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "revocation", "revoke"]
+						},
+						"description": "Revoke a credential"
+					},
+					"response": []
+				},
+				{
+					"name": "7.3 Get Revocation Stats (Phase 2)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has stats', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('totalLists');",
+									"    pm.expect(jsonData).to.have.property('totalCredentials');",
+									"});",
+									"",
+									"console.log('Stats:', JSON.stringify(pm.response.json(), null, 2));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/revocation/stats",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "revocation", "stats"]
+						},
+						"description": "Get revocation statistics (Phase 2)"
+					},
+					"response": []
+				},
+				{
+					"name": "7.4 Check Revocation Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 or 404', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/revocation/status/test-credential-id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "revocation", "status", "test-credential-id"]
+						},
+						"description": "Check if a credential is revoked"
+					},
+					"response": []
+				}
+			],
+			"description": "Credential revocation operations"
+		},
+		{
+			"name": "8. Audit Logs",
+			"item": [
+				{
+					"name": "8.1 Get Audit Logs",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has logs array', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('logs');",
+									"});",
+									"",
+									"console.log('Total logs:', pm.response.json().logs.length);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/audit/logs",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "audit", "logs"]
+						},
+						"description": "Get all audit logs"
+					},
+					"response": []
+				},
+				{
+					"name": "8.2 Get Audit Stats (Phase 2)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has stats', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('totalLogs');",
+									"    pm.expect(jsonData).to.have.property('byEventType');",
+									"});",
+									"",
+									"console.log('Total logs:', pm.response.json().totalLogs);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/audit/stats",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "audit", "stats"]
+						},
+						"description": "Get audit statistics (Phase 2)"
+					},
+					"response": []
+				},
+				{
+					"name": "8.3 Get Audit Logs (Filtered)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/audit/logs?eventType=credential.issued&limit=10",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "audit", "logs"],
+							"query": [
+								{
+									"key": "eventType",
+									"value": "credential.issued"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get audit logs filtered by event type"
+					},
+					"response": []
+				}
+			],
+			"description": "Audit log retrieval and filtering"
+		},
+		{
+			"name": "9. Backup & Restore",
+			"item": [
+				{
+					"name": "9.1 Create Backup",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 or 201', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+									"});",
+									"",
+									"if (pm.response.code === 200 || pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.backupId) {",
+									"        pm.environment.set('backup_id', jsonData.backupId);",
+									"        console.log('Backup ID:', jsonData.backupId);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/backup/create",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "backup", "create"]
+						},
+						"description": "Create a backup of system data"
+					},
+					"response": []
+				},
+				{
+					"name": "9.2 List Backups",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/backup/list",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "backup", "list"]
+						},
+						"description": "List all available backups"
+					},
+					"response": []
+				}
+			],
+			"description": "Backup and restore operations"
+		},
+		{
+			"name": "10. SD-JWT",
+			"item": [
+				{
+					"name": "10.1 Issue SD-JWT Credential",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Has jwt', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('jwt');",
+									"});",
+									"",
+									"pm.test('Has combined SD-JWT', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('combined');",
+									"});",
+									"",
+									"pm.test('Has disclosures', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('disclosures');",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.environment.set('sdjwt_credential', jsonData.combined);",
+									"console.log('SD-JWT issued');",
+									"console.log('Disclosures:', jsonData.disclosures.length);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"subjectDid\": \"did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK\",\n    \"claims\": {\n        \"agent_name\": \"Test Agent\",\n        \"agent_type\": \"autonomous\",\n        \"capabilities\": [\"read\", \"write\", \"execute\"],\n        \"trust_level\": \"high\"\n    },\n    \"selectiveDisclosureClaims\": [\"capabilities\", \"trust_level\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/sdjwt/issue",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "sdjwt", "issue"]
+						},
+						"description": "Issue an SD-JWT credential with selective disclosure"
+					},
+					"response": []
+				},
+				{
+					"name": "10.2 Verify SD-JWT",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200 or 400', function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"presentation\": \"{{sdjwt_credential}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/sdjwt/verify",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "sdjwt", "verify"]
+						},
+						"description": "Verify an SD-JWT credential"
+					},
+					"response": []
+				}
+			],
+			"description": "SD-JWT (Selective Disclosure) operations"
+		},
+		{
+			"name": "11. Metrics",
+			"item": [
+				{
+					"name": "11.1 Get Prometheus Metrics",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Contains http_requests_total', function () {",
+									"    pm.expect(pm.response.text()).to.include('http_requests_total');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/metrics",
+							"host": ["{{base_url}}"],
+							"path": ["metrics"]
+						},
+						"description": "Get Prometheus-format metrics"
+					},
+					"response": []
+				}
+			],
+			"description": "System metrics and monitoring"
+		}
+	]
+}

@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ai-identity-sa
+  namespace: ai-identity
+  labels:
+    app.kubernetes.io/name: ai-identity
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ai-identity-role
+  namespace: ai-identity
+  labels:
+    app.kubernetes.io/name: ai-identity
+rules:
+  # Allow reading ConfigMaps and Secrets
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  # Allow reading pods for health checks
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ai-identity-rolebinding
+  namespace: ai-identity
+  labels:
+    app.kubernetes.io/name: ai-identity
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ai-identity-role
+subjects:
+  - kind: ServiceAccount
+    name: ai-identity-sa
+    namespace: ai-identity

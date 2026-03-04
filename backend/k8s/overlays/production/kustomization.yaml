@@ -1,0 +1,104 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: ai-identity-production
+
+namespace: ai-identity-prod
+
+resources:
+  - ../../base
+
+namePrefix: prod-
+
+commonLabels:
+  environment: production
+
+commonAnnotations:
+  prometheus.io/scrape: "true"
+
+# Production-specific patches
+patches:
+  # Increase replicas for production
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+    target:
+      kind: Deployment
+      name: api-gateway
+
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: issuer|verifier|holder
+
+  # Production resource limits
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "200m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "512Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1000m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "1Gi"
+    target:
+      kind: Deployment
+      name: api-gateway
+
+  # Production HPA settings
+  - patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20
+    target:
+      kind: HorizontalPodAutoscaler
+      name: api-gateway-hpa
+
+  # Production PDB
+  - patch: |-
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+    target:
+      kind: PodDisruptionBudget
+      name: api-gateway-pdb
+
+  # Enable TLS in production
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: TLS_ENABLED
+          value: "true"
+    target:
+      kind: Deployment
+      name: api-gateway
+
+configMapGenerator:
+  - name: ai-identity-config
+    behavior: merge
+    literals:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - TLS_ENABLED=true
+      - RATE_LIMIT_MAX_REQUESTS=1000
+
+# In production, use external secret management
+# secretGenerator is commented out - use Vault, AWS Secrets Manager, etc.
+# secretGenerator:
+#   - name: ai-identity-secrets
+#     behavior: merge
+#     literals:
+#       - JWT_SECRET=use-external-secret-management

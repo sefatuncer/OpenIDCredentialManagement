@@ -1,0 +1,47 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ssi-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - API_PORT=3000
+      - API_BASE_URL=http://localhost:3000
+    volumes:
+      - ./backend/data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  web-wallet:
+    build:
+      context: ./web-wallet
+      dockerfile: Dockerfile
+    container_name: ssi-web-wallet
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  issuer-verifier-dashboard:
+    build:
+      context: ./frontend-issuer-verifier
+      dockerfile: Dockerfile
+    container_name: ssi-issuer-verifier
+    ports:
+      - "5174:5174"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  default:
+    name: ssi-network

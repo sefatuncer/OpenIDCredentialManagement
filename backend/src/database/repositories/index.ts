@@ -1,0 +1,5 @@
+export * from './base.repository'
+export * from './credentialOffer.repository'
+export * from './auditLog.repository'
+export * from './trustedEntity.repository'
+export * from './clientCredentials.repository'

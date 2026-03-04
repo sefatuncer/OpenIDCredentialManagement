@@ -1,0 +1,7 @@
+export * from './revocation.service'
+export * from './trustRegistry.service'
+export * from './audit.service'
+export * from './metrics.service'
+export * from './openid4vci.service'
+export * from './openid4vp.service'
+export * from './didResolver.service'

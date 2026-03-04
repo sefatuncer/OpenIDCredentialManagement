@@ -1,0 +1,5 @@
+export * from './server'
+export * from './routes/health.routes'
+export * from './routes/issuer.routes'
+export * from './routes/verifier.routes'
+export * from './routes/holder.routes'

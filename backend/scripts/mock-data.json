@@ -1,0 +1,147 @@
+{
+  "description": "AI Agent Identity System - Test Mock Data",
+  "apiUrl": "http://localhost:3000",
+  "apiKey": "dev-api-key-12345",
+
+  "testAgents": [
+    {
+      "name": "ChatBot-Alpha",
+      "agentType": "autonomous",
+      "capabilities": ["text-generation", "conversation", "sentiment-analysis"],
+      "trustLevel": "standard",
+      "description": "Customer service chatbot"
+    },
+    {
+      "name": "CodeAssistant-Beta",
+      "agentType": "semi-autonomous",
+      "capabilities": ["code-analysis", "code-generation", "debugging", "refactoring"],
+      "trustLevel": "elevated",
+      "description": "Development assistant for code review"
+    },
+    {
+      "name": "DataAnalyzer-Gamma",
+      "agentType": "supervised",
+      "capabilities": ["data-processing", "visualization", "reporting", "ml-inference"],
+      "trustLevel": "high",
+      "description": "Data analysis and reporting agent"
+    },
+    {
+      "name": "TaskRunner-Delta",
+      "agentType": "tool",
+      "capabilities": ["file-management", "scheduling", "notifications"],
+      "trustLevel": "basic",
+      "description": "Simple task automation tool"
+    }
+  ],
+
+  "testCredentialOffers": {
+    "aiAgentIdentity": {
+      "endpoint": "POST /credential-offer",
+      "body": {
+        "credentialTypes": ["AIAgentIdentityCredential"],
+        "userPinRequired": false,
+        "expiresInSeconds": 300
+      }
+    },
+    "delegation": {
+      "endpoint": "POST /credential-offer",
+      "body": {
+        "credentialTypes": ["DelegationCredential"],
+        "userPinRequired": false,
+        "expiresInSeconds": 600
+      }
+    },
+    "capability": {
+      "endpoint": "POST /credential-offer",
+      "body": {
+        "credentialTypes": ["CapabilityCredential"],
+        "userPinRequired": true,
+        "expiresInSeconds": 300
+      }
+    }
+  },
+
+  "testVerificationRequests": {
+    "agentIdentity": {
+      "endpoint": "POST /api/v1/openid4vp/authorization-request",
+      "body": {
+        "presentationDefinitionId": "agent-identity",
+        "expiresInSeconds": 300
+      }
+    },
+    "delegation": {
+      "endpoint": "POST /api/v1/openid4vp/authorization-request",
+      "body": {
+        "presentationDefinitionId": "delegation",
+        "expiresInSeconds": 300
+      }
+    },
+    "capability": {
+      "endpoint": "POST /api/v1/openid4vp/authorization-request",
+      "body": {
+        "presentationDefinitionId": "capability",
+        "expiresInSeconds": 300
+      }
+    },
+    "combined": {
+      "endpoint": "POST /api/v1/openid4vp/authorization-request",
+      "body": {
+        "presentationDefinitionId": "combined",
+        "expiresInSeconds": 600
+      }
+    }
+  },
+
+  "curlCommands": {
+    "healthCheck": "curl -s http://localhost:3000/health",
+    "getIssuerDid": "curl -s -H \"x-api-key: dev-api-key-12345\" http://localhost:3000/api/v1/issuer/did",
+    "getMetadata": "curl -s http://localhost:3000/.well-known/openid-credential-issuer",
+    "createAgentCredentialOffer": "curl -s -X POST -H \"Content-Type: application/json\" -H \"x-api-key: dev-api-key-12345\" -d '{\"credentialTypes\":[\"AIAgentIdentityCredential\"]}' http://localhost:3000/credential-offer",
+    "createDelegationOffer": "curl -s -X POST -H \"Content-Type: application/json\" -H \"x-api-key: dev-api-key-12345\" -d '{\"credentialTypes\":[\"DelegationCredential\"]}' http://localhost:3000/credential-offer",
+    "createCapabilityOffer": "curl -s -X POST -H \"Content-Type: application/json\" -H \"x-api-key: dev-api-key-12345\" -d '{\"credentialTypes\":[\"CapabilityCredential\"]}' http://localhost:3000/credential-offer",
+    "listOffers": "curl -s -H \"x-api-key: dev-api-key-12345\" http://localhost:3000/credential-offers",
+    "createVerificationRequest": "curl -s -X POST -H \"Content-Type: application/json\" -H \"x-api-key: dev-api-key-12345\" -d '{\"presentationDefinitionId\":\"agent-identity\"}' http://localhost:3000/api/v1/openid4vp/authorization-request",
+    "listPresentationDefinitions": "curl -s -H \"x-api-key: dev-api-key-12345\" http://localhost:3000/api/v1/openid4vp/presentation-definitions",
+    "getAuditLogs": "curl -s -H \"x-api-key: dev-api-key-12345\" http://localhost:3000/api/v1/audit/logs",
+    "openDashboard": "curl -s http://localhost:3000/",
+    "openSwaggerDocs": "curl -s http://localhost:3000/api/v1/docs/"
+  },
+
+  "endpoints": {
+    "public": [
+      { "method": "GET", "path": "/health", "description": "Health check" },
+      { "method": "GET", "path": "/", "description": "Admin Dashboard" },
+      { "method": "GET", "path": "/api/v1/docs", "description": "Swagger Documentation" },
+      { "method": "GET", "path": "/.well-known/openid-credential-issuer", "description": "OpenID4VCI Issuer Metadata" },
+      { "method": "GET", "path": "/.well-known/oauth-authorization-server", "description": "OAuth Server Metadata" }
+    ],
+    "authenticated": [
+      { "method": "GET", "path": "/api/v1/issuer/did", "description": "Get Issuer DID" },
+      { "method": "POST", "path": "/credential-offer", "description": "Create Credential Offer (OpenID4VCI)" },
+      { "method": "GET", "path": "/credential-offers", "description": "List All Credential Offers" },
+      { "method": "GET", "path": "/credential-offer/:offerId", "description": "Get Specific Offer" },
+      { "method": "POST", "path": "/api/v1/openid4vp/authorization-request", "description": "Create Verification Request" },
+      { "method": "GET", "path": "/api/v1/openid4vp/presentation-definitions", "description": "List Presentation Definitions" },
+      { "method": "GET", "path": "/api/v1/openid4vp/sessions", "description": "List Verification Sessions" },
+      { "method": "GET", "path": "/api/v1/audit/logs", "description": "Get Audit Logs" }
+    ]
+  },
+
+  "credentialTypes": {
+    "AIAgentIdentityCredential": {
+      "description": "Proves the identity and capabilities of an AI agent",
+      "fields": ["agent_id", "agent_type", "agent_name", "capabilities", "owner_did", "trust_level"]
+    },
+    "DelegationCredential": {
+      "description": "Represents delegated authority from user to agent",
+      "fields": ["delegation_id", "delegator_did", "delegate_did", "scope", "valid_until"]
+    },
+    "CapabilityCredential": {
+      "description": "Grants specific capabilities to perform actions",
+      "fields": ["capability_id", "capability_type", "resource", "actions", "conditions"]
+    }
+  },
+
+  "validAgentTypes": ["autonomous", "semi-autonomous", "supervised", "tool"],
+  "validTrustLevels": ["basic", "standard", "elevated", "high"]
+}

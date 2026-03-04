@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: issuer
+  namespace: ai-identity
+  labels:
+    app.kubernetes.io/name: issuer
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: ai-agent-identity-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: issuer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: issuer
+        app.kubernetes.io/component: agent
+    spec:
+      serviceAccountName: ai-identity-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: issuer
+          image: ai-agent-identity:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3001
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: ai-identity-config
+            - secretRef:
+                name: ai-identity-secrets
+          env:
+            - name: AGENT_ROLE
+              value: "issuer"
+            - name: AGENT_NAME
+              value: "IssuerAgent"
+            - name: AGENT_PORT
+              value: "3001"
+            - name: AGENT_ENDPOINT
+              value: "http://issuer:3001"
+            - name: WALLET_ID
+              value: "issuer-wallet"
+            - name: WALLET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-identity-secrets
+                  key: ISSUER_WALLET_KEY
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: data
+          persistentVolumeClaim:
+            claimName: issuer-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: issuer
+  namespace: ai-identity
+  labels:
+    app.kubernetes.io/name: issuer
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: issuer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: issuer-data-pvc
+  namespace: ai-identity
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard

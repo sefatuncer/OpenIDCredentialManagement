@@ -1,0 +1,140 @@
+name: ai-identity-dev
+
+# Development Docker Compose Configuration
+# Single service setup for local development and testing
+#
+# Usage:
+#   docker compose -f docker/docker-compose.dev.yml up -d
+#   docker compose -f docker/docker-compose.dev.yml logs -f app
+#   docker compose -f docker/docker-compose.dev.yml down
+
+services:
+  # PostgreSQL - Persistent storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-identity-dev-postgres
+    environment:
+      POSTGRES_USER: aiagent
+      POSTGRES_PASSWORD: aiagent_password
+      POSTGRES_DB: ai_identity
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - ai-identity-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiagent"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Caching
+  redis:
+    image: redis:7-alpine
+    container_name: ai-identity-dev-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    networks:
+      - ai-identity-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  # Main Application - All agents in one container
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ai-identity-dev-app
+    environment:
+      # Node environment
+      NODE_ENV: development
+
+      # API Configuration
+      API_PORT: "3000"
+      ISSUER_BASE_URL: http://localhost:3000
+
+      # Database
+      DATABASE_URL: postgresql://aiagent:aiagent_password@postgres:5432/ai_identity
+
+      # Redis
+      REDIS_URL: redis://redis:6379
+
+      # Secrets (change in production!)
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      CREDENTIAL_SIGNING_SECRET: dev-credential-secret-change-in-production
+      API_KEY: dev-api-key-12345
+
+      # Wallet Configuration
+      WALLET_ID: dev-wallet
+      WALLET_KEY: dev-wallet-key
+
+      # Feature flags
+      FEATURE_TRUST_REGISTRY: "true"
+      FEATURE_REVOCATION: "true"
+      FEATURE_AUDIT: "true"
+      FEATURE_SDJWT: "true"
+      FEATURE_BACKUP: "true"
+      FEATURE_BATCH_ISSUANCE: "true"
+
+      # TLS (disabled for dev)
+      TLS_ENABLED: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - app-dev-data:/app/data
+      - app-dev-logs:/app/logs
+    networks:
+      - ai-identity-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Adminer - Database management UI (optional, for development)
+  adminer:
+    image: adminer:4
+    container_name: ai-identity-dev-adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - ai-identity-dev
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+  # Redis Commander - Redis management UI (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ai-identity-dev-redis-ui
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - ai-identity-dev
+    depends_on:
+      - redis
+    profiles:
+      - tools
+
+networks:
+  ai-identity-dev:
+    name: ai-identity-dev-network
+    driver: bridge
+
+volumes:
+  postgres-dev-data:
+  redis-dev-data:
+  app-dev-data:
+  app-dev-logs:

@@ -1,0 +1,757 @@
+import { v4 as uuidv4 } from 'uuid'
+import * as jose from 'jose'
+import { logger } from '../utils/logger'
+import { getVerifierDid } from '../agents/verifier.agent'
+import { resolveDidKey } from '../agents/base.agent'
+
+/**
+ * OpenID4VP Service
+ *
+ * Implements the OpenID for Verifiable Presentations specification
+ * https://openid.net/specs/openid-4-verifiable-presentations-1_0.html
+ */
+
+// Verification session storage (in-memory, replace with Redis/DB in production)
+const verificationSessions = new Map<
+  string,
+  {
+    id: string
+    presentationDefinition: PresentationDefinition
+    nonce: string
+    state: string
+    responseUri: string
+    clientId: string
+    createdAt: Date
+    expiresAt: Date
+    status: 'pending' | 'submitted' | 'verified' | 'rejected' | 'expired'
+    presentation?: any
+    verificationResult?: VerificationResult
+  }
+>()
+
+export interface PresentationDefinition {
+  id: string
+  name?: string
+  purpose?: string
+  input_descriptors: InputDescriptor[]
+  submission_requirements?: SubmissionRequirement[]
+}
+
+export interface InputDescriptor {
+  id: string
+  name?: string
+  purpose?: string
+  group?: string[]
+  constraints: {
+    fields: FieldConstraint[]
+    limit_disclosure?: 'required' | 'preferred'
+  }
+}
+
+export interface FieldConstraint {
+  path: string[]
+  id?: string
+  name?: string
+  purpose?: string
+  filter?: {
+    type: string
+    const?: any
+    enum?: any[]
+    pattern?: string
+  }
+  optional?: boolean
+}
+
+export interface SubmissionRequirement {
+  name?: string
+  purpose?: string
+  rule: 'all' | 'pick'
+  count?: number
+  min?: number
+  max?: number
+  from?: string
+  from_nested?: SubmissionRequirement[]
+}
+
+export interface AuthorizationRequest {
+  response_type: string
+  response_mode: string
+  client_id: string
+  redirect_uri?: string
+  response_uri?: string
+  scope?: string
+  nonce: string
+  state: string
+  presentation_definition?: PresentationDefinition
+  presentation_definition_uri?: string
+  client_metadata?: ClientMetadata
+}
+
+export interface ClientMetadata {
+  client_name?: string
+  logo_uri?: string
+  client_purpose?: string
+  vp_formats?: Record<string, any>
+}
+
+export interface VerificationResult {
+  verified: boolean
+  credentialSubject?: any
+  issuerDid?: string
+  holderDid?: string
+  issuanceDate?: string
+  expirationDate?: string
+  errors?: string[]
+  warnings?: string[]
+}
+
+export interface PresentationSubmission {
+  id: string
+  definition_id: string
+  descriptor_map: Array<{
+    id: string
+    format: string
+    path: string
+    path_nested?: {
+      format: string
+      path: string
+    }
+  }>
+}
+
+// Predefined presentation definitions
+export const PRESENTATION_DEFINITIONS: Record<string, PresentationDefinition> = {
+  'agent-identity': {
+    id: 'agent-identity-verification',
+    name: 'AI Agent Identity Verification',
+    purpose: 'Verify the identity and capabilities of an AI agent',
+    input_descriptors: [
+      {
+        id: 'agent_identity_credential',
+        name: 'AI Agent Identity',
+        purpose: 'Prove agent identity',
+        constraints: {
+          fields: [
+            {
+              path: ['$.type'],
+              filter: {
+                type: 'array',
+                const: ['VerifiableCredential', 'AIAgentIdentityCredential'],
+              },
+            },
+            {
+              path: ['$.credentialSubject.agent_id'],
+              name: 'Agent ID',
+              purpose: 'Unique identifier for the agent',
+            },
+            {
+              path: ['$.credentialSubject.agent_type'],
+              name: 'Agent Type',
+              purpose: 'Type of the AI agent',
+            },
+            {
+              path: ['$.credentialSubject.owner_did'],
+              name: 'Owner DID',
+              purpose: 'DID of the agent owner',
+            },
+            {
+              path: ['$.credentialSubject.capabilities'],
+              name: 'Capabilities',
+              purpose: 'Agent capabilities',
+              optional: true,
+            },
+            {
+              path: ['$.credentialSubject.trust_level'],
+              name: 'Trust Level',
+              purpose: 'Agent trust level',
+              optional: true,
+            },
+          ],
+        },
+      },
+    ],
+  },
+  delegation: {
+    id: 'delegation-verification',
+    name: 'Delegation Verification',
+    purpose: 'Verify delegation authority from user to agent',
+    input_descriptors: [
+      {
+        id: 'delegation_credential',
+        name: 'Delegation Credential',
+        purpose: 'Prove delegation authority',
+        constraints: {
+          fields: [
+            {
+              path: ['$.type'],
+              filter: {
+                type: 'array',
+                const: ['VerifiableCredential', 'DelegationCredential'],
+              },
+            },
+            {
+              path: ['$.credentialSubject.delegator_did'],
+              name: 'Delegator DID',
+            },
+            {
+              path: ['$.credentialSubject.delegate_did'],
+              name: 'Delegate DID',
+            },
+            {
+              path: ['$.credentialSubject.scope'],
+              name: 'Scope',
+              purpose: 'Delegated permissions',
+            },
+            {
+              path: ['$.credentialSubject.valid_until'],
+              name: 'Valid Until',
+              purpose: 'Delegation expiration',
+            },
+          ],
+        },
+      },
+    ],
+  },
+  capability: {
+    id: 'capability-verification',
+    name: 'Capability Verification',
+    purpose: 'Verify specific capability granted to an agent',
+    input_descriptors: [
+      {
+        id: 'capability_credential',
+        name: 'Capability Credential',
+        purpose: 'Prove granted capability',
+        constraints: {
+          fields: [
+            {
+              path: ['$.type'],
+              filter: {
+                type: 'array',
+                const: ['VerifiableCredential', 'CapabilityCredential'],
+              },
+            },
+            {
+              path: ['$.credentialSubject.capability_type'],
+              name: 'Capability Type',
+            },
+            {
+              path: ['$.credentialSubject.resource'],
+              name: 'Resource',
+            },
+            {
+              path: ['$.credentialSubject.actions'],
+              name: 'Actions',
+            },
+          ],
+        },
+      },
+    ],
+  },
+  combined: {
+    id: 'combined-verification',
+    name: 'Combined Agent and Delegation Verification',
+    purpose: 'Verify both agent identity and delegation authority',
+    input_descriptors: [
+      {
+        id: 'agent_identity_credential',
+        name: 'AI Agent Identity',
+        purpose: 'Prove agent identity',
+        group: ['identity'],
+        constraints: {
+          fields: [
+            {
+              path: ['$.credentialSubject.agent_id'],
+            },
+            {
+              path: ['$.credentialSubject.owner_did'],
+            },
+          ],
+        },
+      },
+      {
+        id: 'delegation_credential',
+        name: 'Delegation Credential',
+        purpose: 'Prove delegation authority',
+        group: ['delegation'],
+        constraints: {
+          fields: [
+            {
+              path: ['$.credentialSubject.delegate_did'],
+            },
+            {
+              path: ['$.credentialSubject.scope'],
+            },
+          ],
+        },
+      },
+    ],
+    submission_requirements: [
+      {
+        name: 'Identity and Delegation',
+        rule: 'all',
+        from: 'identity',
+      },
+      {
+        name: 'Identity and Delegation',
+        rule: 'all',
+        from: 'delegation',
+      },
+    ],
+  },
+}
+
+/**
+ * Get verifier base URL
+ */
+export function getVerifierBaseUrl(): string {
+  // Use API Gateway URL for direct_post endpoint (not the verifier agent directly)
+  // This is required because the direct_post endpoint is on the API gateway
+  return process.env.API_GATEWAY_URL || process.env.VERIFIER_BASE_URL || 'http://localhost:3000'
+}
+
+/**
+ * Get verifier client metadata
+ */
+export function getVerifierClientMetadata(): ClientMetadata {
+  return {
+    client_name: 'AI Agent Identity Verifier',
+    logo_uri: `${getVerifierBaseUrl()}/logo.png`,
+    client_purpose: 'Verify AI agent credentials',
+    vp_formats: {
+      jwt_vp: {
+        alg: ['EdDSA', 'ES256'],
+      },
+      jwt_vc: {
+        alg: ['EdDSA', 'ES256'],
+      },
+    },
+  }
+}
+
+/**
+ * Create an authorization request for credential verification
+ */
+export async function createAuthorizationRequest(
+  presentationDefinitionId: string,
+  options: {
+    customDefinition?: PresentationDefinition
+    expiresInSeconds?: number
+    redirectUri?: string
+  } = {}
+): Promise<{
+  sessionId: string
+  authorizationRequest: AuthorizationRequest
+  authorizationRequestUri: string
+}> {
+  const baseUrl = getVerifierBaseUrl()
+  const sessionId = uuidv4()
+  const nonce = uuidv4()
+  const state = uuidv4()
+  const expiresIn = options.expiresInSeconds || 300 // 5 minutes default
+
+  // Get presentation definition
+  const presentationDefinition =
+    options.customDefinition || PRESENTATION_DEFINITIONS[presentationDefinitionId]
+
+  if (!presentationDefinition) {
+    throw new Error(`Unknown presentation definition: ${presentationDefinitionId}`)
+  }
+
+  const responseUri = `${baseUrl}/direct_post`
+
+  const authorizationRequest: AuthorizationRequest = {
+    response_type: 'vp_token',
+    response_mode: 'direct_post',
+    client_id: getVerifierDid(),
+    response_uri: responseUri,
+    nonce,
+    state,
+    presentation_definition: presentationDefinition,
+    client_metadata: getVerifierClientMetadata(),
+  }
+
+  // Store session
+  verificationSessions.set(sessionId, {
+    id: sessionId,
+    presentationDefinition,
+    nonce,
+    state,
+    responseUri,
+    clientId: getVerifierDid(),
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + expiresIn * 1000),
+    status: 'pending',
+  })
+
+  // Create authorization request URI
+  const params = new URLSearchParams()
+  params.set('response_type', authorizationRequest.response_type)
+  params.set('response_mode', authorizationRequest.response_mode)
+  params.set('client_id', authorizationRequest.client_id)
+  params.set('response_uri', authorizationRequest.response_uri!)
+  params.set('nonce', authorizationRequest.nonce)
+  params.set('state', authorizationRequest.state)
+  params.set('presentation_definition', JSON.stringify(presentationDefinition))
+  params.set('client_metadata', JSON.stringify(authorizationRequest.client_metadata))
+
+  const authorizationRequestUri = `openid4vp://?${params.toString()}`
+
+  logger.info('Created authorization request', {
+    sessionId,
+    presentationDefinitionId: presentationDefinition.id,
+    expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+  })
+
+  return {
+    sessionId,
+    authorizationRequest,
+    authorizationRequestUri,
+  }
+}
+
+/**
+ * Get session by state parameter
+ */
+export function getSessionByState(state: string): typeof verificationSessions extends Map<
+  string,
+  infer V
+>
+  ? V | undefined
+  : never {
+  for (const session of verificationSessions.values()) {
+    if (session.state === state) {
+      return session
+    }
+  }
+  return undefined
+}
+
+/**
+ * Get verification session
+ */
+export function getVerificationSession(sessionId: string): {
+  session: typeof verificationSessions extends Map<string, infer V> ? V : never
+  expired: boolean
+} | null {
+  const session = verificationSessions.get(sessionId)
+  if (!session) {
+    return null
+  }
+
+  return {
+    session,
+    expired: new Date() > session.expiresAt,
+  }
+}
+
+/**
+ * Handle direct_post submission of VP token
+ */
+export async function handleDirectPost(
+  vpToken: string,
+  presentationSubmission: PresentationSubmission,
+  state: string
+): Promise<{
+  redirect_uri?: string
+  error?: string
+  error_description?: string
+}> {
+  // Find session by state
+  const session = getSessionByState(state)
+  if (!session) {
+    return {
+      error: 'invalid_request',
+      error_description: 'Invalid state parameter',
+    }
+  }
+
+  // Check if expired
+  if (new Date() > session.expiresAt) {
+    session.status = 'expired'
+    return {
+      error: 'expired_request',
+      error_description: 'Authorization request has expired',
+    }
+  }
+
+  // Check if already submitted
+  if (session.status !== 'pending') {
+    return {
+      error: 'invalid_request',
+      error_description: 'Request already processed',
+    }
+  }
+
+  try {
+    // Verify the VP token
+    const verificationResult = await verifyVPToken(vpToken, session)
+
+    session.presentation = vpToken
+    session.verificationResult = verificationResult
+
+    if (verificationResult.verified) {
+      session.status = 'verified'
+      logger.info('Presentation verified successfully', { sessionId: session.id })
+    } else {
+      session.status = 'rejected'
+      logger.warn('Presentation verification failed', {
+        sessionId: session.id,
+        errors: verificationResult.errors,
+      })
+    }
+
+    return {}
+  } catch (error) {
+    logger.error('Error processing presentation', { error })
+    session.status = 'rejected'
+    session.verificationResult = {
+      verified: false,
+      errors: [(error as Error).message],
+    }
+
+    return {
+      error: 'invalid_presentation',
+      error_description: (error as Error).message,
+    }
+  }
+}
+
+/**
+ * Verify VP token using Jose-based verification
+ */
+async function verifyVPToken(
+  vpToken: string,
+  session: typeof verificationSessions extends Map<string, infer V> ? V : never
+): Promise<VerificationResult> {
+  try {
+    // Parse JWT
+    const parts = vpToken.split('.')
+    if (parts.length !== 3) {
+      throw new Error('Invalid JWT format')
+    }
+
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
+
+    // Check nonce
+    if (payload.nonce !== session.nonce) {
+      return {
+        verified: false,
+        errors: ['Nonce mismatch'],
+      }
+    }
+
+    // Check expiration
+    if (payload.exp && payload.exp < Date.now() / 1000) {
+      return {
+        verified: false,
+        errors: ['Presentation expired'],
+      }
+    }
+
+    // Verify VP signature using did:key resolution
+    const holderDid = payload.iss
+    let vpSignatureVerified = false
+    const warnings: string[] = []
+
+    if (holderDid && holderDid.startsWith('did:key:')) {
+      try {
+        const publicKey = await resolveDidKey(holderDid)
+        if (publicKey) {
+          await jose.jwtVerify(vpToken, publicKey)
+          vpSignatureVerified = true
+          logger.info('VP signature verified successfully', { holderDid })
+        } else {
+          warnings.push('Could not resolve holder DID public key')
+        }
+      } catch (sigError) {
+        warnings.push('VP signature verification failed: ' + (sigError as Error).message)
+      }
+    } else {
+      warnings.push('Unsupported holder DID method: ' + holderDid)
+    }
+
+    // Extract credential info from VP
+    const vp = payload.vp || payload
+    const credentials = vp.verifiableCredential || []
+
+    // Verify embedded VC signatures
+    let vcSignatureVerified = false
+    let credentialSubject: any = null
+    let issuerDid: string | undefined
+    let issuanceDate: string | undefined
+    let expirationDate: string | undefined
+
+    for (const credential of credentials) {
+      if (typeof credential === 'string') {
+        try {
+          const credParts = credential.split('.')
+          if (credParts.length === 3) {
+            const credPayload = JSON.parse(Buffer.from(credParts[1], 'base64url').toString())
+
+            // Check credential expiration
+            if (credPayload.exp && credPayload.exp < Date.now() / 1000) {
+              warnings.push('Embedded credential expired')
+              continue
+            }
+
+            // Verify VC signature
+            const vcIssuerDid = credPayload.iss
+            if (vcIssuerDid && vcIssuerDid.startsWith('did:key:')) {
+              const vcPublicKey = await resolveDidKey(vcIssuerDid)
+              if (vcPublicKey) {
+                try {
+                  await jose.jwtVerify(credential, vcPublicKey)
+                  vcSignatureVerified = true
+                  logger.info('VC signature verified successfully', { issuerDid: vcIssuerDid })
+                } catch (vcSigError) {
+                  warnings.push('VC signature verification failed: ' + (vcSigError as Error).message)
+                }
+              }
+            }
+
+            // Extract credential data
+            credentialSubject = credPayload.vc?.credentialSubject || credPayload.credentialSubject
+            issuerDid = vcIssuerDid
+            issuanceDate = credPayload.iat ? new Date(credPayload.iat * 1000).toISOString() : undefined
+            expirationDate = credPayload.exp ? new Date(credPayload.exp * 1000).toISOString() : undefined
+          }
+        } catch (parseError) {
+          warnings.push('Failed to parse embedded credential: ' + (parseError as Error).message)
+        }
+      }
+    }
+
+    // Determine overall verification status
+    const verified = vpSignatureVerified && vcSignatureVerified
+
+    if (verified) {
+      return {
+        verified: true,
+        credentialSubject,
+        issuerDid,
+        holderDid,
+        issuanceDate,
+        expirationDate,
+        warnings: warnings.length > 0 ? warnings : undefined,
+      }
+    } else {
+      return {
+        verified: false,
+        errors: warnings.length > 0 ? warnings : ['Signature verification failed'],
+        credentialSubject,
+        issuerDid,
+        holderDid,
+      }
+    }
+  } catch (error) {
+    return {
+      verified: false,
+      errors: ['Failed to verify presentation: ' + (error as Error).message],
+    }
+  }
+}
+
+/**
+ * Get verification result for a session
+ */
+export function getVerificationResult(sessionId: string): VerificationResult | null {
+  const session = verificationSessions.get(sessionId)
+  if (!session) {
+    return null
+  }
+
+  if (session.status === 'pending') {
+    return {
+      verified: false,
+      errors: ['Presentation not yet submitted'],
+    }
+  }
+
+  if (session.status === 'expired') {
+    return {
+      verified: false,
+      errors: ['Session expired'],
+    }
+  }
+
+  return session.verificationResult || null
+}
+
+/**
+ * List all verification sessions (admin)
+ */
+export function listVerificationSessions(): Array<{
+  sessionId: string
+  presentationDefinitionId: string
+  status: string
+  createdAt: Date
+  expiresAt: Date
+  expired: boolean
+}> {
+  const sessions: Array<{
+    sessionId: string
+    presentationDefinitionId: string
+    status: string
+    createdAt: Date
+    expiresAt: Date
+    expired: boolean
+  }> = []
+
+  for (const [sessionId, session] of verificationSessions.entries()) {
+    sessions.push({
+      sessionId,
+      presentationDefinitionId: session.presentationDefinition.id,
+      status: session.status,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt,
+      expired: new Date() > session.expiresAt,
+    })
+  }
+
+  return sessions
+}
+
+/**
+ * Get available presentation definitions
+ */
+export function getAvailablePresentationDefinitions(): Array<{
+  id: string
+  name?: string
+  purpose?: string
+}> {
+  return Object.entries(PRESENTATION_DEFINITIONS).map(([key, def]) => ({
+    id: key,
+    name: def.name,
+    purpose: def.purpose,
+  }))
+}
+
+/**
+ * Cleanup expired sessions
+ */
+export function cleanupExpiredSessions(): { removed: number } {
+  let removed = 0
+  const now = new Date()
+
+  for (const [sessionId, session] of verificationSessions.entries()) {
+    if (now > session.expiresAt && session.status === 'pending') {
+      session.status = 'expired'
+    }
+
+    // Remove sessions older than 1 hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+    if (session.createdAt < oneHourAgo) {
+      verificationSessions.delete(sessionId)
+      removed++
+    }
+  }
+
+  if (removed > 0) {
+    logger.info('Cleaned up expired verification sessions', { removed })
+  }
+
+  return { removed }
+}
+
+// Run cleanup every 5 minutes
+setInterval(cleanupExpiredSessions, 5 * 60 * 1000)

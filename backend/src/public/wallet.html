@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Identity - Web Wallet</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        header h1 {
+            font-size: 2rem;
+            color: #4fc3f7;
+            margin-bottom: 0.5rem;
+        }
+        header p {
+            color: #90a4ae;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .card h2 {
+            color: #4fc3f7;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .card h2::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: #4fc3f7;
+            border-radius: 2px;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #b0bec5;
+            font-size: 0.9rem;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 0.9rem;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #4fc3f7;
+        }
+        textarea {
+            min-height: 100px;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+            color: #1a1a2e;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 195, 247, 0.3);
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+            color: white;
+        }
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .status {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+        .status.success {
+            background: rgba(102, 187, 106, 0.2);
+            border: 1px solid rgba(102, 187, 106, 0.5);
+            color: #a5d6a7;
+        }
+        .status.error {
+            background: rgba(239, 83, 80, 0.2);
+            border: 1px solid rgba(239, 83, 80, 0.5);
+            color: #ef9a9a;
+        }
+        .status.info {
+            background: rgba(79, 195, 247, 0.2);
+            border: 1px solid rgba(79, 195, 247, 0.5);
+            color: #81d4fa;
+        }
+        .credential-card {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .credential-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        }
+        .credential-card .type {
+            font-size: 0.8rem;
+            color: #90caf9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+        .credential-card .name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 1rem;
+        }
+        .credential-card .detail {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.85rem;
+        }
+        .credential-card .detail:last-child {
+            border-bottom: none;
+        }
+        .credential-card .detail .label {
+            color: #90caf9;
+        }
+        .credential-card .detail .value {
+            color: #fff;
+            text-align: right;
+            max-width: 60%;
+            word-break: break-all;
+        }
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .tab {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.05);
+            color: #90a4ae;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            background: rgba(79, 195, 247, 0.2);
+            color: #4fc3f7;
+            border-color: rgba(79, 195, 247, 0.5);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #90a4ae;
+        }
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.8rem;
+            color: #81c784;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI Agent Identity Wallet</h1>
+            <p>Test wallet for OpenID4VCI credential issuance</p>
+        </header>
+
+        <!-- Claim Credential Section -->
+        <div class="card">
+            <h2>Claim Credential</h2>
+            <div class="form-group">
+                <label>Credential Offer URI</label>
+                <input type="text" id="offer-uri" placeholder="openid-credential-offer://?credential_offer=...">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="parseOffer()">Parse Offer</button>
+                <button class="btn btn-secondary" onclick="createTestOffer()">Create Test Offer</button>
+            </div>
+            <div id="offer-status"></div>
+
+            <div id="offer-details" class="hidden" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label>Credential Issuer</label>
+                    <input type="text" id="issuer-url" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Credential Types</label>
+                    <input type="text" id="credential-types" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Pre-Authorized Code</label>
+                    <input type="text" id="pre-auth-code" readonly>
+                </div>
+                <button class="btn btn-success" onclick="claimCredential()">Claim Credential</button>
+            </div>
+        </div>
+
+        <!-- My Credentials Section -->
+        <div class="card">
+            <h2>My Credentials</h2>
+            <div id="credentials-list">
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    <p>No credentials yet. Claim one above!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Present Credential Section -->
+        <div class="card">
+            <h2>Present Credential</h2>
+            <div class="form-group">
+                <label>Verification Request URI (or create new)</label>
+                <input type="text" id="verification-uri" placeholder="openid4vp://?...">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="parseVerificationRequest()">Parse Request</button>
+                <button class="btn btn-secondary" onclick="createVerificationRequest()">Create Test Request</button>
+            </div>
+            <div id="verification-status"></div>
+
+            <div id="presentation-form" class="hidden" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label>Select Credential to Present</label>
+                    <select id="credential-select"></select>
+                </div>
+                <button class="btn btn-success" onclick="submitPresentation()">Submit Presentation</button>
+            </div>
+        </div>
+
+        <!-- Debug Section -->
+        <div class="card">
+            <h2>Debug Log</h2>
+            <pre id="debug-log">Ready...</pre>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        const API_KEY = 'dev-api-key-12345';
+
+        // Wallet DID (simulated)
+        const WALLET_DID = 'did:key:z6Mk' + Math.random().toString(36).substring(2, 15);
+
+        // Local storage for credentials
+        let credentials = JSON.parse(localStorage.getItem('wallet_credentials') || '[]');
+
+        // Current offer data
+        let currentOffer = null;
+        let currentVerificationSession = null;
+
+        function log(message) {
+            const debugLog = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.textContent = `[${timestamp}] ${message}\n` + debugLog.textContent;
+        }
+
+        function showStatus(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        async function createTestOffer() {
+            log('Creating test credential offer...');
+            try {
+                const response = await fetch(`${API_URL}/credential-offer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY
+                    },
+                    body: JSON.stringify({
+                        credentialTypes: ['AIAgentIdentityCredential'],
+                        userPinRequired: false,
+                        expiresInSeconds: 300
+                    })
+                });
+
+                const data = await response.json();
+                log('Offer created: ' + data.offerId);
+
+                document.getElementById('offer-uri').value = data.credentialOfferUri;
+                parseOffer();
+            } catch (error) {
+                log('Error: ' + error.message);
+                showStatus('offer-status', 'Failed to create offer: ' + error.message, 'error');
+            }
+        }
+
+        function parseOffer() {
+            const uri = document.getElementById('offer-uri').value;
+            log('Parsing offer URI...');
+
+            try {
+                let offerData;
+
+                if (uri.includes('credential_offer=')) {
+                    // Inline offer
+                    const params = new URLSearchParams(uri.split('?')[1]);
+                    offerData = JSON.parse(decodeURIComponent(params.get('credential_offer')));
+                } else if (uri.includes('credential_offer_uri=')) {
+                    // URI reference (would need to fetch)
+                    showStatus('offer-status', 'URI reference offers not yet supported', 'error');
+                    return;
+                } else {
+                    showStatus('offer-status', 'Invalid offer URI format', 'error');
+                    return;
+                }
+
+                currentOffer = offerData;
+
+                document.getElementById('issuer-url').value = offerData.credential_issuer;
+                document.getElementById('credential-types').value = offerData.credentials?.join(', ') || 'Unknown';
+
+                const preAuthCode = offerData.grants?.['urn:ietf:params:oauth:grant-type:pre-authorized_code']?.['pre-authorized_code'];
+                document.getElementById('pre-auth-code').value = preAuthCode || 'N/A';
+
+                document.getElementById('offer-details').classList.remove('hidden');
+                showStatus('offer-status', 'Offer parsed successfully!', 'success');
+                log('Offer parsed: ' + JSON.stringify(offerData, null, 2));
+            } catch (error) {
+                log('Parse error: ' + error.message);
+                showStatus('offer-status', 'Failed to parse offer: ' + error.message, 'error');
+            }
+        }
+
+        async function claimCredential() {
+            if (!currentOffer) {
+                showStatus('offer-status', 'No offer to claim', 'error');
+                return;
+            }
+
+            log('Starting credential claim flow...');
+
+            try {
+                // Step 1: Exchange pre-auth code for token
+                const preAuthCode = currentOffer.grants?.['urn:ietf:params:oauth:grant-type:pre-authorized_code']?.['pre-authorized_code'];
+
+                log('Exchanging pre-auth code for token...');
+                const tokenResponse = await fetch(`${API_URL}/token`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        'grant_type': 'urn:ietf:params:oauth:grant-type:pre-authorized_code',
+                        'pre-authorized_code': preAuthCode
+                    })
+                });
+
+                const tokenData = await tokenResponse.json();
+
+                if (tokenData.error) {
+                    throw new Error(tokenData.error_description || tokenData.error);
+                }
+
+                log('Token received: ' + tokenData.access_token.substring(0, 20) + '...');
+
+                // Step 2: Request credential
+                const credentialType = currentOffer.credentials?.[0] || 'AIAgentIdentityCredential';
+
+                log('Requesting credential...');
+                const credentialResponse = await fetch(`${API_URL}/credential`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${tokenData.access_token}`
+                    },
+                    body: JSON.stringify({
+                        format: 'jwt_vc_json',
+                        credential_definition: {
+                            type: ['VerifiableCredential', credentialType]
+                        },
+                        proof: {
+                            proof_type: 'jwt',
+                            jwt: createProofJwt(tokenData.c_nonce)
+                        }
+                    })
+                });
+
+                const credentialData = await credentialResponse.json();
+
+                if (credentialData.error) {
+                    throw new Error(credentialData.error_description || credentialData.error);
+                }
+
+                if (credentialData.acceptance_token) {
+                    showStatus('offer-status', 'Credential issuance pending (deferred)', 'info');
+                    log('Received acceptance token - credential deferred');
+                    return;
+                }
+
+                // Success! Store the credential
+                const credential = {
+                    id: 'cred-' + Date.now(),
+                    jwt: credentialData.credential,
+                    type: credentialType,
+                    issuedAt: new Date().toISOString(),
+                    decoded: decodeJwt(credentialData.credential)
+                };
+
+                credentials.push(credential);
+                localStorage.setItem('wallet_credentials', JSON.stringify(credentials));
+
+                renderCredentials();
+                showStatus('offer-status', 'Credential claimed successfully!', 'success');
+                log('Credential stored: ' + credential.id);
+
+                // Reset form
+                currentOffer = null;
+                document.getElementById('offer-details').classList.add('hidden');
+                document.getElementById('offer-uri').value = '';
+
+            } catch (error) {
+                log('Claim error: ' + error.message);
+                showStatus('offer-status', 'Failed to claim credential: ' + error.message, 'error');
+            }
+        }
+
+        function createProofJwt(nonce) {
+            // Create a simple proof JWT (simplified - real impl would sign properly)
+            const header = btoa(JSON.stringify({ alg: 'ES256', typ: 'openid4vci-proof+jwt' }));
+            const payload = btoa(JSON.stringify({
+                iss: WALLET_DID,
+                aud: API_URL,
+                iat: Math.floor(Date.now() / 1000),
+                nonce: nonce
+            }));
+            return `${header}.${payload}.signature`;
+        }
+
+        function decodeJwt(jwt) {
+            try {
+                const parts = jwt.split('.');
+                return JSON.parse(atob(parts[1]));
+            } catch {
+                return null;
+            }
+        }
+
+        function renderCredentials() {
+            const container = document.getElementById('credentials-list');
+
+            if (credentials.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                        <p>No credentials yet. Claim one above!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = credentials.map((cred, index) => {
+                const vc = cred.decoded?.vc || {};
+                const subject = vc.credentialSubject || {};
+
+                return `
+                    <div class="credential-card">
+                        <div class="type">${cred.type}</div>
+                        <div class="name">${subject.agent_name || subject.delegation_id || 'Credential #' + (index + 1)}</div>
+                        ${subject.agent_type ? `<div class="detail"><span class="label">Agent Type</span><span class="value">${subject.agent_type}</span></div>` : ''}
+                        ${subject.trust_level ? `<div class="detail"><span class="label">Trust Level</span><span class="value">${subject.trust_level}</span></div>` : ''}
+                        ${subject.capabilities ? `<div class="detail"><span class="label">Capabilities</span><span class="value">${subject.capabilities.join(', ')}</span></div>` : ''}
+                        <div class="detail"><span class="label">Issued</span><span class="value">${new Date(cred.issuedAt).toLocaleString()}</span></div>
+                        <div class="detail"><span class="label">Issuer</span><span class="value">${(cred.decoded?.iss || 'Unknown').substring(0, 30)}...</span></div>
+                        <div style="margin-top: 1rem;">
+                            <button class="btn btn-secondary" onclick="viewCredential(${index})" style="margin-right: 0.5rem;">View JWT</button>
+                            <button class="btn btn-secondary" onclick="deleteCredential(${index})">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Update presentation select
+            const select = document.getElementById('credential-select');
+            select.innerHTML = credentials.map((cred, index) =>
+                `<option value="${index}">${cred.type} - ${cred.id}</option>`
+            ).join('');
+        }
+
+        function viewCredential(index) {
+            const cred = credentials[index];
+            log('Credential JWT:\n' + cred.jwt);
+            log('Decoded:\n' + JSON.stringify(cred.decoded, null, 2));
+        }
+
+        function deleteCredential(index) {
+            credentials.splice(index, 1);
+            localStorage.setItem('wallet_credentials', JSON.stringify(credentials));
+            renderCredentials();
+            log('Credential deleted');
+        }
+
+        async function createVerificationRequest() {
+            log('Creating verification request...');
+            try {
+                const response = await fetch(`${API_URL}/api/v1/openid4vp/authorization-request`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY
+                    },
+                    body: JSON.stringify({
+                        presentationDefinitionId: 'agent-identity'
+                    })
+                });
+
+                const data = await response.json();
+                log('Verification request created: ' + data.sessionId);
+
+                currentVerificationSession = data;
+                document.getElementById('verification-uri').value = data.authorizationRequestUri;
+                parseVerificationRequest();
+            } catch (error) {
+                log('Error: ' + error.message);
+                showStatus('verification-status', 'Failed to create request: ' + error.message, 'error');
+            }
+        }
+
+        function parseVerificationRequest() {
+            const uri = document.getElementById('verification-uri').value;
+            log('Parsing verification request...');
+
+            if (!uri) {
+                showStatus('verification-status', 'Enter a verification URI', 'error');
+                return;
+            }
+
+            if (credentials.length === 0) {
+                showStatus('verification-status', 'No credentials to present. Claim one first!', 'error');
+                return;
+            }
+
+            document.getElementById('presentation-form').classList.remove('hidden');
+            showStatus('verification-status', 'Ready to present credential', 'success');
+        }
+
+        async function submitPresentation() {
+            const selectedIndex = document.getElementById('credential-select').value;
+            const credential = credentials[selectedIndex];
+
+            if (!credential) {
+                showStatus('verification-status', 'Select a credential', 'error');
+                return;
+            }
+
+            log('Submitting presentation...');
+
+            try {
+                // Extract parameters from the URI
+                const uri = document.getElementById('verification-uri').value;
+                const params = new URLSearchParams(uri.split('?')[1]);
+                const state = params.get('state');
+                const nonce = params.get('nonce');
+                const clientId = params.get('client_id');
+
+                // Create VP (Verifiable Presentation) wrapper JWT with nonce
+                const vpToken = createVPToken(credential.jwt, nonce, clientId);
+                log('Created VP token with nonce: ' + nonce);
+
+                const response = await fetch(`${API_URL}/direct_post`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        'vp_token': vpToken,
+                        'state': state || 'unknown',
+                        'presentation_submission': JSON.stringify({
+                            id: 'submission-' + Date.now(),
+                            definition_id: 'agent-identity',
+                            descriptor_map: [{
+                                id: 'agent_identity_credential',
+                                format: 'jwt_vp',
+                                path: '$.verifiableCredential[0]'
+                            }]
+                        })
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error_description || data.error);
+                }
+
+                showStatus('verification-status', 'Presentation submitted successfully!', 'success');
+                log('Presentation result: ' + JSON.stringify(data));
+
+                document.getElementById('presentation-form').classList.add('hidden');
+                document.getElementById('verification-uri').value = '';
+
+            } catch (error) {
+                log('Presentation error: ' + error.message);
+                showStatus('verification-status', 'Failed to submit: ' + error.message, 'error');
+            }
+        }
+
+        function createVPToken(vcJwt, nonce, audience) {
+            // Create VP JWT header
+            const header = {
+                alg: 'none',  // Simplified - no signature for demo
+                typ: 'JWT'
+            };
+
+            // Create VP JWT payload with nonce
+            const payload = {
+                iss: WALLET_DID,
+                aud: audience || API_URL,
+                nonce: nonce,
+                iat: Math.floor(Date.now() / 1000),
+                exp: Math.floor(Date.now() / 1000) + 300,
+                vp: {
+                    '@context': ['https://www.w3.org/2018/credentials/v1'],
+                    type: ['VerifiablePresentation'],
+                    holder: WALLET_DID,
+                    verifiableCredential: [vcJwt]
+                }
+            };
+
+            // Encode as JWT (base64url without padding)
+            const encodeBase64Url = (obj) => {
+                return btoa(JSON.stringify(obj))
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=+$/, '');
+            };
+
+            return `${encodeBase64Url(header)}.${encodeBase64Url(payload)}.`;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Wallet initialized. DID: ' + WALLET_DID);
+            renderCredentials();
+        });
+    </script>
+</body>
+</html>

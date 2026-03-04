@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai-identity
+  labels:
+    app.kubernetes.io/name: ai-identity
+    app.kubernetes.io/part-of: ai-agent-identity-system
