@@ -58,6 +58,33 @@ spec:
                 name: api-gateway
                 port:
                   number: 3000
+
+          # Web Wallet Frontend
+          - path: /wallet
+            pathType: Prefix
+            backend:
+              service:
+                name: web-wallet
+                port:
+                  number: 5173
+
+          # Issuer/Verifier Dashboard
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer-verifier
+                port:
+                  number: 5174
+
+          # Default: serve web-wallet
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-wallet
+                port:
+                  number: 5173
 ---
 # Network Policy - restrict traffic between pods
 apiVersion: networking.k8s.io/v1

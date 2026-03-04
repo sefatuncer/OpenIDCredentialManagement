@@ -9,6 +9,7 @@ import { VerifyResults } from './pages/VerifyResults';
 import { TrustManagement } from './pages/TrustManagement';
 import { AuditLogs } from './pages/AuditLogs';
 import { ToastContainer } from './components/Toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { auth } from './services/auth';
 import './styles/main.css';
 
@@ -28,9 +29,10 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
 
 function App() {
   return (
-    <BrowserRouter>
-      <ToastContainer />
-      <Routes>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ToastContainer />
+        <Routes>
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
 
@@ -113,8 +115,9 @@ function App() {
         {/* Default redirect */}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

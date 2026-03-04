@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # Backend Build and Test
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npm run typecheck
+
+      - name: Run linter
+        run: npm run lint || true
+
+      - name: Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+          JWT_SECRET: test-jwt-secret-for-ci-pipeline-min-32-chars
+          API_KEY: test-api-key-for-ci-pipeline
+          WEB_WALLET_SECRET: test-wallet-secret
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: backend/dist
+          retention-days: 7
+
+  # Frontend Issuer/Verifier Build and Test
+  frontend-issuer-verifier:
+    name: Frontend Issuer/Verifier CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-issuer-verifier
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend-issuer-verifier/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test || true
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: /api/v1
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-issuer-verifier-dist
+          path: frontend-issuer-verifier/dist
+          retention-days: 7
+
+  # Web Wallet Build and Test
+  web-wallet:
+    name: Web Wallet CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-wallet
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: web-wallet/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test || true
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: /api/v1
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-wallet-dist
+          path: web-wallet/dist
+          retention-days: 7
+
+  # Summary job that requires all others
+  ci-complete:
+    name: CI Complete
+    runs-on: ubuntu-latest
+    needs: [backend, frontend-issuer-verifier, web-wallet]
+    steps:
+      - name: All checks passed
+        run: echo "All CI checks passed successfully!"

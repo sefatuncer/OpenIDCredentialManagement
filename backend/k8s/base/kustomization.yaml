@@ -17,6 +17,8 @@ resources:
   - verifier.yaml
   - holder.yaml
   - api-gateway.yaml
+  - web-wallet.yaml
+  - issuer-verifier.yaml
   - ingress.yaml
 
 commonLabels:

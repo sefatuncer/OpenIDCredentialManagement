@@ -7,11 +7,13 @@ import AgentControl from './pages/AgentControl'
 import Delegations from './pages/Delegations'
 import TrustManagement from './pages/TrustManagement'
 import Simulation from './pages/Simulation'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function App() {
   return (
-    <BrowserRouter>
-      <div className="app">
+    <ErrorBoundary>
+      <BrowserRouter>
+        <div className="app">
         <header className="header">
           <h1>
             <span className="logo-icon">🤖</span>
@@ -62,8 +64,9 @@ function App() {
           <p>AI Agent Identity System - Fame SSI Framework</p>
           <p className="version">v1.0.0</p>
         </footer>
-      </div>
-    </BrowserRouter>
+        </div>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 
