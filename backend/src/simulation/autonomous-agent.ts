@@ -14,6 +14,7 @@ import {
   Delegation,
   AgentProfile,
   SimulationCredential,
+  SimulationPresentation,
   AgentGoal,
   GoalType,
 } from './types'
@@ -49,7 +50,7 @@ import {
 const simulationCredentials: Map<string, SimulationCredential[]> = new Map()
 
 // Presentations queue
-const simulationPresentations: Map<string, any[]> = new Map()
+const simulationPresentations: Map<string, SimulationPresentation[]> = new Map()
 
 // Messages storage
 const simulationMessages: Map<string, Message[]> = new Map()
@@ -669,7 +670,7 @@ export class AutonomousAgent {
       const verifier = verifiers.find(v => v.did === selectedDid) || verifiers[0]
       const credential = myCredentials[Math.floor(Math.random() * myCredentials.length)]
 
-      const presentation = {
+      const presentation: SimulationPresentation = {
         id: `urn:uuid:${uuidv4()}`,
         type: ['VerifiablePresentation'],
         holder: this.did,
@@ -711,11 +712,54 @@ export class AutonomousAgent {
     const presentation = pendingPresentations.shift()!
     simulationPresentations.set(this.did, pendingPresentations)
 
-    const credential = presentation.verifiableCredential[0] as SimulationCredential
+    // Validate presentation structure
+    if (!presentation.verifiableCredential || presentation.verifiableCredential.length === 0) {
+      this.verifiedPresentations++
+      this.recordInteraction(presentation.holder, false)
+      return {
+        action: 'VERIFY_PRESENTATION',
+        result: {
+          success: false,
+          message: 'Presentation contains no credentials',
+          data: {
+            presentationId: presentation.id,
+            holder: presentation.holder,
+            verified: false,
+            reason: 'no_credentials'
+          }
+        }
+      }
+    }
+
+    const credential = presentation.verifiableCredential[0]
     const holder = allAgents.find(a => a.did === presentation.holder)
 
-    // Check if credential is revoked
-    if (credential.revoked) {
+    // Validate credential structure
+    if (!credential || !credential.type || credential.type.length < 2) {
+      this.verifiedPresentations++
+      this.recordInteraction(presentation.holder, false)
+      return {
+        action: 'VERIFY_PRESENTATION',
+        result: {
+          success: false,
+          message: 'Invalid credential structure',
+          data: {
+            presentationId: presentation.id,
+            holder: holder?.name,
+            verified: false,
+            reason: 'invalid_credential'
+          }
+        }
+      }
+    }
+
+    // Get fresh credential state from storage to check revocation status
+    const holderCredentials = simulationCredentials.get(credential.holder) || []
+    const currentCredential = holderCredentials.find(c => c.id === credential.id)
+
+    // Check if credential is revoked (use current state from storage)
+    const isRevoked = currentCredential?.revoked || credential.revoked
+    if (isRevoked) {
       this.verifiedPresentations++
       this.recordInteraction(presentation.holder, false)
 
@@ -735,8 +779,51 @@ export class AutonomousAgent {
       }
     }
 
-    // Simulate verification (90% success rate)
-    const verified = Math.random() > 0.1
+    // Check credential expiration
+    const now = new Date()
+    const expirationDate = new Date(credential.expirationDate)
+    if (expirationDate < now) {
+      this.verifiedPresentations++
+      this.recordInteraction(presentation.holder, false)
+      return {
+        action: 'VERIFY_PRESENTATION',
+        result: {
+          success: false,
+          message: `Credential ${credential.type[1]} from ${holder?.name || 'unknown'} has expired`,
+          data: {
+            presentationId: presentation.id,
+            credentialType: credential.type[1],
+            holder: holder?.name,
+            verified: false,
+            reason: 'expired'
+          }
+        }
+      }
+    }
+
+    // Verify issuer exists and is an issuer role
+    const issuerAgent = allAgents.find(a => a.did === credential.issuer)
+    if (!issuerAgent || issuerAgent.role !== 'issuer') {
+      this.verifiedPresentations++
+      this.recordInteraction(presentation.holder, false)
+      return {
+        action: 'VERIFY_PRESENTATION',
+        result: {
+          success: false,
+          message: `Credential issuer ${credential.issuer} is not a valid issuer`,
+          data: {
+            presentationId: presentation.id,
+            credentialType: credential.type[1],
+            holder: holder?.name,
+            verified: false,
+            reason: 'invalid_issuer'
+          }
+        }
+      }
+    }
+
+    // All checks passed - verification successful
+    const verified = true
 
     this.verifiedPresentations++
     this.recordInteraction(presentation.holder, verified)
@@ -747,13 +834,12 @@ export class AutonomousAgent {
       action: 'VERIFY_PRESENTATION',
       result: {
         success: verified,
-        message: verified
-          ? `Verified ${credential.type[1]} from ${holder?.name || 'unknown'}`
-          : `Failed to verify ${credential.type[1]} from ${holder?.name || 'unknown'}`,
+        message: `Verified ${credential.type[1]} from ${holder?.name || 'unknown'}`,
         data: {
           presentationId: presentation.id,
           credentialType: credential.type[1],
           holder: holder?.name,
+          issuer: issuerAgent.name,
           verified
         }
       }

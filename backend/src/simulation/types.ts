@@ -255,6 +255,18 @@ export interface SimulationCredential {
 }
 
 /**
+ * Simulation presentation for VP flow
+ */
+export interface SimulationPresentation {
+  id: string
+  type: string[]
+  holder: string
+  verifier: string
+  verifiableCredential: SimulationCredential[]
+  presentedAt: string
+}
+
+/**
  * Tick result returned by agent actions
  */
 export interface TickResult {
