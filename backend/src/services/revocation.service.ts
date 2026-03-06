@@ -352,6 +352,31 @@ export async function checkStatusListEntry(
 }
 
 /**
+ * Get revocation status with detailed result
+ * Used for StatusList2021 verification in OpenID4VP
+ */
+export async function getRevocationStatus(
+  statusListCredential: string,
+  statusListIndex: string | number
+): Promise<{ revoked: boolean; checkedAt: Date }> {
+  const index = typeof statusListIndex === 'string' ? parseInt(statusListIndex, 10) : statusListIndex
+
+  if (!isFeatureEnabled('module.revocation')) {
+    return { revoked: false, checkedAt: new Date() }
+  }
+
+  const revoked = await checkStatusListEntry(statusListCredential, index)
+
+  logger.debug('Revocation status checked', {
+    statusListCredential,
+    statusListIndex: index,
+    revoked,
+  })
+
+  return { revoked, checkedAt: new Date() }
+}
+
+/**
  * Get credential status details
  */
 export async function getCredentialStatus(credentialId: string): Promise<CredentialStatus | null> {

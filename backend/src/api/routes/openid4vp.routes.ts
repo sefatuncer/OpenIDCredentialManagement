@@ -2,6 +2,10 @@ import { Router, Request, Response } from 'express'
 import { logger } from '../../utils/logger'
 import { asyncHandler } from '../middleware/error.middleware'
 import {
+  verificationRateLimiter,
+  defaultRateLimiter,
+} from '../middleware/rateLimit.middleware'
+import {
   createAuthorizationRequest,
   getVerificationSession,
   handleDirectPost,
@@ -117,6 +121,7 @@ openid4vpRoutes.get(
  */
 openid4vpRoutes.post(
   '/authorization-request',
+  verificationRateLimiter, // Rate limit: 50 requests per minute
   asyncHandler(async (req: Request, res: Response) => {
     const { presentationDefinitionId, customDefinition, expiresInSeconds } = req.body
 

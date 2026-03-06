@@ -2,6 +2,11 @@ import { Router, Request, Response } from 'express'
 import { logger } from '../../utils/logger'
 import { asyncHandler } from '../middleware/error.middleware'
 import {
+  authRateLimiter,
+  credentialIssuanceRateLimiter,
+  defaultRateLimiter,
+} from '../middleware/rateLimit.middleware'
+import {
   getIssuerMetadata,
   getAuthorizationServerMetadata,
   createCredentialOffer,
@@ -240,6 +245,7 @@ openid4vciRoutes.get(
  */
 openid4vciRoutes.post(
   '/token',
+  authRateLimiter, // Rate limit: 10 requests per 15 minutes
   asyncHandler(async (req: Request, res: Response) => {
     const grantType = req.body.grant_type || req.body['grant_type']
     const preAuthorizedCode =
@@ -326,6 +332,7 @@ openid4vciRoutes.post(
  */
 openid4vciRoutes.post(
   '/credential',
+  credentialIssuanceRateLimiter, // Rate limit: 30 requests per minute
   asyncHandler(async (req: Request, res: Response) => {
     // Extract bearer token
     const authHeader = req.headers.authorization

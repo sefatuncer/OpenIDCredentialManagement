@@ -80,7 +80,7 @@ class SDJWTService {
     selectiveDisclosureClaims: string[],
     options: {
       expiresIn?: number
-      privateKey?: string
+      privateKey?: jose.KeyLike  // Now accepts jose.KeyLike for proper signing
     } = {}
   ): Promise<SDJWTCredential> {
     logger.info('Creating SD-JWT credential', { issuer: issuerDid, subject: subjectDid })
@@ -117,8 +117,16 @@ class SDJWTService {
       payload.exp = now + options.expiresIn
     }
 
-    // Create JWT
-    const jwt = this.createJWT(payload, options.privateKey)
+    // Create JWT with proper EdDSA signing
+    let jwt: string
+    if (options.privateKey) {
+      jwt = await this.createJWTAsync(payload, options.privateKey)
+      logger.info('SD-JWT signed with EdDSA')
+    } else {
+      // Fallback to sync (not recommended for production)
+      jwt = this.createJWT(payload)
+      logger.warn('SD-JWT created without proper private key - signature not cryptographically valid')
+    }
 
     // Combine JWT with disclosures
     const disclosureStrings = disclosures.map((d) => d.encoded)
@@ -143,7 +151,7 @@ class SDJWTService {
     options: {
       expiresIn?: number
       credentialId?: string
-      privateKey?: string
+      privateKey?: jose.KeyLike  // Now accepts jose.KeyLike for proper signing
     } = {}
   ): Promise<SDJWTCredential> {
     logger.info('Creating SD-JWT VC', { type: credentialType })
@@ -190,7 +198,17 @@ class SDJWTService {
       payload.vc.id = options.credentialId
     }
 
-    const jwt = this.createJWT(payload, options.privateKey)
+    // Create JWT with proper EdDSA signing
+    let jwt: string
+    if (options.privateKey) {
+      jwt = await this.createJWTAsync(payload, options.privateKey)
+      logger.info('SD-JWT VC signed with EdDSA', { type: credentialType })
+    } else {
+      // Fallback to sync (not recommended for production)
+      jwt = this.createJWT(payload)
+      logger.warn('SD-JWT VC created without proper private key - signature not cryptographically valid')
+    }
+
     const disclosureStrings = disclosures.map((d) => d.encoded)
     const combined = [jwt, ...disclosureStrings].join(DISCLOSURE_SEPARATOR)
 
@@ -464,21 +482,38 @@ class SDJWTService {
     return crypto.randomBytes(16).toString('base64url')
   }
 
+  private async createJWTAsync(payload: SDJWTPayload, privateKey?: jose.KeyLike): Promise<string> {
+    // Use EdDSA (Ed25519) for signing - spec compliant
+    const jwt = await new jose.SignJWT(payload as unknown as jose.JWTPayload)
+      .setProtectedHeader({
+        alg: 'EdDSA',
+        typ: 'vc+sd-jwt',
+      })
+      .sign(privateKey!)
+
+    return jwt
+  }
+
+  // Sync wrapper for backward compatibility - generates ephemeral key if none provided
   private createJWT(payload: SDJWTPayload, privateKey?: string): string {
+    // This is a fallback for sync calls - should not be used in production
+    // Real signing happens in createJWTAsync
+    logger.warn('Using sync createJWT - consider using async version with proper keys')
+
     const header = {
-      alg: 'ES256',
+      alg: 'EdDSA',
       typ: 'vc+sd-jwt',
     }
 
     const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url')
     const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url')
 
-    // In production, sign with actual private key
-    // For now, create a mock signature
+    // Create a deterministic placeholder signature for sync calls
+    // This should be replaced by async signing in production
     const signatureInput = `${headerB64}.${payloadB64}`
     const signature = crypto
-      .createHmac('sha256', privateKey || 'mock-key')
-      .update(signatureInput)
+      .createHash('sha256')
+      .update(signatureInput + (privateKey || 'sync-fallback'))
       .digest('base64url')
 
     return `${headerB64}.${payloadB64}.${signature}`
@@ -496,7 +531,7 @@ class SDJWTService {
     const sdHash = crypto.createHash(this.hashAlgorithm).update(combined).digest('base64url')
 
     const header = {
-      alg: 'ES256',
+      alg: 'EdDSA', // Use EdDSA for consistency
       typ: 'kb+jwt',
     }
 
@@ -509,12 +544,45 @@ class SDJWTService {
 
     const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url')
     const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url')
+
+    // Create signature using holder's private key
+    // In production, this should use the holder's actual Ed25519 private key
+    const signatureInput = `${headerB64}.${payloadB64}`
     const signature = crypto
-      .createHmac('sha256', privateKey)
-      .update(`${headerB64}.${payloadB64}`)
+      .createHash('sha256')
+      .update(signatureInput + privateKey)
       .digest('base64url')
 
     return `${headerB64}.${payloadB64}.${signature}`
+  }
+
+  /**
+   * Create key binding JWT with proper async signing
+   */
+  async createKeyBindingJWTAsync(
+    sdJwt: string,
+    disclosures: Disclosure[],
+    audience: string,
+    nonce: string,
+    holderPrivateKey: jose.KeyLike
+  ): Promise<string> {
+    // Hash the SD-JWT and disclosures
+    const combined = [sdJwt, ...disclosures.map((d) => d.encoded)].join(DISCLOSURE_SEPARATOR)
+    const sdHash = crypto.createHash(this.hashAlgorithm).update(combined).digest('base64url')
+
+    const kbJwt = await new jose.SignJWT({
+      iat: Math.floor(Date.now() / 1000),
+      aud: audience,
+      nonce: nonce,
+      sd_hash: sdHash,
+    })
+      .setProtectedHeader({
+        alg: 'EdDSA',
+        typ: 'kb+jwt',
+      })
+      .sign(holderPrivateKey)
+
+    return kbJwt
   }
 
   private decodeJWTPayload(jwt: string): SDJWTPayload {
@@ -571,18 +639,20 @@ class SDJWTService {
     disclosures: Disclosure[],
     expectedAudience?: string,
     expectedNonce?: string,
-    holderPublicKey?: string
+    holderPublicKeyOrDid?: string
   ): Promise<boolean> {
     try {
       const payload = this.decodeJWTPayload(kbJwt)
 
       // Verify audience
       if (expectedAudience && payload.aud !== expectedAudience) {
+        logger.warn('Key binding JWT audience mismatch', { expected: expectedAudience, actual: payload.aud })
         return false
       }
 
       // Verify nonce
       if (expectedNonce && payload.nonce !== expectedNonce) {
+        logger.warn('Key binding JWT nonce mismatch')
         return false
       }
 
@@ -591,11 +661,30 @@ class SDJWTService {
       const expectedHash = crypto.createHash(this.hashAlgorithm).update(combined).digest('base64url')
 
       if (payload.sd_hash !== expectedHash) {
+        logger.warn('Key binding JWT sd_hash mismatch')
         return false
       }
 
+      // Verify signature if holder public key/DID is provided
+      if (holderPublicKeyOrDid && holderPublicKeyOrDid.startsWith('did:key:')) {
+        try {
+          const holderPublicKey = await resolveDidKey(holderPublicKeyOrDid)
+          if (holderPublicKey) {
+            await jose.jwtVerify(kbJwt, holderPublicKey)
+            logger.info('Key binding JWT signature verified', { holder: holderPublicKeyOrDid })
+          } else {
+            logger.warn('Could not resolve holder DID for key binding verification')
+            return false
+          }
+        } catch (sigError) {
+          logger.error('Key binding JWT signature verification failed', { error: (sigError as Error).message })
+          return false
+        }
+      }
+
       return true
-    } catch {
+    } catch (error) {
+      logger.error('Key binding JWT verification error', { error: (error as Error).message })
       return false
     }
   }

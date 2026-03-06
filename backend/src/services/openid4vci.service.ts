@@ -4,6 +4,7 @@ import * as jose from 'jose'
 import { logger } from '../utils/logger'
 import { getIssuerDid, getIssuerAgent } from '../agents/issuer.agent'
 import { resolveDidKey } from '../agents/base.agent'
+import { resolveDID } from './didResolver.service'
 import {
   IStorageAdapter,
   createStorageAdapter,
@@ -75,10 +76,19 @@ interface StoredDeferredCredential {
   createdAt: Date
 }
 
+interface StoredNonce {
+  nonce: string
+  tokenId: string  // Associated access token
+  createdAt: Date
+  expiresAt: Date
+  used: boolean
+}
+
 // Storage adapters (initialized lazily)
 let credentialOffersStorage: IStorageAdapter<StoredCredentialOffer> | null = null
 let accessTokensStorage: IStorageAdapter<StoredAccessToken> | null = null
 let deferredCredentialsStorage: IStorageAdapter<StoredDeferredCredential> | null = null
+let nonceStorage: IStorageAdapter<StoredNonce> | null = null
 
 /**
  * Get or initialize storage adapters
@@ -102,6 +112,13 @@ function getDeferredStorage(): IStorageAdapter<StoredDeferredCredential> {
     deferredCredentialsStorage = createStorageAdapter<StoredDeferredCredential>('deferred_credentials')
   }
   return deferredCredentialsStorage
+}
+
+function getNonceStorage(): IStorageAdapter<StoredNonce> {
+  if (!nonceStorage) {
+    nonceStorage = createStorageAdapter<StoredNonce>('credential_nonces')
+  }
+  return nonceStorage
 }
 
 export interface CredentialOffer {
@@ -495,11 +512,22 @@ export async function exchangePreAuthorizedCode(
 
   await getTokensStorage().save(accessToken, tokenData)
 
-  // Generate c_nonce for proof of possession
+  // Generate c_nonce for proof of possession and store it
   const cNonce = uuidv4()
+  const nonceExpiresIn = 300 // 5 minutes (spec recommends short-lived nonces)
+
+  const storedNonce: StoredNonce = {
+    nonce: cNonce,
+    tokenId: accessToken,
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + nonceExpiresIn * 1000),
+    used: false,
+  }
+  await getNonceStorage().save(cNonce, storedNonce)
 
   logger.info('Issued access token for credential offer', {
     expiresIn,
+    nonceExpiresIn,
     storage: getStorageType(),
   })
 
@@ -513,7 +541,7 @@ export async function exchangePreAuthorizedCode(
     token_type: 'Bearer',
     expires_in: expiresIn,
     c_nonce: cNonce,
-    c_nonce_expires_in: 86400, // 24 hours
+    c_nonce_expires_in: nonceExpiresIn,
   }
 }
 
@@ -608,33 +636,78 @@ export async function issueCredential(
         }
       }
 
-      // Cryptographic signature verification
+      // Validate c_nonce - CRITICAL for replay attack prevention
+      const proofNonce = proofPayload.nonce
+      if (!proofNonce) {
+        return {
+          error: 'invalid_proof',
+          error_description: 'Proof JWT must contain nonce claim',
+        }
+      }
+
+      // Check nonce exists in storage and is valid
+      const storedNonce = await getNonceStorage().get(proofNonce)
+      if (!storedNonce) {
+        return {
+          error: 'invalid_proof',
+          error_description: 'Invalid or unknown nonce',
+        }
+      }
+
+      // Check nonce is not expired
+      if (new Date() > storedNonce.expiresAt) {
+        await getNonceStorage().delete(proofNonce)
+        return {
+          error: 'invalid_proof',
+          error_description: 'Nonce has expired',
+        }
+      }
+
+      // Check nonce is not already used
+      if (storedNonce.used) {
+        return {
+          error: 'invalid_proof',
+          error_description: 'Nonce has already been used',
+        }
+      }
+
+      // Mark nonce as used (prevent replay)
+      await getNonceStorage().update(proofNonce, { used: true })
+      logger.info('Nonce validated and marked as used', { nonce: proofNonce })
+
+      // Cryptographic signature verification for ALL DID methods
       const proofIssuer = proofPayload.iss || (proofHeader.kid?.split('#')[0])
-      if (proofIssuer && proofIssuer.startsWith('did:key:')) {
+      if (proofIssuer && proofIssuer.startsWith('did:')) {
         try {
-          const holderPublicKey = await resolveDidKey(proofIssuer)
+          // Use universal public key resolver that supports did:key, did:web, did:peer
+          const holderPublicKey = await resolvePublicKeyFromDid(proofIssuer)
           if (holderPublicKey) {
             await jose.jwtVerify(request.proof.jwt, holderPublicKey)
             logger.info('Proof signature verified successfully', { holderDid: proofIssuer })
           } else {
-            logger.warn('Could not resolve holder DID public key', { holderDid: proofIssuer })
+            logger.error('Could not resolve holder DID public key', { holderDid: proofIssuer })
             return {
               error: 'invalid_proof',
-              error_description: 'Could not resolve holder DID public key',
+              error_description: 'Could not resolve holder DID public key for signature verification',
             }
           }
         } catch (sigError) {
-          logger.error('Proof signature verification failed', { error: (sigError as Error).message })
+          logger.error('Proof signature verification failed', {
+            error: (sigError as Error).message,
+            holderDid: proofIssuer
+          })
           return {
             error: 'invalid_proof',
             error_description: 'Proof signature verification failed: ' + (sigError as Error).message,
           }
         }
-      } else if (proofIssuer) {
-        // Non did:key methods - log warning but accept for now
-        logger.warn('Unsupported DID method for proof verification, signature not verified', {
-          didMethod: proofIssuer.split(':')[1],
-        })
+      } else if (!proofIssuer) {
+        // No issuer in proof - this is a security issue
+        logger.error('Proof JWT missing issuer claim')
+        return {
+          error: 'invalid_proof',
+          error_description: 'Proof JWT must contain iss claim or kid header with DID',
+        }
       }
 
       holderDid = proofPayload.iss || holderDid
@@ -710,11 +783,24 @@ export async function issueCredential(
       holderDid,
     })
 
+    // Generate new nonce for potential follow-up requests
+    const newNonce = uuidv4()
+    const newNonceExpiresIn = 300 // 5 minutes
+
+    const newStoredNonce: StoredNonce = {
+      nonce: newNonce,
+      tokenId: accessToken,
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + newNonceExpiresIn * 1000),
+      used: false,
+    }
+    await getNonceStorage().save(newNonce, newStoredNonce)
+
     return {
       format: request.format || 'jwt_vc_json',
       credential,
-      c_nonce: uuidv4(),
-      c_nonce_expires_in: 86400,
+      c_nonce: newNonce,
+      c_nonce_expires_in: newNonceExpiresIn,
     }
   } catch (error) {
     logger.error('Failed to issue credential', { error })
@@ -890,11 +976,12 @@ export async function listCredentialOffers(): Promise<Array<{
 }
 
 /**
- * Cleanup expired offers and tokens
+ * Cleanup expired offers, tokens, and nonces
  */
-export async function cleanupExpired(): Promise<{ offersRemoved: number; tokensRemoved: number }> {
+export async function cleanupExpired(): Promise<{ offersRemoved: number; tokensRemoved: number; noncesRemoved: number }> {
   let offersRemoved = 0
   let tokensRemoved = 0
+  let noncesRemoved = 0
   const now = new Date()
 
   // Cleanup expired offers
@@ -919,16 +1006,26 @@ export async function cleanupExpired(): Promise<{ offersRemoved: number; tokensR
     }
   }
 
-  if (offersRemoved > 0 || tokensRemoved > 0) {
-    logger.info('Cleaned up expired items', { offersRemoved, tokensRemoved })
+  // Cleanup expired or used nonces
+  const nonces = await getNonceStorage().list()
+  for (const nonce of nonces) {
+    if (now > nonce.expiresAt || nonce.used) {
+      const deleted = await getNonceStorage().delete(nonce.nonce)
+      if (deleted) noncesRemoved++
+    }
+  }
+
+  if (offersRemoved > 0 || tokensRemoved > 0 || noncesRemoved > 0) {
+    logger.info('Cleaned up expired items', { offersRemoved, tokensRemoved, noncesRemoved })
 
     eventBus.emit('credential.offer.expired', {
       offersRemoved,
       tokensRemoved,
+      noncesRemoved,
     })
   }
 
-  return { offersRemoved, tokensRemoved }
+  return { offersRemoved, tokensRemoved, noncesRemoved }
 }
 
 // Run cleanup periodically
@@ -950,3 +1047,78 @@ export function stopCleanupInterval(): void {
 
 // Start cleanup by default
 startCleanupInterval()
+
+/**
+ * Resolve public key from any supported DID method
+ * Supports: did:key, did:web, did:peer
+ */
+async function resolvePublicKeyFromDid(did: string): Promise<jose.KeyLike | null> {
+  try {
+    // Fast path for did:key
+    if (did.startsWith('did:key:')) {
+      return await resolveDidKey(did)
+    }
+
+    // Use universal DID resolver for other methods
+    const resolution = await resolveDID(did)
+    if (!resolution.didDocument) {
+      logger.warn('Could not resolve DID document', { did })
+      return null
+    }
+
+    // Extract verification method from DID document
+    const verificationMethods = resolution.didDocument.verificationMethod || []
+    const authenticationMethods = resolution.didDocument.authentication || []
+
+    // Find the first usable verification method
+    for (const vm of verificationMethods) {
+      // Handle embedded verification methods
+      const method = typeof vm === 'string'
+        ? verificationMethods.find((m: any) => typeof m !== 'string' && m.id === vm)
+        : vm
+
+      if (!method || typeof method === 'string') continue
+
+      // Try to extract public key based on type
+      if (method.publicKeyJwk) {
+        try {
+          return await jose.importJWK(method.publicKeyJwk as jose.JWK)
+        } catch (e) {
+          logger.warn('Failed to import JWK from verification method', { id: method.id })
+        }
+      }
+
+      if (method.publicKeyMultibase) {
+        // For Ed25519 keys encoded as multibase
+        try {
+          const multibase = method.publicKeyMultibase as string
+          if (multibase.startsWith('z')) {
+            // This is base58btc encoded - extract and import
+            // Note: Full multibase decoding would require additional library
+            // For now, try to resolve via did:key if it's an Ed25519 key
+            const keyDid = `did:key:${multibase}`
+            return await resolveDidKey(keyDid)
+          }
+        } catch (e) {
+          logger.warn('Failed to import multibase key from verification method', { id: method.id })
+        }
+      }
+    }
+
+    // Check authentication methods as fallback
+    for (const auth of authenticationMethods) {
+      if (typeof auth === 'string') {
+        const refMethod = verificationMethods.find((m: any) => typeof m !== 'string' && m.id === auth)
+        if (refMethod && typeof refMethod !== 'string' && refMethod.publicKeyJwk) {
+          return await jose.importJWK(refMethod.publicKeyJwk as jose.JWK)
+        }
+      }
+    }
+
+    logger.warn('No usable public key found in DID document', { did })
+    return null
+  } catch (error) {
+    logger.error('Failed to resolve public key from DID', { did, error: (error as Error).message })
+    return null
+  }
+}

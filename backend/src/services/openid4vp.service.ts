@@ -8,6 +8,7 @@ import {
   createStorageAdapter,
   getStorageType,
 } from '../core/storage'
+import { isCredentialRevoked, getRevocationStatus } from './revocation.service'
 
 /**
  * OpenID4VP Service
@@ -621,6 +622,54 @@ async function verifyVPToken(
                 } catch (vcSigError) {
                   warnings.push('VC signature verification failed: ' + (vcSigError as Error).message)
                 }
+              }
+            }
+
+            // Check credential revocation status - CRITICAL security check
+            const credentialId = credPayload.jti || credPayload.vc?.id
+            if (credentialId) {
+              try {
+                const revoked = await isCredentialRevoked(credentialId)
+                if (revoked) {
+                  logger.warn('Credential has been revoked', { credentialId })
+                  return {
+                    verified: false,
+                    errors: ['Credential has been revoked'],
+                    credentialSubject: credPayload.vc?.credentialSubject,
+                    issuerDid: vcIssuerDid,
+                    holderDid,
+                  }
+                }
+
+                // Also check StatusList2021 if credential has credentialStatus
+                const credentialStatus = credPayload.vc?.credentialStatus
+                if (credentialStatus && credentialStatus.type === 'StatusList2021Entry') {
+                  const statusResult = await getRevocationStatus(
+                    credentialStatus.statusListCredential,
+                    credentialStatus.statusListIndex
+                  )
+                  if (statusResult.revoked) {
+                    logger.warn('Credential revoked via StatusList2021', {
+                      credentialId,
+                      statusListIndex: credentialStatus.statusListIndex
+                    })
+                    return {
+                      verified: false,
+                      errors: ['Credential has been revoked (StatusList2021)'],
+                      credentialSubject: credPayload.vc?.credentialSubject,
+                      issuerDid: vcIssuerDid,
+                      holderDid,
+                    }
+                  }
+                }
+
+                logger.info('Credential revocation check passed', { credentialId })
+              } catch (revocationError) {
+                // Log but don't fail on revocation check errors (optional endpoint)
+                logger.warn('Revocation check failed, continuing with verification', {
+                  error: (revocationError as Error).message,
+                  credentialId
+                })
               }
             }
 
