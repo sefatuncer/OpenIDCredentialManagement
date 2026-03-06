@@ -9,7 +9,9 @@
  */
 
 import * as crypto from 'crypto'
+import * as jose from 'jose'
 import { logger } from '../utils/logger'
+import { resolveDidKey } from '../agents/base.agent'
 
 // Types
 export interface SDJWTClaims {
@@ -526,15 +528,41 @@ class SDJWTService {
     return payload
   }
 
-  private async verifyJWTSignature(jwt: string, publicKey?: string): Promise<boolean> {
-    // In production, verify signature with public key
-    // For now, accept all signatures in development
-    if (process.env.NODE_ENV === 'development') {
-      return true
-    }
+  private async verifyJWTSignature(jwt: string, publicKeyOrDid?: string): Promise<boolean> {
+    try {
+      const payload = this.decodeJWTPayload(jwt)
+      const issuerDid = payload.iss
 
-    // TODO: Implement actual signature verification
-    return true
+      // If a public key/DID is provided, use it; otherwise try to resolve from iss claim
+      const didToResolve = publicKeyOrDid || issuerDid
+
+      if (!didToResolve) {
+        logger.warn('No issuer DID found for signature verification')
+        return false
+      }
+
+      // Resolve did:key to public key
+      if (didToResolve.startsWith('did:key:')) {
+        const publicKey = await resolveDidKey(didToResolve)
+        if (!publicKey) {
+          logger.warn('Could not resolve DID to public key', { did: didToResolve })
+          return false
+        }
+
+        await jose.jwtVerify(jwt, publicKey)
+        logger.info('SD-JWT signature verified successfully', { issuer: didToResolve })
+        return true
+      }
+
+      // For non did:key methods, log warning
+      logger.warn('Unsupported DID method for SD-JWT verification', {
+        method: didToResolve.split(':')[1],
+      })
+      return false
+    } catch (error) {
+      logger.error('SD-JWT signature verification failed', { error: (error as Error).message })
+      return false
+    }
   }
 
   private async verifyKeyBindingJWT(

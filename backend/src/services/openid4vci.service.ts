@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import * as jose from 'jose'
 import { logger } from '../utils/logger'
 import { getIssuerDid, getIssuerAgent } from '../agents/issuer.agent'
+import { resolveDidKey } from '../agents/base.agent'
 import {
   IStorageAdapter,
   createStorageAdapter,
@@ -607,16 +608,34 @@ export async function issueCredential(
         }
       }
 
-      // TODO: Cryptographic signature verification requires resolving the holder's DID
-      // and verifying the signature against the public key. For now, we log a warning.
-      // In production, implement full signature verification using:
-      // 1. Resolve the DID from proofPayload.iss or proofHeader.kid
-      // 2. Extract the public key from the DID document
-      // 3. Verify the JWT signature using jose.jwtVerify()
-      logger.warn('Proof signature verification not fully implemented - accepting proof without cryptographic verification', {
-        iss: proofPayload.iss,
-        kid: proofHeader.kid,
-      })
+      // Cryptographic signature verification
+      const proofIssuer = proofPayload.iss || (proofHeader.kid?.split('#')[0])
+      if (proofIssuer && proofIssuer.startsWith('did:key:')) {
+        try {
+          const holderPublicKey = await resolveDidKey(proofIssuer)
+          if (holderPublicKey) {
+            await jose.jwtVerify(request.proof.jwt, holderPublicKey)
+            logger.info('Proof signature verified successfully', { holderDid: proofIssuer })
+          } else {
+            logger.warn('Could not resolve holder DID public key', { holderDid: proofIssuer })
+            return {
+              error: 'invalid_proof',
+              error_description: 'Could not resolve holder DID public key',
+            }
+          }
+        } catch (sigError) {
+          logger.error('Proof signature verification failed', { error: (sigError as Error).message })
+          return {
+            error: 'invalid_proof',
+            error_description: 'Proof signature verification failed: ' + (sigError as Error).message,
+          }
+        }
+      } else if (proofIssuer) {
+        // Non did:key methods - log warning but accept for now
+        logger.warn('Unsupported DID method for proof verification, signature not verified', {
+          didMethod: proofIssuer.split(':')[1],
+        })
+      }
 
       holderDid = proofPayload.iss || holderDid
     } catch (error) {

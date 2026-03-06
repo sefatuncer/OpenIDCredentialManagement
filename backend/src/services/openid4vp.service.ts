@@ -3,6 +3,11 @@ import * as jose from 'jose'
 import { logger } from '../utils/logger'
 import { getVerifierDid } from '../agents/verifier.agent'
 import { resolveDidKey } from '../agents/base.agent'
+import {
+  IStorageAdapter,
+  createStorageAdapter,
+  getStorageType,
+} from '../core/storage'
 
 /**
  * OpenID4VP Service
@@ -11,23 +16,31 @@ import { resolveDidKey } from '../agents/base.agent'
  * https://openid.net/specs/openid-4-verifiable-presentations-1_0.html
  */
 
-// Verification session storage (in-memory, replace with Redis/DB in production)
-const verificationSessions = new Map<
-  string,
-  {
-    id: string
-    presentationDefinition: PresentationDefinition
-    nonce: string
-    state: string
-    responseUri: string
-    clientId: string
-    createdAt: Date
-    expiresAt: Date
-    status: 'pending' | 'submitted' | 'verified' | 'rejected' | 'expired'
-    presentation?: any
-    verificationResult?: VerificationResult
+// Verification session storage type
+interface VerificationSession {
+  id: string
+  presentationDefinition: PresentationDefinition
+  nonce: string
+  state: string
+  responseUri: string
+  clientId: string
+  createdAt: Date
+  expiresAt: Date
+  status: 'pending' | 'submitted' | 'verified' | 'rejected' | 'expired'
+  presentation?: any
+  verificationResult?: VerificationResult
+}
+
+// Storage adapter (initialized lazily)
+let vpSessionsStorage: IStorageAdapter<VerificationSession> | null = null
+
+function getVPSessionsStorage(): IStorageAdapter<VerificationSession> {
+  if (!vpSessionsStorage) {
+    vpSessionsStorage = createStorageAdapter<VerificationSession>('vp_sessions')
+    logger.info('VP sessions storage initialized', { type: getStorageType() })
   }
->()
+  return vpSessionsStorage
+}
 
 export interface PresentationDefinition {
   id: string
@@ -370,8 +383,8 @@ export async function createAuthorizationRequest(
     client_metadata: getVerifierClientMetadata(),
   }
 
-  // Store session
-  verificationSessions.set(sessionId, {
+  // Store session using storage adapter
+  const session: VerificationSession = {
     id: sessionId,
     presentationDefinition,
     nonce,
@@ -381,7 +394,8 @@ export async function createAuthorizationRequest(
     createdAt: new Date(),
     expiresAt: new Date(Date.now() + expiresIn * 1000),
     status: 'pending',
-  })
+  }
+  await getVPSessionsStorage().save(sessionId, session)
 
   // Create authorization request URI
   const params = new URLSearchParams()
@@ -412,35 +426,29 @@ export async function createAuthorizationRequest(
 /**
  * Get session by state parameter
  */
-export function getSessionByState(state: string): typeof verificationSessions extends Map<
-  string,
-  infer V
->
-  ? V | undefined
-  : never {
-  for (const session of verificationSessions.values()) {
-    if (session.state === state) {
-      return session
-    }
-  }
-  return undefined
+export async function getSessionByState(state: string): Promise<VerificationSession | undefined> {
+  const result = await getVPSessionsStorage().query({
+    where: { state },
+    limit: 1,
+  })
+  return result.data[0]
 }
 
 /**
  * Get verification session
  */
-export function getVerificationSession(sessionId: string): {
-  session: typeof verificationSessions extends Map<string, infer V> ? V : never
+export async function getVerificationSession(sessionId: string): Promise<{
+  session: VerificationSession
   expired: boolean
-} | null {
-  const session = verificationSessions.get(sessionId)
+} | null> {
+  const session = await getVPSessionsStorage().get(sessionId)
   if (!session) {
     return null
   }
 
   return {
     session,
-    expired: new Date() > session.expiresAt,
+    expired: new Date() > new Date(session.expiresAt),
   }
 }
 
@@ -457,7 +465,7 @@ export async function handleDirectPost(
   error_description?: string
 }> {
   // Find session by state
-  const session = getSessionByState(state)
+  const session = await getSessionByState(state)
   if (!session) {
     return {
       error: 'invalid_request',
@@ -466,8 +474,8 @@ export async function handleDirectPost(
   }
 
   // Check if expired
-  if (new Date() > session.expiresAt) {
-    session.status = 'expired'
+  if (new Date() > new Date(session.expiresAt)) {
+    await getVPSessionsStorage().update(session.id, { status: 'expired' })
     return {
       error: 'expired_request',
       error_description: 'Authorization request has expired',
@@ -486,14 +494,19 @@ export async function handleDirectPost(
     // Verify the VP token
     const verificationResult = await verifyVPToken(vpToken, session)
 
-    session.presentation = vpToken
-    session.verificationResult = verificationResult
-
     if (verificationResult.verified) {
-      session.status = 'verified'
+      await getVPSessionsStorage().update(session.id, {
+        status: 'verified',
+        presentation: vpToken,
+        verificationResult,
+      })
       logger.info('Presentation verified successfully', { sessionId: session.id })
     } else {
-      session.status = 'rejected'
+      await getVPSessionsStorage().update(session.id, {
+        status: 'rejected',
+        presentation: vpToken,
+        verificationResult,
+      })
       logger.warn('Presentation verification failed', {
         sessionId: session.id,
         errors: verificationResult.errors,
@@ -503,11 +516,13 @@ export async function handleDirectPost(
     return {}
   } catch (error) {
     logger.error('Error processing presentation', { error })
-    session.status = 'rejected'
-    session.verificationResult = {
-      verified: false,
-      errors: [(error as Error).message],
-    }
+    await getVPSessionsStorage().update(session.id, {
+      status: 'rejected',
+      verificationResult: {
+        verified: false,
+        errors: [(error as Error).message],
+      },
+    })
 
     return {
       error: 'invalid_presentation',
@@ -521,7 +536,7 @@ export async function handleDirectPost(
  */
 async function verifyVPToken(
   vpToken: string,
-  session: typeof verificationSessions extends Map<string, infer V> ? V : never
+  session: VerificationSession
 ): Promise<VerificationResult> {
   try {
     // Parse JWT
@@ -654,8 +669,8 @@ async function verifyVPToken(
 /**
  * Get verification result for a session
  */
-export function getVerificationResult(sessionId: string): VerificationResult | null {
-  const session = verificationSessions.get(sessionId)
+export async function getVerificationResult(sessionId: string): Promise<VerificationResult | null> {
+  const session = await getVPSessionsStorage().get(sessionId)
   if (!session) {
     return null
   }
@@ -680,35 +695,25 @@ export function getVerificationResult(sessionId: string): VerificationResult | n
 /**
  * List all verification sessions (admin)
  */
-export function listVerificationSessions(): Array<{
+export async function listVerificationSessions(): Promise<Array<{
   sessionId: string
   presentationDefinitionId: string
   status: string
   createdAt: Date
   expiresAt: Date
   expired: boolean
-}> {
-  const sessions: Array<{
-    sessionId: string
-    presentationDefinitionId: string
-    status: string
-    createdAt: Date
-    expiresAt: Date
-    expired: boolean
-  }> = []
+}>> {
+  const allSessions = await getVPSessionsStorage().list()
+  const now = new Date()
 
-  for (const [sessionId, session] of verificationSessions.entries()) {
-    sessions.push({
-      sessionId,
-      presentationDefinitionId: session.presentationDefinition.id,
-      status: session.status,
-      createdAt: session.createdAt,
-      expiresAt: session.expiresAt,
-      expired: new Date() > session.expiresAt,
-    })
-  }
-
-  return sessions
+  return allSessions.map((session) => ({
+    sessionId: session.id,
+    presentationDefinitionId: session.presentationDefinition.id,
+    status: session.status,
+    createdAt: new Date(session.createdAt),
+    expiresAt: new Date(session.expiresAt),
+    expired: now > new Date(session.expiresAt),
+  }))
 }
 
 /**
@@ -729,29 +734,35 @@ export function getAvailablePresentationDefinitions(): Array<{
 /**
  * Cleanup expired sessions
  */
-export function cleanupExpiredSessions(): { removed: number } {
+export async function cleanupExpiredSessions(): Promise<{ removed: number }> {
   let removed = 0
   const now = new Date()
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
 
-  for (const [sessionId, session] of verificationSessions.entries()) {
-    if (now > session.expiresAt && session.status === 'pending') {
-      session.status = 'expired'
+  const allSessions = await getVPSessionsStorage().list()
+
+  for (const session of allSessions) {
+    const sessionExpiresAt = new Date(session.expiresAt)
+    const sessionCreatedAt = new Date(session.createdAt)
+
+    // Mark as expired if pending and past expiration
+    if (now > sessionExpiresAt && session.status === 'pending') {
+      await getVPSessionsStorage().update(session.id, { status: 'expired' })
     }
 
     // Remove sessions older than 1 hour
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
-    if (session.createdAt < oneHourAgo) {
-      verificationSessions.delete(sessionId)
-      removed++
+    if (sessionCreatedAt < oneHourAgo) {
+      const deleted = await getVPSessionsStorage().delete(session.id)
+      if (deleted) removed++
     }
   }
 
   if (removed > 0) {
-    logger.info('Cleaned up expired verification sessions', { removed })
+    logger.info('Cleaned up expired verification sessions', { removed, storage: getStorageType() })
   }
 
   return { removed }
 }
 
 // Run cleanup every 5 minutes
-setInterval(cleanupExpiredSessions, 5 * 60 * 1000)
+setInterval(() => cleanupExpiredSessions().catch(err => logger.error('Cleanup error', err)), 5 * 60 * 1000)

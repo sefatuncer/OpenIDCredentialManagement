@@ -163,9 +163,9 @@ openid4vpRoutes.post(
  */
 openid4vpRoutes.get(
   '/sessions/:sessionId',
-  (req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const { sessionId } = req.params
-    const result = getVerificationSession(sessionId)
+    const result = await getVerificationSession(sessionId)
 
     if (!result) {
       return res.status(404).json({
@@ -184,7 +184,7 @@ openid4vpRoutes.get(
       expiresAt: session.expiresAt,
       expired,
     })
-  }
+  })
 )
 
 /**
@@ -210,9 +210,9 @@ openid4vpRoutes.get(
  */
 openid4vpRoutes.get(
   '/sessions/:sessionId/result',
-  (req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const { sessionId } = req.params
-    const result = getVerificationResult(sessionId)
+    const result = await getVerificationResult(sessionId)
 
     if (!result) {
       return res.status(404).json({
@@ -222,7 +222,7 @@ openid4vpRoutes.get(
     }
 
     res.json(result)
-  }
+  })
 )
 
 /**
@@ -241,10 +241,10 @@ openid4vpRoutes.get(
  */
 openid4vpRoutes.get(
   '/sessions',
-  (req: Request, res: Response) => {
-    const sessions = listVerificationSessions()
+  asyncHandler(async (req: Request, res: Response) => {
+    const sessions = await listVerificationSessions()
     res.json({ sessions })
-  }
+  })
 )
 
 /**
