@@ -1082,7 +1082,13 @@ async function resolvePublicKeyFromDid(did: string): Promise<jose.KeyLike | null
       // Try to extract public key based on type
       if (method.publicKeyJwk) {
         try {
-          return await jose.importJWK(method.publicKeyJwk as jose.JWK)
+          const key = await jose.importJWK(method.publicKeyJwk as jose.JWK)
+          // importJWK can return Uint8Array for symmetric keys, we need KeyLike
+          if (key instanceof Uint8Array) {
+            logger.warn('Symmetric key not supported for signature verification', { id: method.id })
+            continue
+          }
+          return key
         } catch (e) {
           logger.warn('Failed to import JWK from verification method', { id: method.id })
         }
@@ -1110,7 +1116,11 @@ async function resolvePublicKeyFromDid(did: string): Promise<jose.KeyLike | null
       if (typeof auth === 'string') {
         const refMethod = verificationMethods.find((m: any) => typeof m !== 'string' && m.id === auth)
         if (refMethod && typeof refMethod !== 'string' && refMethod.publicKeyJwk) {
-          return await jose.importJWK(refMethod.publicKeyJwk as jose.JWK)
+          const key = await jose.importJWK(refMethod.publicKeyJwk as jose.JWK)
+          if (key instanceof Uint8Array) {
+            continue
+          }
+          return key
         }
       }
     }
