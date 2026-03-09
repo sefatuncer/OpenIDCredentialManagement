@@ -77,3 +77,16 @@ cd web-wallet && npm run dev
 - Branch: main
 - .env dosyaları gitignore'da
 - docs/ ve *.md (README hariç) gitignore'da
+
+## Lessons Learned
+
+- **[2026-03-09] Architecture:** Jose PRIMARY, Credo OPTIONAL mimarisi kullan. Native modül bağımlılıkları opsiyonel olmalı, kritik yol pure JS'de çalışmalı. Bkz: `.claude/solutions/jose-primary-credo-optional.md`
+- **[2026-03-09] DID:** DID:key oluştururken multicodec prefix (0xed01 for Ed25519) ve base58btc encoding zorunlu. Bkz: `.claude/solutions/did-key-multibase-encoding.md`
+- **[2026-03-09] TypeScript:** `jose.importJWK()` dönüş tipi `KeyLike | Uint8Array` olabilir, type assertion gerekebilir.
+
+## Pattern Library
+
+| Pattern | Açıklama | Dosya |
+|---------|----------|-------|
+| Jose PRIMARY + Credo Optional | Native modül gerektirmeyen SSI mimarisi | `.claude/solutions/jose-primary-credo-optional.md` |
+| DID:key Encoding | Ed25519'dan DID:key oluşturma | `.claude/solutions/did-key-multibase-encoding.md` |
