@@ -71,6 +71,7 @@ paper-latex.zip
 *.md
 !README.md
 !CLAUDE.md
+!.claude/**/*.md
 
 # Docs folder (private)
 docs/
