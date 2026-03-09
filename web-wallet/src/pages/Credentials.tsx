@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
-import { parseJwt } from '../api'
+import SDJWTCredentialCard, { SDJWTCredentialDetail } from '../components/SDJWTCredentialCard'
+import CreatePresentationModal from '../components/CreatePresentationModal'
+import { isSDJWT, sdJWTToCredentialData } from '../services/sdjwt.service'
+import type { SDJWTCredentialData } from '../types/sdjwt.types'
 
 interface StoredCredential {
   id: string
@@ -8,7 +11,12 @@ interface StoredCredential {
   issuer: string
   issuanceDate: string
   subject: Record<string, unknown>
+  // SD-JWT fields (optional)
+  isSDJWT?: boolean
+  combined?: string
 }
+
+type SelectedCredential = StoredCredential | SDJWTCredentialData | null
 
 // Simple credential storage encryption using Web Crypto API
 // Note: For production, use proper key management and consider IndexedDB with encryption
@@ -101,8 +109,9 @@ async function migrateOldStorage(): Promise<StoredCredential[]> {
 
 export default function Credentials() {
   const [credentials, setCredentials] = useState<StoredCredential[]>([])
-  const [selectedCredential, setSelectedCredential] = useState<StoredCredential | null>(null)
+  const [selectedCredential, setSelectedCredential] = useState<SelectedCredential>(null)
   const [loading, setLoading] = useState(true)
+  const [presentationCredential, setPresentationCredential] = useState<SDJWTCredentialData | null>(null)
 
   useEffect(() => {
     // Load credentials from encrypted storage
@@ -156,6 +165,82 @@ export default function Credentials() {
     localStorage.setItem(STORAGE_KEY, encrypted)
   }
 
+  const addTestSDJWTCredential = async () => {
+    // SD-JWT test credential with selective disclosure claims
+    // Format: jwt~disclosure1~disclosure2~...
+    // Each disclosure is base64url encoded [salt, claimName, claimValue]
+    const salt1 = btoa(Math.random().toString()).replace(/[+/=]/g, '').substring(0, 16)
+    const salt2 = btoa(Math.random().toString()).replace(/[+/=]/g, '').substring(0, 16)
+    const salt3 = btoa(Math.random().toString()).replace(/[+/=]/g, '').substring(0, 16)
+
+    // Create disclosures
+    const disclosure1 = btoa(JSON.stringify([salt1, 'capabilities', ['text-gen', 'code', 'reasoning']])).replace(/=/g, '')
+    const disclosure2 = btoa(JSON.stringify([salt2, 'trustLevel', 'high'])).replace(/=/g, '')
+    const disclosure3 = btoa(JSON.stringify([salt3, 'ownerName', 'Anthropic Inc.'])).replace(/=/g, '')
+
+    // Simple test JWT with _sd array (mock - not cryptographically valid)
+    const header = btoa(JSON.stringify({ alg: 'EdDSA', typ: 'vc+sd-jwt' })).replace(/=/g, '')
+    const payload = btoa(JSON.stringify({
+      iss: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+      sub: 'did:key:z6MkjRagNiMu91DduvCvgEsqLZDVzrJzFrwahc4tXLt9DoHd',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 86400 * 365,
+      vc: {
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        type: ['VerifiableCredential', 'AIAgentIdentityCredential'],
+        credentialSubject: {
+          id: 'did:key:z6MkjRagNiMu91DduvCvgEsqLZDVzrJzFrwahc4tXLt9DoHd',
+          agentName: 'Claude Assistant',
+          agentVersion: '3.5',
+          _sd: ['hash1', 'hash2', 'hash3']
+        }
+      },
+      _sd_alg: 'sha-256'
+    })).replace(/=/g, '')
+    const signature = 'mock_signature_for_testing'
+
+    const combined = `${header}.${payload}.${signature}~${disclosure1}~${disclosure2}~${disclosure3}`
+
+    const testSDJWT: StoredCredential = {
+      id: `sdjwt-${Date.now()}`,
+      jwt: `${header}.${payload}.${signature}`,
+      combined: combined,
+      isSDJWT: true,
+      type: 'AIAgentIdentityCredential',
+      issuer: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+      issuanceDate: new Date().toISOString(),
+      subject: {
+        agentName: 'Claude Assistant',
+        agentVersion: '3.5',
+        capabilities: ['text-gen', 'code', 'reasoning'],
+        trustLevel: 'high',
+        ownerName: 'Anthropic Inc.',
+      },
+    }
+
+    const updated = [...credentials, testSDJWT]
+    setCredentials(updated)
+    const encrypted = await encryptCredentials(updated)
+    localStorage.setItem(STORAGE_KEY, encrypted)
+  }
+
+  // Convert stored credential to SD-JWT credential data if applicable
+  const getSDJWTCredentialData = (cred: StoredCredential): SDJWTCredentialData | null => {
+    if (cred.isSDJWT && cred.combined) {
+      return sdJWTToCredentialData(cred.id, cred.combined)
+    }
+    // Check if JWT itself is SD-JWT format
+    if (isSDJWT(cred.jwt)) {
+      return sdJWTToCredentialData(cred.id, cred.jwt)
+    }
+    return null
+  }
+
+  const handleCreatePresentation = (credential: SDJWTCredentialData) => {
+    setSelectedCredential(null)
+    setPresentationCredential(credential)
+  }
+
   const deleteCredential = async (id: string) => {
     const updated = credentials.filter((c) => c.id !== id)
     setCredentials(updated)
@@ -180,9 +265,14 @@ export default function Credentials() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h2>My Credentials</h2>
-        <button className="btn btn-primary" onClick={addTestCredential}>
-          Add Test Credential
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button className="btn btn-secondary" onClick={addTestCredential}>
+            Add JWT Credential
+          </button>
+          <button className="btn btn-primary" onClick={addTestSDJWTCredential}>
+            Add SD-JWT Credential
+          </button>
+        </div>
       </div>
 
       {credentials.length === 0 ? (
@@ -194,45 +284,73 @@ export default function Credentials() {
         </div>
       ) : (
         <div className="grid">
-          {credentials.map((credential) => (
-            <div
-              key={credential.id}
-              className="credential-card"
-              onClick={() => setSelectedCredential(credential)}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="credential-type">{credential.type}</div>
-              <div className="credential-subject">
-                {(credential.subject as any).agentName || 'AI Agent'}
-              </div>
-              <div className="credential-details">
-                <div className="credential-detail">
-                  <label>Issuer</label>
-                  <span>{credential.issuer.substring(0, 20)}...</span>
+          {credentials.map((credential) => {
+            const sdjwtData = getSDJWTCredentialData(credential)
+
+            if (sdjwtData) {
+              // Render SD-JWT credential card
+              return (
+                <SDJWTCredentialCard
+                  key={credential.id}
+                  credential={sdjwtData}
+                  onClick={() => setSelectedCredential(sdjwtData)}
+                  onCreatePresentation={handleCreatePresentation}
+                />
+              )
+            }
+
+            // Render regular JWT credential card
+            return (
+              <div
+                key={credential.id}
+                className="credential-card"
+                onClick={() => setSelectedCredential(credential)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="credential-type">{credential.type}</div>
+                <div className="credential-subject">
+                  {(credential.subject as Record<string, unknown>).agentName as string || 'AI Agent'}
                 </div>
-                <div className="credential-detail">
-                  <label>Issued</label>
-                  <span>{new Date(credential.issuanceDate).toLocaleDateString()}</span>
+                <div className="credential-details">
+                  <div className="credential-detail">
+                    <label>Issuer</label>
+                    <span>{credential.issuer.substring(0, 20)}...</span>
+                  </div>
+                  <div className="credential-detail">
+                    <label>Issued</label>
+                    <span>{new Date(credential.issuanceDate).toLocaleDateString()}</span>
+                  </div>
+                  {(credential.subject as Record<string, unknown>).agentVersion && (
+                    <div className="credential-detail">
+                      <label>Version</label>
+                      <span>{(credential.subject as Record<string, unknown>).agentVersion as string}</span>
+                    </div>
+                  )}
+                  {(credential.subject as Record<string, unknown>).developer && (
+                    <div className="credential-detail">
+                      <label>Developer</label>
+                      <span>{(credential.subject as Record<string, unknown>).developer as string}</span>
+                    </div>
+                  )}
                 </div>
-                {(credential.subject as any).agentVersion && (
-                  <div className="credential-detail">
-                    <label>Version</label>
-                    <span>{(credential.subject as any).agentVersion}</span>
-                  </div>
-                )}
-                {(credential.subject as any).developer && (
-                  <div className="credential-detail">
-                    <label>Developer</label>
-                    <span>{(credential.subject as any).developer}</span>
-                  </div>
-                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      {selectedCredential && (
+      {/* SD-JWT Credential Detail Modal */}
+      {selectedCredential && 'isSDJWT' in selectedCredential && selectedCredential.isSDJWT && (
+        <SDJWTCredentialDetail
+          credential={selectedCredential as SDJWTCredentialData}
+          onClose={() => setSelectedCredential(null)}
+          onDelete={deleteCredential}
+          onCreatePresentation={handleCreatePresentation}
+        />
+      )}
+
+      {/* Regular JWT Credential Detail Modal */}
+      {selectedCredential && !('isSDJWT' in selectedCredential && selectedCredential.isSDJWT) && (
         <div
           style={{
             position: 'fixed',
@@ -257,7 +375,7 @@ export default function Credentials() {
               <h3>Credential Details</h3>
               <button
                 className="btn btn-danger"
-                onClick={() => deleteCredential(selectedCredential.id)}
+                onClick={() => deleteCredential((selectedCredential as StoredCredential).id)}
               >
                 Delete
               </button>
@@ -265,19 +383,19 @@ export default function Credentials() {
 
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ color: 'var(--text-muted)' }}>Type</label>
-              <p>{selectedCredential.type}</p>
+              <p>{(selectedCredential as StoredCredential).type}</p>
             </div>
 
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ color: 'var(--text-muted)' }}>Issuer</label>
               <p style={{ fontFamily: 'monospace', fontSize: '0.875rem', wordBreak: 'break-all' }}>
-                {selectedCredential.issuer}
+                {(selectedCredential as StoredCredential).issuer}
               </p>
             </div>
 
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ color: 'var(--text-muted)' }}>Issuance Date</label>
-              <p>{new Date(selectedCredential.issuanceDate).toLocaleString()}</p>
+              <p>{new Date((selectedCredential as StoredCredential).issuanceDate).toLocaleString()}</p>
             </div>
 
             <div style={{ marginBottom: '1rem' }}>
@@ -291,7 +409,7 @@ export default function Credentials() {
                   overflow: 'auto',
                 }}
               >
-                {JSON.stringify(selectedCredential.subject, null, 2)}
+                {JSON.stringify((selectedCredential as StoredCredential).subject, null, 2)}
               </pre>
             </div>
 
@@ -299,7 +417,7 @@ export default function Credentials() {
               <label style={{ color: 'var(--text-muted)' }}>JWT</label>
               <textarea
                 className="input"
-                value={selectedCredential.jwt}
+                value={(selectedCredential as StoredCredential).jwt}
                 readOnly
                 rows={4}
                 style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
@@ -307,13 +425,21 @@ export default function Credentials() {
               <button
                 className="btn btn-primary"
                 style={{ marginTop: '0.5rem' }}
-                onClick={() => navigator.clipboard.writeText(selectedCredential.jwt)}
+                onClick={() => navigator.clipboard.writeText((selectedCredential as StoredCredential).jwt)}
               >
                 Copy JWT
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Create Presentation Modal */}
+      {presentationCredential && (
+        <CreatePresentationModal
+          credential={presentationCredential}
+          onClose={() => setPresentationCredential(null)}
+        />
       )}
     </div>
   )

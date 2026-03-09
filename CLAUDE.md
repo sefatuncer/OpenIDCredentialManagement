@@ -83,6 +83,7 @@ cd web-wallet && npm run dev
 - **[2026-03-09] Architecture:** Jose PRIMARY, Credo OPTIONAL mimarisi kullan. Native modül bağımlılıkları opsiyonel olmalı, kritik yol pure JS'de çalışmalı. Bkz: `.claude/solutions/jose-primary-credo-optional.md`
 - **[2026-03-09] DID:** DID:key oluştururken multicodec prefix (0xed01 for Ed25519) ve base58btc encoding zorunlu. Bkz: `.claude/solutions/did-key-multibase-encoding.md`
 - **[2026-03-09] TypeScript:** `jose.importJWK()` dönüş tipi `KeyLike | Uint8Array` olabilir, type assertion gerekebilir.
+- **[2026-03-09] SD-JWT:** Client-side SD-JWT parsing için backend API gerekmez, base64url decode yeterli. Crypto işlemleri (digest verification) için API kullan. Bkz: `.claude/solutions/sdjwt-selective-disclosure-ui.md`
 
 ## Pattern Library
 
@@ -90,3 +91,4 @@ cd web-wallet && npm run dev
 |---------|----------|-------|
 | Jose PRIMARY + Credo Optional | Native modül gerektirmeyen SSI mimarisi | `.claude/solutions/jose-primary-credo-optional.md` |
 | DID:key Encoding | Ed25519'dan DID:key oluşturma | `.claude/solutions/did-key-multibase-encoding.md` |
+| SD-JWT Selective Disclosure UI | Client-side parsing + claim selection UI | `.claude/solutions/sdjwt-selective-disclosure-ui.md` |

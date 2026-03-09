@@ -38,9 +38,15 @@ Single environment development setup - no staging/production yet.
 ### Workflow (2026-03-09)
 - [x] Compound Engineering workflow komutları (/plan, /work, /review, /compound, /deploy, /lfg)
 
+### SD-JWT UI (2026-03-09)
+- [x] SD-JWT selective disclosure UI entegrasyonu
+- [x] Client-side SD-JWT parsing (sdjwt.service.ts)
+- [x] SDJWTCredentialCard component - disclosed/hidden claims gösterimi
+- [x] CreatePresentationModal - claim selection UI
+- [x] Credentials.tsx - SD-JWT credential detection ve rendering
+
 ## In Progress
 
-- [ ] SD-JWT selective disclosure UI entegrasyonu
 - [ ] Batch credential issuance
 
 ## Planned
