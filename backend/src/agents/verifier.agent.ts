@@ -1,6 +1,11 @@
 /**
- * Verifier Agent - JWT-VC verification
- * Jose tabanlı, Credo bağımlılığı yok
+ * Verifier Agent - JWT-VC verification (LEGACY/FALLBACK)
+ *
+ * Bu dosya Credo aktif olmadığında fallback olarak kullanılır.
+ * Credo aktifken (askar kurulu), Credo Agent kullanılır.
+ *
+ * @deprecated Credo kurulduğunda bu modül yerine credo.agent.ts ve credo.service.ts kullanılır
+ * @see credo.agent.ts - Credo tabanlı implementation
  */
 
 import { v4 as uuidv4 } from 'uuid'

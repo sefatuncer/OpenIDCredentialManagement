@@ -30,6 +30,10 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@credo-ts/askar": "^0.6.2",
+    "@credo-ts/core": "^0.6.2",
+    "@credo-ts/node": "^0.6.2",
+    "@credo-ts/openid4vc": "^0.6.2",
     "bcrypt": "^5.1.1",
     "body-parser": "^1.20.2",
     "commander": "^11.1.0",

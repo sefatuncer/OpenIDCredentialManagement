@@ -1,6 +1,11 @@
 /**
- * Base Agent - Jose tabanlı DID ve Credential yönetimi
- * Credo bağımlılığı olmadan çalışır
+ * Base Agent - Jose tabanlı DID ve Credential yönetimi (LEGACY/FALLBACK)
+ *
+ * Bu dosya Credo aktif olmadığında fallback olarak kullanılır.
+ * Credo aktifken (askar kurulu), Credo Agent kullanılır.
+ *
+ * @deprecated Credo kurulduğunda bu modül yerine credo.agent.ts kullanılır
+ * @see credo.agent.ts - Credo tabanlı implementation
  */
 
 import * as jose from 'jose'

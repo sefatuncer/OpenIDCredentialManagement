@@ -12,6 +12,12 @@ import {
 } from '../core/storage'
 import { eventBus } from '../core/event-bus'
 import { isFeatureEnabled } from '../core/feature-flags'
+// Credo Service import - Credo varsa onu kullan, yoksa Jose fallback
+import {
+  isUsingCredo,
+  createCredentialOffer as credoCreateOffer,
+  getIssuerDid as credoGetIssuerDid,
+} from './credo.service'
 
 // EdDSA key pair for credential signing (Ed25519)
 // In production, these should be loaded from secure key management (HSM, KMS, etc.)
@@ -334,6 +340,7 @@ export function getAuthorizationServerMetadata() {
 
 /**
  * Create a credential offer
+ * Credo varsa Credo'yu, yoksa Jose-based implementation'ı kullanır
  */
 export async function createCredentialOffer(
   credentialTypes: string[],
@@ -346,6 +353,38 @@ export async function createCredentialOffer(
   credentialOffer: CredentialOffer
   credentialOfferUri: string
 }> {
+  // Credo kullanılabilirse öncelikli olarak onu kullan
+  if (isUsingCredo()) {
+    const credoResult = await credoCreateOffer(credentialTypes, {
+      preAuthorizedCodeFlowConfig: {
+        userPinRequired: options.userPinRequired,
+      },
+    })
+
+    if (credoResult) {
+      logger.info('Created credential offer via Credo', {
+        credentialTypes,
+        mode: 'credo',
+      })
+
+      eventBus.emit('credential.offer.created', {
+        offerId: credoResult.issuanceSession?.id || uuidv4(),
+        credentialTypes,
+        expiresAt: new Date(Date.now() + (options.expiresInSeconds || 300) * 1000),
+        mode: 'credo',
+      })
+
+      return {
+        offerId: credoResult.issuanceSession?.id || uuidv4(),
+        credentialOffer: credoResult.credentialOffer,
+        credentialOfferUri: credoResult.credentialOfferUri,
+      }
+    }
+    // Credo başarısız olursa Jose fallback'e düş
+    logger.warn('Credo credential offer failed, falling back to Jose')
+  }
+
+  // Jose-based implementation (fallback)
   const baseUrl = getIssuerBaseUrl()
   const offerId = uuidv4()
   const preAuthorizedCode = uuidv4()
@@ -382,12 +421,14 @@ export async function createCredentialOffer(
     credentialTypes,
     expiresAt: storedOffer.expiresAt.toISOString(),
     storage: getStorageType(),
+    mode: 'jose',
   })
 
   eventBus.emit('credential.offer.created', {
     offerId,
     credentialTypes,
     expiresAt: storedOffer.expiresAt,
+    mode: 'jose',
   })
 
   return {
