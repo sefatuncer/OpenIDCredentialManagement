@@ -1,11 +1,8 @@
 /**
- * Issuer Agent - JWT-VC credential issuance (LEGACY/FALLBACK)
+ * Issuer Agent - JWT-VC credential issuance (PRIMARY)
  *
- * Bu dosya Credo aktif olmadığında fallback olarak kullanılır.
- * Credo aktifken (askar kurulu), Credo Agent kullanılır.
- *
- * @deprecated Credo kurulduğunda bu modül yerine credo.agent.ts ve credo.service.ts kullanılır
- * @see credo.agent.ts - Credo tabanlı implementation
+ * Ana credential issuance implementation. Native modül gerektirmez.
+ * OpenID4VCI standardını destekler.
  */
 
 import { v4 as uuidv4 } from 'uuid'

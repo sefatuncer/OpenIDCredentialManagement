@@ -1,11 +1,11 @@
 /**
- * Base Agent - Jose tabanlı DID ve Credential yönetimi (LEGACY/FALLBACK)
+ * Base Agent - Jose tabanlı DID ve Credential yönetimi (PRIMARY)
  *
- * Bu dosya Credo aktif olmadığında fallback olarak kullanılır.
- * Credo aktifken (askar kurulu), Credo Agent kullanılır.
+ * Ana SSI implementation. Native modül gerektirmez, pure JavaScript.
+ * OpenID4VCI ve OpenID4VP standartlarını destekler.
  *
- * @deprecated Credo kurulduğunda bu modül yerine credo.agent.ts kullanılır
- * @see credo.agent.ts - Credo tabanlı implementation
+ * Credo (askar) kuruluysa opsiyonel olarak Credo da kullanılabilir.
+ * @see credo.agent.ts - Credo tabanlı implementation (opsiyonel)
  */
 
 import * as jose from 'jose'

@@ -46,6 +46,7 @@ export interface CredoAgentConfig {
 
 /**
  * Askar modülünün kullanılabilirliğini kontrol et
+ * NOT: Askar native modül gerektirdiğinden, kurulum zorsa Jose fallback kullanılır
  */
 export async function checkAskarAvailability(): Promise<boolean> {
   if (askarAvailable !== null) {
@@ -58,19 +59,18 @@ export async function checkAskarAvailability(): Promise<boolean> {
     const ariesAskarNodejs = await import('@hyperledger/aries-askar-nodejs')
 
     if (askarModule && ariesAskarNodejs && ariesAskarNodejs.ariesAskarNodeJS) {
-      logger.info('Askar module available')
+      logger.info('Askar module available - using Credo mode')
       askarAvailable = true
       return true
     }
 
-    logger.warn('Askar module loaded but ariesAskarNodeJS not properly initialized')
+    // Sessiz fallback - debug seviyesinde log
+    logger.debug('Askar module not fully initialized, using Jose fallback')
     askarAvailable = false
     return false
-  } catch (error) {
-    logger.warn('Askar module not available', {
-      error: (error as Error).message,
-      hint: 'Run scripts/setup-credo.ps1 as administrator to install Visual Studio Build Tools',
-    })
+  } catch {
+    // Sessiz fallback - Askar yoksa Jose kullanılır, bu normal bir durum
+    logger.debug('Askar not available, using Jose-based implementation')
     askarAvailable = false
     return false
   }

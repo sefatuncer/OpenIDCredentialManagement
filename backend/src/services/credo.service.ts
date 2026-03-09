@@ -44,8 +44,8 @@ export async function initializeCredoService(): Promise<boolean> {
   const askarAvailable = await checkAskarAvailability()
 
   if (!askarAvailable) {
-    logger.info('Askar not available. Using Jose-based implementation.')
-    logger.info('To enable Credo, run: scripts/setup-credo.ps1 as administrator')
+    // Jose mode - bu normal çalışma modu, Askar opsiyonel
+    logger.info('Using Jose-based SSI implementation (primary mode)')
     serviceInitialized = true
     usingCredo = false
     return false
