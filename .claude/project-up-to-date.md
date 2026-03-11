@@ -596,9 +596,10 @@ Verifier Frontend               Backend                        Wallet
 
 **PostgreSQL Persistence — Fase 1 (todo 002):**
 - Holder credentials, issuer offers/issued, partner keys → `IStorageAdapter` (PostgreSQL)
-- 5 yeni JSONB collection: `storage_holder_credentials`, `storage_issuer_credential_offers`, `storage_issuer_issued_credentials`, `storage_partner_keys`, `storage_org_agent_counts`
+- 7 JSONB collection (Fase 1+2): `storage_holder_credentials`, `storage_issuer_credential_offers`, `storage_issuer_issued_credentials`, `storage_partner_keys`, `storage_org_agent_counts`, `storage_oidc_provider_configs`, `storage_batch_jobs`
 - Auto-create tablolar (migration gereksiz), GIN index
 - `holder.agent.ts`, `issuer.agent.ts`, `agentCredentialRequest.service.ts` tamamen persistent
+- Fase 2: `oidc.service.ts` configs persistent (sessions/metadataCache transient kaldı), `batchIssuance.service.ts` jobs persistent (processJob chunk-level save)
 
 ---
 

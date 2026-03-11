@@ -31,10 +31,10 @@ Kritik servisler zaten PostgreSQL'e geçirildi (IStorageAdapter pattern). Kalan 
 - [x] `issuer.agent.ts` — issuedCredentials Map → storage adapter (`issuer_issued_credentials`)
 - [x] `agentCredentialRequest.service.ts` — partnerKeys + orgAgentCounts Map → storage adapter (`partner_keys`, `org_agent_counts`)
 
-## Fase 2 — HIGH (session kaybı)
+## Fase 2 — HIGH (session kaybı) ✅ TAMAMLANDI
 
-- [ ] `oidc.service.ts` — sessions + configs + metadataCache Map → storage adapter
-- [ ] `batchIssuance.service.ts` — jobs Map → storage adapter
+- [x] `oidc.service.ts` — configs Map → storage adapter (`oidc_provider_configs`). metadataCache (1h TTL cache) ve sessions (10min OAuth CSRF) transient → Map olarak kaldı.
+- [x] `batchIssuance.service.ts` — jobs Map → storage adapter (`batch_jobs`). processJob() explicit save per chunk (crash recovery).
 
 ## Fase 3 — MEDIUM (defer edilebilir)
 
@@ -54,6 +54,7 @@ Kritik servisler zaten PostgreSQL'e geçirildi (IStorageAdapter pattern). Kalan 
 ## Kabul Kriterleri
 
 - [x] Fase 1 tamamlandı — CRITICAL data PostgreSQL'de persist ediliyor
+- [x] Fase 2 tamamlandı — OIDC configs + batch jobs persistent
 - [x] Mevcut API kontratları değişmiyor (backward compat)
 - [x] IStorageAdapter pattern kullanılıyor (yeni repo yazmaya gerek yok)
 - [x] TypeScript compile — zero errors

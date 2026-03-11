@@ -6,6 +6,11 @@
 
 import * as crypto from 'crypto'
 import { logger } from '../utils/logger'
+import {
+  IStorageAdapter,
+  createStorageAdapter,
+  getStorageType,
+} from '../core/storage'
 
 export interface OIDCConfig {
   issuerUrl: string
@@ -54,31 +59,44 @@ interface AuthSession {
   createdAt: Date
 }
 
+interface StoredOIDCConfig extends OIDCConfig {
+  providerId: string
+}
+
 class OIDCService {
-  private configs: Map<string, OIDCConfig> = new Map()
+  private configsStorage: IStorageAdapter<StoredOIDCConfig> | null = null
   private metadataCache: Map<string, OIDCMetadata> = new Map()
   private sessions: Map<string, AuthSession> = new Map()
+
+  private getConfigsStorage(): IStorageAdapter<StoredOIDCConfig> {
+    if (!this.configsStorage) {
+      this.configsStorage = createStorageAdapter<StoredOIDCConfig>('oidc_provider_configs')
+      logger.info('OIDC provider configs storage initialized', { type: getStorageType() })
+    }
+    return this.configsStorage
+  }
 
   /**
    * Register an OIDC provider
    */
-  registerProvider(providerId: string, config: OIDCConfig): void {
-    this.configs.set(providerId, config)
+  async registerProvider(providerId: string, config: OIDCConfig): Promise<void> {
+    await this.getConfigsStorage().save(providerId, { providerId, ...config })
     logger.info(`OIDC provider registered: ${providerId}`)
   }
 
   /**
    * Get registered provider
    */
-  getProvider(providerId: string): OIDCConfig | undefined {
-    return this.configs.get(providerId)
+  async getProvider(providerId: string): Promise<OIDCConfig | null> {
+    return this.getConfigsStorage().get(providerId)
   }
 
   /**
    * List registered providers
    */
-  listProviders(): string[] {
-    return Array.from(this.configs.keys())
+  async listProviders(): Promise<string[]> {
+    const configs = await this.getConfigsStorage().list()
+    return configs.map(c => c.providerId)
   }
 
   /**
@@ -136,7 +154,7 @@ class OIDCService {
     providerId: string,
     options: { state?: string; nonce?: string; prompt?: string } = {}
   ): Promise<{ url: string; state: string; nonce: string }> {
-    const config = this.configs.get(providerId)
+    const config = await this.getProvider(providerId)
     if (!config) {
       throw new Error(`Provider not found: ${providerId}`)
     }
@@ -188,7 +206,7 @@ class OIDCService {
     code: string,
     state: string
   ): Promise<OIDCTokens> {
-    const config = this.configs.get(providerId)
+    const config = await this.getProvider(providerId)
     if (!config) {
       throw new Error(`Provider not found: ${providerId}`)
     }
@@ -247,7 +265,7 @@ class OIDCService {
    * Get user info from OIDC provider
    */
   async getUserInfo(providerId: string, accessToken: string): Promise<OIDCUserInfo> {
-    const config = this.configs.get(providerId)
+    const config = await this.getProvider(providerId)
     if (!config) {
       throw new Error(`Provider not found: ${providerId}`)
     }
@@ -275,7 +293,7 @@ class OIDCService {
    * Refresh access token
    */
   async refreshToken(providerId: string, refreshToken: string): Promise<OIDCTokens> {
-    const config = this.configs.get(providerId)
+    const config = await this.getProvider(providerId)
     if (!config) {
       throw new Error(`Provider not found: ${providerId}`)
     }

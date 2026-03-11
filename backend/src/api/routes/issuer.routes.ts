@@ -414,7 +414,7 @@ issuerRoutes.post(
 issuerRoutes.get(
   '/credentials/batch/:jobId',
   asyncHandler(async (req: Request, res: Response) => {
-    const job = batchIssuanceService.getJobStatus(req.params.jobId)
+    const job = await batchIssuanceService.getJobStatus(req.params.jobId)
 
     if (!job) {
       res.status(404).json({ error: 'Job not found' })
@@ -438,14 +438,14 @@ issuerRoutes.get(
 issuerRoutes.get(
   '/credentials/batch/:jobId/results',
   asyncHandler(async (req: Request, res: Response) => {
-    const job = batchIssuanceService.getJobStatus(req.params.jobId)
+    const job = await batchIssuanceService.getJobStatus(req.params.jobId)
 
     if (!job) {
       res.status(404).json({ error: 'Job not found' })
       return
     }
 
-    const results = batchIssuanceService.getJobResults(req.params.jobId)
+    const results = await batchIssuanceService.getJobResults(req.params.jobId)
 
     res.json({ results })
   })

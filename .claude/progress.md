@@ -94,7 +94,8 @@ Single environment development setup - no staging/production yet.
 ## WP2: Temel Geliştirme — Alfa Prototip (Ay 4-6)
 
 - [x] Batch credential issuance (todo 001) — 2026-03-11
-- [ ] PostgreSQL — kalan Map-based servisler (todo 002)
+- [ ] PostgreSQL — Fase 3-4 kalan Map-based servisler (todo 002)
+- [x] PostgreSQL — Fase 2: oidc configs + batch jobs → IStorageAdapter — 2026-03-11
 - [x] SD-JWT VC format migration (todo 009) — 2026-03-11
 - [ ] Credential schema registry (todo 010)
 - [ ] Issuer SD-JWT credential form (todo 005)

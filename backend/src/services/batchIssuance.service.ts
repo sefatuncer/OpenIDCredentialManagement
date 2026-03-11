@@ -5,6 +5,11 @@
  */
 
 import { logger } from '../utils/logger'
+import {
+  IStorageAdapter,
+  createStorageAdapter,
+  getStorageType,
+} from '../core/storage'
 
 export interface BatchCredentialRequest {
   id: string
@@ -45,7 +50,7 @@ interface BatchConfig {
 type CredentialIssuer = (request: BatchCredentialRequest) => Promise<{ credentialId: string; credential: string }>
 
 class BatchIssuanceService {
-  private jobs: Map<string, BatchJob> = new Map()
+  private jobsStorage: IStorageAdapter<BatchJob> | null = null
   private config: BatchConfig = {
     maxConcurrent: 10,
     batchSize: 50,
@@ -53,6 +58,14 @@ class BatchIssuanceService {
     retryDelay: 1000,
   }
   private issuer: CredentialIssuer | null = null
+
+  private getJobsStorage(): IStorageAdapter<BatchJob> {
+    if (!this.jobsStorage) {
+      this.jobsStorage = createStorageAdapter<BatchJob>('batch_jobs')
+      logger.info('Batch jobs storage initialized', { type: getStorageType() })
+    }
+    return this.jobsStorage
+  }
 
   configure(config: Partial<BatchConfig>): void {
     this.config = { ...this.config, ...config }
@@ -78,17 +91,18 @@ class BatchIssuanceService {
       results: [],
     }
 
-    this.jobs.set(jobId, job)
+    await this.getJobsStorage().save(jobId, job)
     logger.info(`Batch job created: ${jobId} with ${requests.length} requests`)
 
     // Start processing in background
-    this.processJob(jobId, requests).catch((err) => {
+    this.processJob(jobId, requests).catch(async (err) => {
       logger.error(`Batch job ${jobId} failed:`, err)
-      const j = this.jobs.get(jobId)
+      const j = await this.getJobsStorage().get(jobId)
       if (j) {
         j.status = 'failed'
         j.error = err.message
         j.completedAt = new Date()
+        await this.getJobsStorage().save(jobId, j)
       }
     })
 
@@ -98,23 +112,23 @@ class BatchIssuanceService {
   /**
    * Get job status
    */
-  getJobStatus(jobId: string): BatchJob | null {
-    return this.jobs.get(jobId) || null
+  async getJobStatus(jobId: string): Promise<BatchJob | null> {
+    return this.getJobsStorage().get(jobId)
   }
 
   /**
    * Get job results
    */
-  getJobResults(jobId: string): BatchCredentialResult[] {
-    const job = this.jobs.get(jobId)
+  async getJobResults(jobId: string): Promise<BatchCredentialResult[]> {
+    const job = await this.getJobsStorage().get(jobId)
     return job?.results || []
   }
 
   /**
    * Cancel a pending or processing job
    */
-  cancelJob(jobId: string): boolean {
-    const job = this.jobs.get(jobId)
+  async cancelJob(jobId: string): Promise<boolean> {
+    const job = await this.getJobsStorage().get(jobId)
     if (!job || job.status === 'completed' || job.status === 'failed') {
       return false
     }
@@ -122,14 +136,15 @@ class BatchIssuanceService {
     job.status = 'failed'
     job.error = 'Cancelled by user'
     job.completedAt = new Date()
+    await this.getJobsStorage().save(jobId, job)
     return true
   }
 
   /**
    * List all jobs
    */
-  listJobs(status?: BatchJob['status']): BatchJob[] {
-    const jobs = Array.from(this.jobs.values())
+  async listJobs(status?: BatchJob['status']): Promise<BatchJob[]> {
+    const jobs = await this.getJobsStorage().list()
     if (status) {
       return jobs.filter((j) => j.status === status)
     }
@@ -139,17 +154,18 @@ class BatchIssuanceService {
   /**
    * Clean up completed jobs older than specified age
    */
-  cleanupJobs(maxAgeMs: number = 24 * 60 * 60 * 1000): number {
+  async cleanupJobs(maxAgeMs: number = 24 * 60 * 60 * 1000): Promise<number> {
     const threshold = Date.now() - maxAgeMs
     let cleaned = 0
 
-    for (const [jobId, job] of this.jobs) {
+    const jobs = await this.getJobsStorage().list()
+    for (const job of jobs) {
       if (
         (job.status === 'completed' || job.status === 'failed') &&
         job.completedAt &&
-        job.completedAt.getTime() < threshold
+        new Date(job.completedAt).getTime() < threshold
       ) {
-        this.jobs.delete(jobId)
+        await this.getJobsStorage().delete(job.jobId)
         cleaned++
       }
     }
@@ -161,16 +177,17 @@ class BatchIssuanceService {
   }
 
   private async processJob(jobId: string, requests: BatchCredentialRequest[]): Promise<void> {
-    const job = this.jobs.get(jobId)
+    const job = await this.getJobsStorage().get(jobId)
     if (!job) return
 
     job.status = 'processing'
     job.startedAt = new Date()
+    await this.getJobsStorage().save(jobId, job)
 
     // Process in batches
     for (let i = 0; i < requests.length; i += this.config.batchSize) {
-      // Check if job was cancelled (re-read from map in case it was modified)
-      const currentJob = this.jobs.get(jobId)
+      // Check if job was cancelled
+      const currentJob = await this.getJobsStorage().get(jobId)
       if (!currentJob || currentJob.status === 'failed') {
         break
       }
@@ -189,14 +206,17 @@ class BatchIssuanceService {
         }
       }
 
+      // Save progress after each chunk
+      await this.getJobsStorage().save(jobId, job)
       logger.debug(`Batch job ${jobId}: processed ${job.processedCount}/${job.totalRequests}`)
     }
 
-    // Re-read job from map to check current status
-    const finalJob = this.jobs.get(jobId)
+    // Re-read to check cancellation
+    const finalJob = await this.getJobsStorage().get(jobId)
     if (finalJob && finalJob.status !== 'failed') {
       finalJob.status = 'completed'
       finalJob.completedAt = new Date()
+      await this.getJobsStorage().save(jobId, finalJob)
     }
 
     logger.info(
@@ -285,15 +305,15 @@ class BatchIssuanceService {
   /**
    * Get statistics
    */
-  getStats(): {
+  async getStats(): Promise<{
     totalJobs: number
     pendingJobs: number
     processingJobs: number
     completedJobs: number
     failedJobs: number
     totalCredentialsIssued: number
-  } {
-    const jobs = Array.from(this.jobs.values())
+  }> {
+    const jobs = await this.getJobsStorage().list()
 
     return {
       totalJobs: jobs.length,
