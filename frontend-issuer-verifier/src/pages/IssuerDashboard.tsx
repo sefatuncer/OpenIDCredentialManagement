@@ -141,6 +141,18 @@ export function IssuerDashboard() {
 
         <div className="card">
           <div className="card-header">
+            <h3 className="card-title">Schema Registry</h3>
+          </div>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+            Manage credential type definitions and selective disclosure rules.
+          </p>
+          <Link to="/issuer/schemas" className="btn btn-issuer">
+            Manage Schemas
+          </Link>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
             <h3 className="card-title">🚫 Revocation Management</h3>
           </div>
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>

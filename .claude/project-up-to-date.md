@@ -425,6 +425,20 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 
 ---
 
+### Credential Schema Registry
+
+| Method | Path | Auth | Rate Limit | Aciklama |
+|--------|------|------|------------|----------|
+| GET | `/api/v1/schemas` | Auth | - | Tum aktif schema'lari listele |
+| GET | `/api/v1/schemas/{id}` | Auth | - | Schema detayi |
+| POST | `/api/v1/schemas` | Auth | 30/min | Yeni schema olustur |
+| PUT | `/api/v1/schemas/{id}` | Auth | 30/min | Schema guncelle |
+| DELETE | `/api/v1/schemas/{id}` | Auth | - | Schema deaktive et (soft delete) |
+
+**Built-in schemas:** AIAgentIdentityCredential, DelegationCredential, CapabilityCredential (seed data olarak yuklu)
+
+---
+
 ### Legacy Redirects
 
 | Eski Path | Yeni Path | Status |
@@ -447,6 +461,12 @@ Issuer Dashboard
   ├─▶ POST /api/v1/issuer/credentials/agent-identity  → credentialOfferUri + QR
   ├─▶ POST /api/v1/issuer/credentials/delegation       → credentialOfferUri + QR
   └─▶ POST /api/v1/issuer/credentials/capability        → credentialOfferUri + QR
+
+Schema Management (/issuer/schemas)
+  ├─▶ GET    /api/v1/schemas                      → schema listesi
+  ├─▶ POST   /api/v1/schemas                      → yeni schema olustur
+  ├─▶ PUT    /api/v1/schemas/{id}                  → schema guncelle
+  └─▶ DELETE /api/v1/schemas/{id}                  → schema deaktive et
 
 Batch Issue (/issuer/issue-batch)
   ├─▶ POST /api/v1/issuer/credentials/batch        → 202 + jobId
@@ -665,4 +685,7 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `backend/src/database/storage-adapter.ts` | IStorageAdapter<T> — PostgreSQL / memory fallback |
 | `backend/src/core/storage/index.ts` | Storage factory — `createStorageAdapter<T>()`, auto/postgres/memory/redis |
 | `backend/src/core/storage/PostgresStorageAdapter.ts` | JSONB-based persistent storage, auto-table creation |
+| `backend/src/api/routes/schema.routes.ts` | Schema registry CRUD endpoints (5 routes) |
+| `backend/src/services/schemaRegistry.service.ts` | Schema registry service — 3 built-in schemas, CRUD, validation |
+| `frontend-issuer-verifier/src/pages/SchemaManagement.tsx` | Schema management UI (list/detail/create) |
 | `docker-compose.dev.yml` | Dev environment (4 services: backend, wallet, frontend, postgres) |

@@ -1,7 +1,7 @@
 ---
 id: "010"
 title: "Credential Schema Registry"
-status: pending
+status: done
 priority: medium
 category: feature
 wp: WP2

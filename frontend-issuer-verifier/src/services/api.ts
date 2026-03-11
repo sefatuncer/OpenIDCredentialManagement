@@ -353,6 +353,90 @@ export const auditApi = {
     }>(`/audit/stats${period ? `?period=${period}` : ''}`, {}, { showErrorToast: false }),
 };
 
+// Schema Registry API
+export const schemaApi = {
+  list: () =>
+    request<{
+      schemas: Array<{
+        id: string;
+        name: string;
+        version: string;
+        type: string;
+        description: string;
+        required: string[];
+        credentialSubject: {
+          type: string;
+          properties: Record<string, unknown>;
+        };
+        issuanceConfig?: {
+          validityPeriod?: number;
+          revocable?: boolean;
+          selectiveDisclosure?: string[];
+        };
+        active: boolean;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    }>('/schemas'),
+
+  get: (id: string) =>
+    request<{
+      schema: {
+        id: string;
+        name: string;
+        version: string;
+        type: string;
+        description: string;
+        required: string[];
+        credentialSubject: {
+          type: string;
+          properties: Record<string, unknown>;
+        };
+        issuanceConfig?: {
+          validityPeriod?: number;
+          revocable?: boolean;
+          selectiveDisclosure?: string[];
+        };
+        active: boolean;
+        createdAt: string;
+        updatedAt: string;
+      };
+    }>(`/schemas/${encodeURIComponent(id)}`),
+
+  create: (data: {
+    id: string;
+    name: string;
+    version: string;
+    type: string;
+    description: string;
+    required?: string[];
+    credentialSubject: {
+      type: string;
+      properties: Record<string, unknown>;
+    };
+    issuanceConfig?: {
+      validityPeriod?: number;
+      revocable?: boolean;
+      selectiveDisclosure?: string[];
+    };
+  }) =>
+    request<{ schema: unknown }>('/schemas', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Record<string, unknown>) =>
+    request<{ schema: unknown }>(`/schemas/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deactivate: (id: string) =>
+    request<{ success: boolean }>(`/schemas/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+};
+
 // Health check
 export const healthApi = {
   check: () => request<{ status: string }>('/health', {}, { showErrorToast: false }),
@@ -365,5 +449,6 @@ export default {
   verifier: verifierApi,
   trust: trustApi,
   audit: auditApi,
+  schema: schemaApi,
   health: healthApi,
 };

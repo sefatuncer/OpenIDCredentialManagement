@@ -5,6 +5,7 @@ import { VerifierDashboard } from './pages/VerifierDashboard';
 import { IssueCredential } from './pages/IssueCredential';
 import { Revocation } from './pages/Revocation';
 import { BatchIssue } from './pages/BatchIssue';
+import { SchemaManagement } from './pages/SchemaManagement';
 import { VerifyRequest } from './pages/VerifyRequest';
 import { VerifyResults } from './pages/VerifyResults';
 import { TrustManagement } from './pages/TrustManagement';
@@ -59,6 +60,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="issuer">
               <BatchIssue />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/issuer/schemas"
+          element={
+            <ProtectedRoute requiredRole="issuer">
+              <SchemaManagement />
             </ProtectedRoute>
           }
         />

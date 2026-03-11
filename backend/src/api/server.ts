@@ -22,6 +22,7 @@ import { agentRoutes } from './routes/agent.routes'
 import { walletRoutes } from './routes/wallet.routes'
 import { delegationRoutes } from './routes/delegation.routes'
 import { agentTrustRoutes } from './routes/agentTrust.routes'
+import { schemaRoutes } from './routes/schema.routes'
 import simulationRoutes from './routes/simulation.routes'
 import {
   requestIdMiddleware,
@@ -421,6 +422,7 @@ export function createServer(): Express {
   app.use(`${API_BASE_PATH}/wallet`, walletRoutes)
   app.use(`${API_BASE_PATH}/delegations`, delegationRoutes)
   app.use(`${API_BASE_PATH}/agent-trust`, agentTrustRoutes)
+  app.use(`${API_BASE_PATH}/schemas`, schemaRoutes)
 
   // Legacy routes (for backward compatibility) - redirects to v1
   app.use('/api/issuer', (req: Request, res: Response) => {

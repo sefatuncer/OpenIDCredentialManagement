@@ -73,6 +73,48 @@ export const batchJobIdParamSchema = z.object({
 export type BatchIssuanceInput = z.infer<typeof batchIssuanceSchema>
 export type BatchJobIdParam = z.infer<typeof batchJobIdParamSchema>
 
+// Credential Schema Registry schemas
+const schemaPropertySchema: z.ZodType<any> = z.lazy(() =>
+  z.object({
+    type: z.enum(['string', 'number', 'boolean', 'array', 'object']),
+    description: z.string().optional(),
+    required: z.boolean().optional(),
+    items: schemaPropertySchema.optional(),
+    properties: z.record(schemaPropertySchema).optional(),
+    enum: z.array(z.unknown()).optional(),
+    default: z.unknown().optional(),
+    format: z.string().optional(),
+  })
+)
+
+export const credentialSchemaCreateSchema = z.object({
+  id: z.string().min(1, 'Schema ID is required').max(100),
+  name: z.string().min(1, 'Schema name is required').max(200),
+  version: z.string().regex(/^\d+\.\d+\.\d+$/, 'Version must be semver (e.g. 1.0.0)'),
+  type: z.string().min(1, 'Type is required'),
+  description: z.string().min(1, 'Description is required').max(500),
+  required: z.array(z.string()).default([]),
+  context: z.array(z.string()).default([
+    'https://www.w3.org/2018/credentials/v1',
+    'https://w3id.org/security/suites/jws-2020/v1',
+  ]),
+  credentialSubject: z.object({
+    type: z.string().min(1),
+    properties: z.record(schemaPropertySchema),
+  }),
+  issuanceConfig: z.object({
+    validityPeriod: z.number().positive().optional(),
+    revocable: z.boolean().optional(),
+    selectiveDisclosure: z.array(z.string()).optional(),
+  }).optional(),
+  active: z.boolean().default(true),
+})
+
+export const credentialSchemaUpdateSchema = credentialSchemaCreateSchema.partial().omit({ id: true })
+
+export type CredentialSchemaCreateInput = z.infer<typeof credentialSchemaCreateSchema>
+export type CredentialSchemaUpdateInput = z.infer<typeof credentialSchemaUpdateSchema>
+
 // Holder schemas
 export const credentialReceiveSchema = z.object({
   credentialOfferUri: z.string().url('Invalid credential offer URI'),

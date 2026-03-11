@@ -95,6 +95,7 @@ cd web-wallet && npm run dev
 - **[2026-03-11] Architecture:** Map→Adapter migration'da `list()`/`query()` key dönmez. Silme gereken entity'lerde key'i data içinde de sakla (`offerId` pattern). Bkz: `.claude/solutions/map-to-storage-adapter-migration.md`
 - **[2026-03-11] TypeScript:** sync→async dönüşümü tüm caller zincirini etkiler. `tsc --noEmit` ile erken doğrula — compiler kaçırılan `await`'leri yakalar.
 - **[2026-03-11] Architecture:** Mevcut standalone servis varsa yeni yazmak yerine wire-up et. `setIssuer()` callback pattern'i ile servisi agent'a bağla, endpoint'lerden servise delege et. `issueCredentialDirect()` offer flow bypass eder.
+- **[2026-03-11] Architecture:** Orphan servis pattern — service katmanı tam olsa bile API route'ları yoksa ulaşılamaz. Yeni servis eklerken hep route + validation + server mount + frontend API birlikte ekle.
 
 ## Pattern Library
 
@@ -108,3 +109,4 @@ cd web-wallet && npm run dev
 | VP Flow Unification | Thin wrapper pattern: agent delegates to service, preserves API contract | `.claude/solutions/vp-flow-unification-thin-wrapper.md` |
 | SD-JWT VC Format Migration | jwt_vc_json → vc+sd-jwt dual format with _sdjwt config ID convention | `.claude/solutions/sdjwt-vc-format-migration.md` |
 | Map→Adapter Migration | In-memory Map → IStorageAdapter with key-in-data pattern | `.claude/solutions/map-to-storage-adapter-migration.md` |
+| Orphan Service → Full Stack | Service exists → add route + zod + mount + frontend API in one pass | `.claude/solutions/orphan-service-to-api.md` |
