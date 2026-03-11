@@ -102,18 +102,24 @@
 | POST | `/batch-credential` | Bearer | - | Toplu credential talebi |
 | POST | `/deferred-credential` | Bearer | - | Ertelenmiş credential durumu |
 
+**Credential Offer (Draft 13+):**
+- `credential_configuration_ids` (yeni) + `credentials` (backward compat) her ikisi de gönderilir
+- Grant: `tx_code: { input_mode, length }` (eski `user_pin_required` yerine)
+
 **Flow:** `credential-offer` → wallet scans → `token` (code exchange) → `credential` (with proof)
 
-**Credential Request Proof:**
+**Credential Request (Draft 13+):**
 ```json
 {
   "format": "jwt_vc_json",
+  "credential_configuration_id": "AIAgentIdentityCredential",
   "proof": {
     "proof_type": "jwt",
     "jwt": "<proof JWT with typ:openid4vci-proof+jwt, aud, nonce, iat>"
   }
 }
 ```
+> `credential_configuration_id` (Draft 13+) önceliklidir. Eski `credential_definition.type` de kabul edilir (backward compat).
 
 #### Issuer-Specific Endpoints
 
@@ -171,7 +177,11 @@
 | GET | `/api/v1/openid4vp/client-metadata` | - | - | Verifier client metadata |
 | GET | `/api/v1/openid4vp/did` | - | - | Verifier DID |
 
-**Flow:** `authorization-request` → wallet scans QR → `direct_post` (VP submission) → `sessions/{id}/result` (poll)
+**Authorization Request (Draft 20+):**
+- `response_mode: "direct_post"` + `response_uri` (eski `redirect_uri` yerine)
+- `client_id_scheme: "did"` eklendi
+
+**Flow:** `authorization-request` → wallet scans QR → `direct_post` (VP submission via `response_uri`) → `sessions/{id}/result` (poll)
 
 **VP Token Submission:**
 ```json
@@ -575,11 +585,11 @@ API dokümantasyonu: `GET /api/v1/docs`
 | Dosya | Rol |
 |-------|-----|
 | `backend/src/index.ts` | Express app setup, route mounting, middleware |
-| `backend/src/services/openid4vci.service.ts` | OpenID4VCI protocol implementation (1176 satır) |
+| `backend/src/services/openid4vci.service.ts` | OpenID4VCI protocol implementation (Draft 13+, ~1108 satır) |
 | `backend/src/services/openid4vp.service.ts` | OpenID4VP protocol implementation (877 satır) |
 | `backend/src/services/sdjwt.service.ts` | SD-JWT issuance, verification |
 | `backend/src/services/credo.service.ts` | Credo-TS entegrasyonu (optional) |
-| `backend/src/services/didResolver.service.ts` | DID çözümleme (did:key, did:web, did:peer) |
+| `backend/src/services/didResolver.service.ts` | DID çözümleme + `resolvePublicKeyFromDid()` (did:key, did:web, did:peer) |
 | `backend/src/services/revocation.service.ts` | Revocation & StatusList2021 |
 | `backend/src/agents/base.agent.ts` | DID:key oluşturma, JWT signing |
 | `backend/src/agents/credo.agent.ts` | Credo-TS agent wrapper |
