@@ -34,6 +34,10 @@ services:
       - API_KEY=dev-api-key-docker-only
       - WEB_WALLET_SECRET=dev-wallet-secret-docker-only
       - DATABASE_URL=postgresql://ssi_dev:ssi_dev_pass@postgres:5432/ssi_dev
+      - CREDO_WALLET_KEY=dev-credo-wallet-key-docker-only
+      - CREDO_WALLET_ID=ai-agent-wallet-dev
+      - ISSUER_BASE_URL=http://backend:3000
+      - VERIFIER_BASE_URL=http://backend:3000
     volumes:
       - ./backend/data:/app/data
     depends_on:

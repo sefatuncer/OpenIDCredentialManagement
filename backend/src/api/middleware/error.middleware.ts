@@ -79,6 +79,8 @@ export function errorMiddleware(
 }
 
 export function notFoundMiddleware(req: Request, res: Response): void {
+  // Skip if response already sent (e.g., by Credo OpenID4VC routes)
+  if (res.headersSent) return;
   const requestId = (req as any).requestId || uuidv4()
 
   const problemDetails: ProblemDetails = {

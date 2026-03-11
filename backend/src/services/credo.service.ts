@@ -25,6 +25,7 @@ import {
 } from '../agents/credo.agent'
 import { logger } from '../utils/logger'
 import { issuerConfig, verifierConfig } from '../config/agent.config'
+import type { Express } from 'express'
 
 // Service state
 let serviceInitialized = false
@@ -34,7 +35,7 @@ let usingCredo = false
  * Credo Service'i başlat
  * @returns true if using Credo, false if using Jose fallback
  */
-export async function initializeCredoService(): Promise<boolean> {
+export async function initializeCredoService(expressApp?: Express): Promise<boolean> {
   if (serviceInitialized) {
     logger.info('Credo service already initialized', { usingCredo })
     return usingCredo
@@ -66,7 +67,7 @@ export async function initializeCredoService(): Promise<boolean> {
   }
 
   try {
-    const agent = await initializeCredoAgent(config)
+    const agent = await initializeCredoAgent(config, expressApp)
 
     if (agent) {
       serviceInitialized = true
@@ -136,6 +137,41 @@ export async function getHolderDid(): Promise<string | null> {
     return await getAgentDid()
   }
   return null
+}
+
+// ==================== ISSUER METADATA ====================
+
+/**
+ * Get Credo issuer metadata for .well-known endpoint
+ */
+export async function getCredoIssuerMetadata(): Promise<Record<string, any> | null> {
+  if (!usingCredo) {
+    return null
+  }
+
+  try {
+    const agent = getCredoAgent()
+    if (!agent) return null
+
+    const issuerApi = agent.modules.openId4Vc.issuer
+    const issuers = await issuerApi.getAllIssuers()
+    if (issuers.length === 0) return null
+
+    const issuer = issuers[0]
+
+    // Use Credo's built-in metadata generation
+    const credoMetadata = await issuerApi.getIssuerMetadata(issuer.issuerId) as any
+
+    // Credo wraps metadata in { credentialIssuer, authorizationServers, ... }
+    // Flatten to spec-compliant .well-known response
+    if (credoMetadata?.credentialIssuer) {
+      return credoMetadata.credentialIssuer as Record<string, any>
+    }
+    return credoMetadata as Record<string, any>
+  } catch (error) {
+    logger.error('Failed to get Credo issuer metadata', { error: (error as Error).message })
+    return null
+  }
 }
 
 // ==================== ISSUER API ====================

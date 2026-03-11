@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
 import https from 'https'
 import http from 'http'
-import { createServer } from './api/server'
+import { createServer, finalizeServer } from './api/server'
 import { initializeIssuerAgent } from './agents/issuer.agent'
 import { initializeVerifierAgent } from './agents/verifier.agent'
 import { initializeHolderAgent } from './agents/holder.agent'
@@ -82,17 +82,21 @@ async function main() {
 
     logger.info('All agents initialized successfully')
 
+    // Create Express app BEFORE Credo init (Credo needs the app for route registration)
+    const app = createServer()
+
     // Initialize Credo service (optional - enhances with full OpenID4VC support)
     logger.info('Initializing Credo service...')
-    const credoActive = await initializeCredoService()
+    const credoActive = await initializeCredoService(app)
     if (credoActive) {
       logger.info('Credo service active - using Credo-TS for OpenID4VCI/VP')
     } else {
       logger.info('Credo service inactive - using Jose-based implementation')
     }
 
-    // Create Express app
-    const app = createServer()
+    // Finalize server: add error/404 handlers AFTER Credo route registration
+    finalizeServer(app)
+
     const port = process.env.API_PORT || 3000
     const httpsPort = process.env.HTTPS_PORT || 3443
 

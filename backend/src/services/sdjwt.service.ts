@@ -14,16 +14,26 @@ import { logger } from '../utils/logger'
 import { resolvePublicKeyFromDid } from './didResolver.service'
 
 // Types
+type SDJWTClaimValue = string | number | boolean | null | SDJWTClaimValue[] | { [key: string]: SDJWTClaimValue }
+
 export interface SDJWTClaims {
-  [key: string]: any
+  [key: string]: SDJWTClaimValue
 }
 
 export interface Disclosure {
   salt: string
   claimName: string
-  claimValue: any
+  claimValue: SDJWTClaimValue
   encoded: string
   digest: string
+}
+
+export interface VCPayload {
+  '@context'?: string[]
+  type?: string[]
+  credentialSubject?: Record<string, SDJWTClaimValue>
+  credentialStatus?: { id: string; type: string; statusListIndex: string; statusListCredential: string }
+  [key: string]: SDJWTClaimValue | undefined
 }
 
 export interface SDJWTPayload {
@@ -32,10 +42,10 @@ export interface SDJWTPayload {
   exp?: number
   nbf?: number
   sub?: string
-  vc?: any
+  vc?: VCPayload
   _sd?: string[]
   _sd_alg?: string
-  [key: string]: any
+  [key: string]: SDJWTClaimValue | VCPayload | string[] | undefined
 }
 
 export interface SDJWTCredential {
@@ -194,7 +204,7 @@ class SDJWTService {
       payload.exp = now + options.expiresIn
     }
 
-    if (options.credentialId) {
+    if (options.credentialId && payload.vc) {
       payload.vc.id = options.credentialId
     }
 
@@ -446,7 +456,7 @@ class SDJWTService {
 
   // Private helper methods
 
-  private createDisclosure(claimName: string, claimValue: any): Disclosure {
+  private createDisclosure(claimName: string, claimValue: SDJWTClaimValue): Disclosure {
     const salt = this.generateSalt()
     const disclosureArray = [salt, claimName, claimValue]
     const encoded = Buffer.from(JSON.stringify(disclosureArray)).toString('base64url')
@@ -694,14 +704,14 @@ class SDJWTService {
       if (['iss', 'sub', 'iat', 'exp', 'nbf', 'aud', 'jti', '_sd', '_sd_alg', 'vc'].includes(key)) {
         continue
       }
-      claims[key] = value
+      claims[key] = value as SDJWTClaimValue
     }
 
     // Handle VC structure
     if (payload.vc?.credentialSubject) {
       for (const [key, value] of Object.entries(payload.vc.credentialSubject)) {
         if (key !== '_sd') {
-          claims[key] = value
+          claims[key] = value as SDJWTClaimValue
         }
       }
     }

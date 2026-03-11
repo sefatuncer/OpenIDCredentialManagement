@@ -42,6 +42,7 @@ WORKDIR /app
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nodejs:nodejs /app/scripts ./scripts
 
 # Copy public folder if exists
 COPY --from=builder --chown=nodejs:nodejs /app/public ./public 2>/dev/null || true
@@ -60,4 +61,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:${API_PORT:-3000}/health || exit 1
 
 # Default command
-CMD ["node", "dist/index.js"]
+CMD ["node", "--require", "./scripts/register-askar.js", "dist/index.js"]

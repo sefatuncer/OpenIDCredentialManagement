@@ -35,7 +35,7 @@ interface VerificationSession {
   createdAt: Date
   expiresAt: Date
   status: 'pending' | 'submitted' | 'verified' | 'rejected' | 'expired'
-  presentation?: any
+  presentation?: string
   verificationResult?: VerificationResult
 }
 
@@ -76,8 +76,8 @@ export interface FieldConstraint {
   purpose?: string
   filter?: {
     type: string
-    const?: any
-    enum?: any[]
+    const?: string | number | boolean | string[]
+    enum?: (string | number | boolean)[]
     pattern?: string
   }
   optional?: boolean
@@ -113,12 +113,12 @@ export interface ClientMetadata {
   client_name?: string
   logo_uri?: string
   client_purpose?: string
-  vp_formats?: Record<string, any>
+  vp_formats?: Record<string, Record<string, string[]>>
 }
 
 export interface VerificationResult {
   verified: boolean
-  credentialSubject?: any
+  credentialSubject?: Record<string, unknown>
   issuerDid?: string
   holderDid?: string
   issuanceDate?: string
@@ -380,15 +380,16 @@ export async function createAuthorizationRequest(
 
     if (credoResult) {
       const sessionId = credoResult.verificationSession?.id || uuidv4()
+      const credoClientId = (await credoGetVerifierDid()) || getVerifierDid()
 
-      // Jose storage'a da kaydet (hybrid mode için)
+      // Jose storage'a da kaydet (hybrid mode — session status lookup)
       const session: VerificationSession = {
         id: sessionId,
         presentationDefinition,
         nonce: uuidv4(),
-        state: uuidv4(),
+        state: sessionId, // Credo manages its own state
         responseUri: credoResult.authorizationRequestUri,
-        clientId: (await credoGetVerifierDid()) || getVerifierDid(),
+        clientId: credoClientId,
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + (options.expiresInSeconds || 300) * 1000),
         status: 'pending',
@@ -401,13 +402,13 @@ export async function createAuthorizationRequest(
         mode: 'credo',
       })
 
-      // Credo'dan gelen authorization request'i standart formata dönüştür
+      // Build informational authorization request for API response
+      // The wallet uses authorizationRequestUri directly (which contains request_uri param)
       const authorizationRequest: AuthorizationRequest = {
         response_type: 'vp_token',
         response_mode: 'direct_post',
-        client_id: (await credoGetVerifierDid()) || getVerifierDid(),
+        client_id: credoClientId,
         client_id_scheme: 'did',
-        response_uri: credoResult.authorizationRequestUri,
         nonce: session.nonce,
         state: session.state,
         presentation_definition: presentationDefinition,
@@ -655,7 +656,7 @@ async function verifyVPToken(
 
     // Verify embedded VC signatures
     let vcSignatureVerified = false
-    let credentialSubject: any = null
+    let credentialSubject: Record<string, unknown> | undefined
     let issuerDid: string | undefined
     let issuanceDate: string | undefined
     let expirationDate: string | undefined

@@ -537,9 +537,9 @@ export function getDIDCacheStats(): {
  * Dereference a DID URL (DID + path/query/fragment)
  */
 export async function dereferenceDIDURL(didUrl: string): Promise<{
-  contentStream: any
-  contentMetadata: Record<string, any>
-  dereferencingMetadata: Record<string, any>
+  contentStream: VerificationMethod | ServiceEndpoint | DIDDocument | null
+  contentMetadata: DIDDocumentMetadata | Record<string, string>
+  dereferencingMetadata: Record<string, string | undefined>
 }> {
   // Parse DID URL
   const hashIndex = didUrl.indexOf('#')
@@ -645,7 +645,7 @@ export async function resolvePublicKeyFromDid(did: string): Promise<jose.KeyLike
     // Find the first usable verification method
     for (const vm of verificationMethods) {
       const method = typeof vm === 'string'
-        ? verificationMethods.find((m: any) => typeof m !== 'string' && m.id === vm)
+        ? verificationMethods.find((m): m is VerificationMethod => typeof m !== 'string' && m.id === vm)
         : vm
 
       if (!method || typeof method === 'string') continue
@@ -679,7 +679,7 @@ export async function resolvePublicKeyFromDid(did: string): Promise<jose.KeyLike
     // Check authentication methods as fallback
     for (const auth of authenticationMethods) {
       if (typeof auth === 'string') {
-        const refMethod = verificationMethods.find((m: any) => typeof m !== 'string' && m.id === auth)
+        const refMethod = verificationMethods.find((m): m is VerificationMethod => typeof m !== 'string' && m.id === auth)
         if (refMethod && typeof refMethod !== 'string' && refMethod.publicKeyJwk) {
           const key = await jose.importJWK(refMethod.publicKeyJwk as jose.JWK)
           if (key instanceof Uint8Array) {

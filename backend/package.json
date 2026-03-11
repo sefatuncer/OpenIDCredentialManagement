@@ -7,7 +7,7 @@
     "build": "tsc && npm run copy-public",
     "copy-public": "node scripts/copy-public.js",
     "start": "node --require ./scripts/register-askar.js dist/index.js",
-    "dev": "cross-env NODE_ENV=development nodemon --exec ts-node src/index.ts",
+    "dev": "cross-env NODE_ENV=development nodemon --exec 'ts-node --require ./scripts/register-askar.js' src/index.ts",
     "test": "jest",
     "clean": "rimraf dist",
     "prebuild": "npm run clean",

@@ -74,7 +74,7 @@ interface StoredAccessToken {
 
 interface StoredDeferredCredential {
   credentialType: string
-  subject: Record<string, any>
+  subject: Record<string, unknown>
   holderDid: string
   status: 'pending' | 'ready' | 'issued' | 'failed'
   credential?: string
@@ -163,7 +163,7 @@ export interface CredentialConfiguration {
   credential_signing_alg_values_supported?: string[]
   credential_definition: {
     type: string[]
-    credentialSubject?: Record<string, any>
+    credentialSubject?: Record<string, unknown>
   }
   display?: CredentialDisplay[]
 }
@@ -876,8 +876,8 @@ export async function issueCredential(
 function buildCredentialSubject(
   credentialType: string,
   holderDid: string,
-  offerData: any
-): Record<string, any> {
+  offerData: StoredCredentialOffer
+): Record<string, unknown> {
   const now = new Date().toISOString()
   const oneYearFromNow = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
 

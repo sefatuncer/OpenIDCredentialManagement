@@ -439,13 +439,22 @@ export function createServer(): Express {
     res.sendFile(path.join(publicPath, 'index.html'))
   })
 
+  // NOTE: Error/404 handlers are added AFTER Credo init via finalizeServer()
+  // This allows Credo to register its OpenID4VC routes before the catch-all handlers
+
+  return app
+}
+
+/**
+ * Finalize server by adding error/404 handlers.
+ * Must be called AFTER any dynamic route registration (e.g., Credo OpenID4VC).
+ */
+export function finalizeServer(app: Express): void {
   // Error handling middleware
   app.use(errorMiddleware)
 
   // 404 handler
   app.use(notFoundMiddleware)
-
-  return app
 }
 
 export { API_VERSION, API_BASE_PATH }
