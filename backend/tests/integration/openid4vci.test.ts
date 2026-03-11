@@ -184,6 +184,8 @@ describe('OpenID4VCI Integration Tests', () => {
         .expect(200)
 
       const offer = response.body.credentialOffer
+      expect(offer.credential_configuration_ids).toHaveLength(2)
+      // backward compat field should also be present
       expect(offer.credentials).toHaveLength(2)
     })
 

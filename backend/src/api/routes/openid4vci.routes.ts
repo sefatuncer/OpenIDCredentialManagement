@@ -93,9 +93,17 @@ openid4vciRoutes.get(
  *                 items:
  *                   type: string
  *                 example: ["AIAgentIdentityCredential"]
- *               userPinRequired:
- *                 type: boolean
- *                 default: false
+ *               txCode:
+ *                 type: object
+ *                 description: Transaction code configuration (replaces deprecated userPinRequired)
+ *                 properties:
+ *                   input_mode:
+ *                     type: string
+ *                     enum: [numeric, text]
+ *                   length:
+ *                     type: integer
+ *                   description:
+ *                     type: string
  *               expiresInSeconds:
  *                 type: integer
  *                 default: 300
@@ -117,7 +125,7 @@ openid4vciRoutes.get(
 openid4vciRoutes.post(
   '/credential-offer',
   asyncHandler(async (req: Request, res: Response) => {
-    const { credentialTypes, userPinRequired, expiresInSeconds } = req.body
+    const { credentialTypes, txCode, userPinRequired, expiresInSeconds } = req.body
 
     if (!credentialTypes || !Array.isArray(credentialTypes) || credentialTypes.length === 0) {
       return res.status(400).json({
@@ -127,7 +135,8 @@ openid4vciRoutes.post(
     }
 
     const result = await createCredentialOffer(credentialTypes, {
-      userPinRequired,
+      txCode,
+      userPinRequired, // deprecated, mapped to txCode in service
       expiresInSeconds,
     })
 
@@ -222,8 +231,9 @@ openid4vciRoutes.get(
  *                 enum: [urn:ietf:params:oauth:grant-type:pre-authorized_code]
  *               pre-authorized_code:
  *                 type: string
- *               user_pin:
+ *               tx_code:
  *                 type: string
+ *                 description: Transaction code value (replaces deprecated user_pin)
  *     responses:
  *       200:
  *         description: Access token
@@ -250,7 +260,7 @@ openid4vciRoutes.post(
     const grantType = req.body.grant_type || req.body['grant_type']
     const preAuthorizedCode =
       req.body['pre-authorized_code'] || req.body.pre_authorized_code
-    const userPin = req.body.user_pin
+    const txCodeValue = req.body.tx_code || req.body.user_pin // backward compat
 
     logger.debug('Token request received', { grantType, hasCode: !!preAuthorizedCode })
 
@@ -268,7 +278,7 @@ openid4vciRoutes.post(
       })
     }
 
-    const result = await exchangePreAuthorizedCode(preAuthorizedCode, userPin)
+    const result = await exchangePreAuthorizedCode(preAuthorizedCode, txCodeValue)
 
     if ('error' in result) {
       return res.status(400).json(result)
@@ -299,6 +309,10 @@ openid4vciRoutes.post(
  *               format:
  *                 type: string
  *                 example: jwt_vc_json
+ *               credential_configuration_id:
+ *                 type: string
+ *                 description: Credential configuration identifier (preferred over credential_definition)
+ *                 example: AIAgentIdentityCredential
  *               credential_definition:
  *                 type: object
  *                 properties:

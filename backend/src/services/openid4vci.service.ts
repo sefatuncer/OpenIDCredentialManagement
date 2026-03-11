@@ -3,8 +3,7 @@ import jwt from 'jsonwebtoken'
 import * as jose from 'jose'
 import { logger } from '../utils/logger'
 import { getIssuerDid, getIssuerAgent } from '../agents/issuer.agent'
-import { resolveDidKey } from '../agents/base.agent'
-import { resolveDID } from './didResolver.service'
+import { resolvePublicKeyFromDid } from './didResolver.service'
 import {
   IStorageAdapter,
   createStorageAdapter,
@@ -129,11 +128,17 @@ function getNonceStorage(): IStorageAdapter<StoredNonce> {
 
 export interface CredentialOffer {
   credential_issuer: string
-  credentials: string[]
+  credential_configuration_ids: string[]
+  credentials?: string[] // deprecated, backward compat
   grants: {
     'urn:ietf:params:oauth:grant-type:pre-authorized_code'?: {
       'pre-authorized_code': string
-      user_pin_required: boolean
+      tx_code?: {
+        input_mode: string
+        length: number
+        description?: string
+      }
+      user_pin_required?: boolean // deprecated, backward compat
     }
     authorization_code?: {
       issuer_state?: string
@@ -155,7 +160,7 @@ export interface CredentialConfiguration {
   format: string
   scope?: string
   cryptographic_binding_methods_supported?: string[]
-  cryptographic_suites_supported?: string[]
+  credential_signing_alg_values_supported?: string[]
   credential_definition: {
     type: string[]
     credentialSubject?: Record<string, any>
@@ -194,6 +199,7 @@ export interface TokenResponse {
 
 export interface CredentialRequest {
   format: string
+  credential_configuration_id?: string
   credential_definition?: {
     type: string[]
   }
@@ -234,7 +240,7 @@ export function getIssuerMetadata(): IssuerMetadata {
         format: 'jwt_vc_json',
         scope: 'agent_identity',
         cryptographic_binding_methods_supported: ['did:key'],
-        cryptographic_suites_supported: ['EdDSA'],
+        credential_signing_alg_values_supported: ['EdDSA'],
         credential_definition: {
           type: ['VerifiableCredential', 'AIAgentIdentityCredential'],
           credentialSubject: {
@@ -264,7 +270,7 @@ export function getIssuerMetadata(): IssuerMetadata {
         format: 'jwt_vc_json',
         scope: 'delegation',
         cryptographic_binding_methods_supported: ['did:key'],
-        cryptographic_suites_supported: ['EdDSA'],
+        credential_signing_alg_values_supported: ['EdDSA'],
         credential_definition: {
           type: ['VerifiableCredential', 'DelegationCredential'],
           credentialSubject: {
@@ -289,7 +295,7 @@ export function getIssuerMetadata(): IssuerMetadata {
         format: 'jwt_vc_json',
         scope: 'capability',
         cryptographic_binding_methods_supported: ['did:key'],
-        cryptographic_suites_supported: ['EdDSA'],
+        credential_signing_alg_values_supported: ['EdDSA'],
         credential_definition: {
           type: ['VerifiableCredential', 'CapabilityCredential'],
           credentialSubject: {
@@ -345,7 +351,8 @@ export function getAuthorizationServerMetadata() {
 export async function createCredentialOffer(
   credentialTypes: string[],
   options: {
-    userPinRequired?: boolean
+    txCode?: { input_mode: string; length: number; description?: string }
+    userPinRequired?: boolean // deprecated, mapped to txCode
     expiresInSeconds?: number
   } = {}
 ): Promise<{
@@ -355,10 +362,11 @@ export async function createCredentialOffer(
 }> {
   // Credo kullanılabilirse öncelikli olarak onu kullan
   if (isUsingCredo()) {
+    const txCode = options.txCode || (options.userPinRequired
+      ? { inputMode: 'numeric', length: 6 }
+      : undefined)
     const credoResult = await credoCreateOffer(credentialTypes, {
-      preAuthorizedCodeFlowConfig: {
-        userPinRequired: options.userPinRequired,
-      },
+      preAuthorizedCodeFlowConfig: txCode ? { txCode } : undefined,
     })
 
     if (credoResult) {
@@ -390,13 +398,19 @@ export async function createCredentialOffer(
   const preAuthorizedCode = uuidv4()
   const expiresIn = options.expiresInSeconds || 300 // 5 minutes default
 
+  // Resolve tx_code from options (support deprecated userPinRequired)
+  const txCode = options.txCode || (options.userPinRequired
+    ? { input_mode: 'numeric', length: 6 }
+    : undefined)
+
   const credentialOffer: CredentialOffer = {
     credential_issuer: baseUrl,
-    credentials: credentialTypes,
+    credential_configuration_ids: credentialTypes,
+    credentials: credentialTypes, // deprecated, backward compat for old clients
     grants: {
       'urn:ietf:params:oauth:grant-type:pre-authorized_code': {
         'pre-authorized_code': preAuthorizedCode,
-        user_pin_required: options.userPinRequired || false,
+        ...(txCode ? { tx_code: txCode } : {}),
       },
     },
   }
@@ -548,7 +562,7 @@ export async function exchangePreAuthorizedCode(
     offerId: preAuthorizedCode, // Use preAuthorizedCode as reference
     issuedAt: new Date(),
     expiresAt: new Date(Date.now() + expiresIn * 1000),
-    scope: foundOffer.offer.credentials.join(' '),
+    scope: (foundOffer.offer.credential_configuration_ids || foundOffer.offer.credentials || []).join(' '),
   }
 
   await getTokensStorage().save(accessToken, tokenData)
@@ -762,7 +776,10 @@ export async function issueCredential(
   }
 
   // Determine credential type from request
-  const credentialTypes = request.credential_definition?.type || ['VerifiableCredential', 'AIAgentIdentityCredential']
+  // Priority: credential_configuration_id > credential_definition.type
+  const credentialTypes = request.credential_definition?.type
+    || (request.credential_configuration_id ? ['VerifiableCredential', request.credential_configuration_id] : null)
+    || ['VerifiableCredential', 'AIAgentIdentityCredential']
   const credentialType = credentialTypes[credentialTypes.length - 1]
 
   try {
@@ -1008,7 +1025,7 @@ export async function listCredentialOffers(): Promise<Array<{
 
   return offers.map((offer) => ({
     offerId: offer.preAuthorizedCode, // Use preAuthorizedCode as ID
-    credentialTypes: offer.offer.credentials,
+    credentialTypes: offer.offer.credential_configuration_ids || offer.offer.credentials || [],
     createdAt: offer.createdAt,
     expiresAt: offer.expiresAt,
     claimed: offer.claimed,
@@ -1088,88 +1105,3 @@ export function stopCleanupInterval(): void {
 
 // Start cleanup by default
 startCleanupInterval()
-
-/**
- * Resolve public key from any supported DID method
- * Supports: did:key, did:web, did:peer
- */
-async function resolvePublicKeyFromDid(did: string): Promise<jose.KeyLike | null> {
-  try {
-    // Fast path for did:key
-    if (did.startsWith('did:key:')) {
-      return await resolveDidKey(did)
-    }
-
-    // Use universal DID resolver for other methods
-    const resolution = await resolveDID(did)
-    if (!resolution.didDocument) {
-      logger.warn('Could not resolve DID document', { did })
-      return null
-    }
-
-    // Extract verification method from DID document
-    const verificationMethods = resolution.didDocument.verificationMethod || []
-    const authenticationMethods = resolution.didDocument.authentication || []
-
-    // Find the first usable verification method
-    for (const vm of verificationMethods) {
-      // Handle embedded verification methods
-      const method = typeof vm === 'string'
-        ? verificationMethods.find((m: any) => typeof m !== 'string' && m.id === vm)
-        : vm
-
-      if (!method || typeof method === 'string') continue
-
-      // Try to extract public key based on type
-      if (method.publicKeyJwk) {
-        try {
-          const key = await jose.importJWK(method.publicKeyJwk as jose.JWK)
-          // importJWK can return Uint8Array for symmetric keys, we need KeyLike
-          if (key instanceof Uint8Array) {
-            logger.warn('Symmetric key not supported for signature verification', { id: method.id })
-            continue
-          }
-          return key
-        } catch (e) {
-          logger.warn('Failed to import JWK from verification method', { id: method.id })
-        }
-      }
-
-      if (method.publicKeyMultibase) {
-        // For Ed25519 keys encoded as multibase
-        try {
-          const multibase = method.publicKeyMultibase as string
-          if (multibase.startsWith('z')) {
-            // This is base58btc encoded - extract and import
-            // Note: Full multibase decoding would require additional library
-            // For now, try to resolve via did:key if it's an Ed25519 key
-            const keyDid = `did:key:${multibase}`
-            return await resolveDidKey(keyDid)
-          }
-        } catch (e) {
-          logger.warn('Failed to import multibase key from verification method', { id: method.id })
-        }
-      }
-    }
-
-    // Check authentication methods as fallback
-    for (const auth of authenticationMethods) {
-      if (typeof auth === 'string') {
-        const refMethod = verificationMethods.find((m: any) => typeof m !== 'string' && m.id === auth)
-        if (refMethod && typeof refMethod !== 'string' && refMethod.publicKeyJwk) {
-          const key = await jose.importJWK(refMethod.publicKeyJwk as jose.JWK)
-          if (key instanceof Uint8Array) {
-            continue
-          }
-          return key
-        }
-      }
-    }
-
-    logger.warn('No usable public key found in DID document', { did })
-    return null
-  } catch (error) {
-    logger.error('Failed to resolve public key from DID', { did, error: (error as Error).message })
-    return null
-  }
-}

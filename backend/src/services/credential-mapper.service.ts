@@ -258,7 +258,7 @@ export function getCredentialConfigurationMetadata(configId: CredentialConfigura
     format: 'jwt_vc_json',
     scope: configId.toLowerCase().replace('credential', ''),
     cryptographic_binding_methods_supported: ['did:key', 'did:web', 'did:peer'],
-    cryptographic_suites_supported: ['EdDSA', 'ES256'],
+    credential_signing_alg_values_supported: ['EdDSA', 'ES256'],
     credential_definition: {
       type: getCredentialTypes(configId),
       credentialSubject: getCredentialSubjectSchema(configId),

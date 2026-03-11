@@ -1,4 +1,6 @@
+import * as jose from 'jose'
 import { logger } from '../utils/logger'
+import { resolveDidKey as resolveDidKeyToPublicKey } from '../agents/base.agent'
 
 /**
  * Universal DID Resolver Service
@@ -614,5 +616,84 @@ export async function dereferenceDIDURL(didUrl: string): Promise<{
     contentStream: resolution.didDocument,
     contentMetadata: resolution.didDocumentMetadata,
     dereferencingMetadata: {},
+  }
+}
+
+/**
+ * Resolve public key from any supported DID method
+ * Supports: did:key, did:web, did:peer
+ * Returns a jose.KeyLike suitable for JWT signature verification
+ */
+export async function resolvePublicKeyFromDid(did: string): Promise<jose.KeyLike | null> {
+  try {
+    // Fast path for did:key
+    if (did.startsWith('did:key:')) {
+      return await resolveDidKeyToPublicKey(did)
+    }
+
+    // Use universal DID resolver for other methods
+    const resolution = await resolveDID(did)
+    if (!resolution.didDocument) {
+      logger.warn('Could not resolve DID document', { did })
+      return null
+    }
+
+    // Extract verification method from DID document
+    const verificationMethods = resolution.didDocument.verificationMethod || []
+    const authenticationMethods = resolution.didDocument.authentication || []
+
+    // Find the first usable verification method
+    for (const vm of verificationMethods) {
+      const method = typeof vm === 'string'
+        ? verificationMethods.find((m: any) => typeof m !== 'string' && m.id === vm)
+        : vm
+
+      if (!method || typeof method === 'string') continue
+
+      if (method.publicKeyJwk) {
+        try {
+          const key = await jose.importJWK(method.publicKeyJwk as jose.JWK)
+          if (key instanceof Uint8Array) {
+            logger.warn('Symmetric key not supported for signature verification', { id: method.id })
+            continue
+          }
+          return key
+        } catch (e) {
+          logger.warn('Failed to import JWK from verification method', { id: method.id })
+        }
+      }
+
+      if (method.publicKeyMultibase) {
+        try {
+          const multibase = method.publicKeyMultibase as string
+          if (multibase.startsWith('z')) {
+            const keyDid = `did:key:${multibase}`
+            return await resolveDidKeyToPublicKey(keyDid)
+          }
+        } catch (e) {
+          logger.warn('Failed to import multibase key from verification method', { id: method.id })
+        }
+      }
+    }
+
+    // Check authentication methods as fallback
+    for (const auth of authenticationMethods) {
+      if (typeof auth === 'string') {
+        const refMethod = verificationMethods.find((m: any) => typeof m !== 'string' && m.id === auth)
+        if (refMethod && typeof refMethod !== 'string' && refMethod.publicKeyJwk) {
+          const key = await jose.importJWK(refMethod.publicKeyJwk as jose.JWK)
+          if (key instanceof Uint8Array) {
+            continue
+          }
+          return key
+        }
+      }
+    }
+
+    logger.warn('No usable public key found in DID document', { did })
+    return null
+  } catch (error) {
+    logger.error('Failed to resolve public key from DID', { did, error: (error as Error).message })
+    return null
   }
 }

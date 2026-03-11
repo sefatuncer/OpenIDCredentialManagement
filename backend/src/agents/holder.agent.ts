@@ -213,12 +213,14 @@ export async function presentCredential(
       presentation_definition: { id: string; input_descriptors: Array<{ id: string; constraints?: { fields?: Array<{ path: string[] }> } }> }
       nonce: string
       state: string
-      redirect_uri: string
+      response_uri?: string
+      redirect_uri?: string
     }
     const presentationDefinition = authRequest.presentation_definition
     const nonce = authRequest.nonce
     const state = authRequest.state
-    const redirectUri = authRequest.redirect_uri
+    // OpenID4VP: response_uri for direct_post, redirect_uri as fallback
+    const submitUrl = authRequest.response_uri || authRequest.redirect_uri
 
     logger.info(`Verification request: ${presentationDefinition.id}`)
 
@@ -232,8 +234,12 @@ export async function presentCredential(
     // VP token oluştur
     const vpToken = await createVpToken(matchingCredentials, nonce, clientId!)
 
+    if (!submitUrl) {
+      throw new Error('No response_uri or redirect_uri in authorization request')
+    }
+
     // Presentation submit et (direct_post)
-    const submitResponse = await fetch(redirectUri, {
+    const submitResponse = await fetch(submitUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -261,7 +267,7 @@ export async function presentCredential(
 
     logger.info('Presentation submitted successfully')
 
-    return { presentationSubmitted: true, redirectUri }
+    return { presentationSubmitted: true, redirectUri: submitUrl }
   } catch (error) {
     logger.error('Error presenting credential', { error })
     return { presentationSubmitted: false }

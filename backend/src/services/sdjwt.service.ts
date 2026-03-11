@@ -11,7 +11,7 @@
 import * as crypto from 'crypto'
 import * as jose from 'jose'
 import { logger } from '../utils/logger'
-import { resolveDidKey } from '../agents/base.agent'
+import { resolvePublicKeyFromDid } from './didResolver.service'
 
 // Types
 export interface SDJWTClaims {
@@ -609,9 +609,9 @@ class SDJWTService {
         return false
       }
 
-      // Resolve did:key to public key
-      if (didToResolve.startsWith('did:key:')) {
-        const publicKey = await resolveDidKey(didToResolve)
+      // Resolve DID to public key (supports did:key, did:web, did:peer)
+      if (didToResolve.startsWith('did:')) {
+        const publicKey = await resolvePublicKeyFromDid(didToResolve)
         if (!publicKey) {
           logger.warn('Could not resolve DID to public key', { did: didToResolve })
           return false
@@ -622,10 +622,7 @@ class SDJWTService {
         return true
       }
 
-      // For non did:key methods, log warning
-      logger.warn('Unsupported DID method for SD-JWT verification', {
-        method: didToResolve.split(':')[1],
-      })
+      logger.warn('Invalid DID format for SD-JWT verification', { did: didToResolve })
       return false
     } catch (error) {
       logger.error('SD-JWT signature verification failed', { error: (error as Error).message })
@@ -666,9 +663,9 @@ class SDJWTService {
       }
 
       // Verify signature if holder public key/DID is provided
-      if (holderPublicKeyOrDid && holderPublicKeyOrDid.startsWith('did:key:')) {
+      if (holderPublicKeyOrDid && holderPublicKeyOrDid.startsWith('did:')) {
         try {
-          const holderPublicKey = await resolveDidKey(holderPublicKeyOrDid)
+          const holderPublicKey = await resolvePublicKeyFromDid(holderPublicKeyOrDid)
           if (holderPublicKey) {
             await jose.jwtVerify(kbJwt, holderPublicKey)
             logger.info('Key binding JWT signature verified', { holder: holderPublicKeyOrDid })

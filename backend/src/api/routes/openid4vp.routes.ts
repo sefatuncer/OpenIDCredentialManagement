@@ -114,6 +114,7 @@ openid4vpRoutes.get(
  *                   type: string
  *                 authorizationRequest:
  *                   type: object
+ *                   description: Contains client_id_scheme, response_type, response_mode, response_uri, etc.
  *                 authorizationRequestUri:
  *                   type: string
  *       400:

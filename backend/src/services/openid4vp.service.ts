@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import * as jose from 'jose'
 import { logger } from '../utils/logger'
 import { getVerifierDid } from '../agents/verifier.agent'
-import { resolveDidKey } from '../agents/base.agent'
+import { resolvePublicKeyFromDid } from './didResolver.service'
 import {
   IStorageAdapter,
   createStorageAdapter,
@@ -98,6 +98,7 @@ export interface AuthorizationRequest {
   response_type: string
   response_mode: string
   client_id: string
+  client_id_scheme?: string
   redirect_uri?: string
   response_uri?: string
   scope?: string
@@ -405,6 +406,7 @@ export async function createAuthorizationRequest(
         response_type: 'vp_token',
         response_mode: 'direct_post',
         client_id: (await credoGetVerifierDid()) || getVerifierDid(),
+        client_id_scheme: 'did',
         response_uri: credoResult.authorizationRequestUri,
         nonce: session.nonce,
         state: session.state,
@@ -435,6 +437,7 @@ export async function createAuthorizationRequest(
     response_type: 'vp_token',
     response_mode: 'direct_post',
     client_id: getVerifierDid(),
+    client_id_scheme: 'did',
     response_uri: responseUri,
     nonce,
     state,
@@ -461,6 +464,7 @@ export async function createAuthorizationRequest(
   params.set('response_type', authorizationRequest.response_type)
   params.set('response_mode', authorizationRequest.response_mode)
   params.set('client_id', authorizationRequest.client_id)
+  params.set('client_id_scheme', authorizationRequest.client_id_scheme || 'did')
   params.set('response_uri', authorizationRequest.response_uri!)
   params.set('nonce', authorizationRequest.nonce)
   params.set('state', authorizationRequest.state)
@@ -623,14 +627,14 @@ async function verifyVPToken(
       }
     }
 
-    // Verify VP signature using did:key resolution
+    // Verify VP signature using universal DID resolution
     const holderDid = payload.iss
     let vpSignatureVerified = false
     const warnings: string[] = []
 
-    if (holderDid && holderDid.startsWith('did:key:')) {
+    if (holderDid && holderDid.startsWith('did:')) {
       try {
-        const publicKey = await resolveDidKey(holderDid)
+        const publicKey = await resolvePublicKeyFromDid(holderDid)
         if (publicKey) {
           await jose.jwtVerify(vpToken, publicKey)
           vpSignatureVerified = true
@@ -642,7 +646,7 @@ async function verifyVPToken(
         warnings.push('VP signature verification failed: ' + (sigError as Error).message)
       }
     } else {
-      warnings.push('Unsupported holder DID method: ' + holderDid)
+      warnings.push('Missing or invalid holder DID: ' + holderDid)
     }
 
     // Extract credential info from VP
@@ -669,10 +673,10 @@ async function verifyVPToken(
               continue
             }
 
-            // Verify VC signature
+            // Verify VC signature using universal DID resolution
             const vcIssuerDid = credPayload.iss
-            if (vcIssuerDid && vcIssuerDid.startsWith('did:key:')) {
-              const vcPublicKey = await resolveDidKey(vcIssuerDid)
+            if (vcIssuerDid && vcIssuerDid.startsWith('did:')) {
+              const vcPublicKey = await resolvePublicKeyFromDid(vcIssuerDid)
               if (vcPublicKey) {
                 try {
                   await jose.jwtVerify(credential, vcPublicKey)
@@ -681,6 +685,8 @@ async function verifyVPToken(
                 } catch (vcSigError) {
                   warnings.push('VC signature verification failed: ' + (vcSigError as Error).message)
                 }
+              } else {
+                warnings.push('Could not resolve VC issuer public key: ' + vcIssuerDid)
               }
             }
 

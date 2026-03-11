@@ -84,6 +84,9 @@ cd web-wallet && npm run dev
 - **[2026-03-09] DID:** DID:key oluştururken multicodec prefix (0xed01 for Ed25519) ve base58btc encoding zorunlu. Bkz: `.claude/solutions/did-key-multibase-encoding.md`
 - **[2026-03-09] TypeScript:** `jose.importJWK()` dönüş tipi `KeyLike | Uint8Array` olabilir, type assertion gerekebilir.
 - **[2026-03-09] SD-JWT:** Client-side SD-JWT parsing için backend API gerekmez, base64url decode yeterli. Crypto işlemleri (digest verification) için API kullan. Bkz: `.claude/solutions/sdjwt-selective-disclosure-ui.md`
+- **[2026-03-11] OpenID4VCI:** Spec draft geçişlerinde tüm katmanlar aynı field adlarını kullanmalı. Farklı katmanların farklı draft versiyonları kullanması runtime interop bug'larına yol açar. Dual-write pattern ile geçiş yap. Bkz: `.claude/solutions/openid4vc-spec-compliance-migration.md`
+- **[2026-03-11] DID:** DID resolution tek merkezde olmalı (`didResolver.service.ts`). VP/SD-JWT/VCI servislerinde ayrı ayrı `did:key` kontrolü yerine `resolvePublicKeyFromDid()` kullan.
+- **[2026-03-11] TypeScript:** Aynı isimde local fonksiyon ve import çakışmasında `import { foo as fooAlias }` kullan. Rename import, conflict'i temiz çözer.
 
 ## Pattern Library
 
@@ -92,3 +95,5 @@ cd web-wallet && npm run dev
 | Jose PRIMARY + Credo Optional | Native modül gerektirmeyen SSI mimarisi | `.claude/solutions/jose-primary-credo-optional.md` |
 | DID:key Encoding | Ed25519'dan DID:key oluşturma | `.claude/solutions/did-key-multibase-encoding.md` |
 | SD-JWT Selective Disclosure UI | Client-side parsing + claim selection UI | `.claude/solutions/sdjwt-selective-disclosure-ui.md` |
+| OpenID4VC Spec Migration | Draft 11→13+ field migration with backward compat | `.claude/solutions/openid4vc-spec-compliance-migration.md` |
+| Universal DID Resolution | Centralized `resolvePublicKeyFromDid()` for all DID methods | `.claude/solutions/openid4vc-spec-compliance-migration.md` |
