@@ -7,6 +7,7 @@ import AgentControl from './pages/AgentControl'
 import Delegations from './pages/Delegations'
 import TrustManagement from './pages/TrustManagement'
 import Simulation from './pages/Simulation'
+import PresentCredential from './pages/PresentCredential'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 function App() {
@@ -44,6 +45,9 @@ function App() {
             <NavLink to="/verify" className={({ isActive }) => isActive ? 'active' : ''}>
               Verify
             </NavLink>
+            <NavLink to="/present" className={({ isActive }) => isActive ? 'active' : ''}>
+              Present
+            </NavLink>
           </nav>
         </header>
 
@@ -57,6 +61,7 @@ function App() {
             <Route path="/credentials" element={<Credentials />} />
             <Route path="/issue" element={<IssueCredential />} />
             <Route path="/verify" element={<VerifyCredential />} />
+            <Route path="/present" element={<PresentCredential />} />
           </Routes>
         </main>
 

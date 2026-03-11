@@ -1,7 +1,7 @@
 ---
 id: "006"
 title: "OpenID4VP Wallet Integration"
-status: pending
+status: done
 priority: medium
 category: feature
 created: 2026-03-09
@@ -14,12 +14,12 @@ Web-wallet'ta OpenID4VP ile credential presentation flow'u.
 ## Gereksinimler
 
 ### Wallet Tarafı
-- [ ] QR code scanner (verification request)
-- [ ] Presentation definition parsing
-- [ ] Credential selection UI
-- [ ] SD-JWT claim selection (which to disclose)
-- [ ] Consent screen
-- [ ] Presentation submission
+- [x] QR code scanner (verification request)
+- [x] Presentation definition parsing (backend-driven)
+- [ ] Credential selection UI (todo 007 — client-side flow)
+- [ ] SD-JWT claim selection (todo 007 — client-side flow)
+- [x] Consent screen
+- [x] Presentation submission
 
 ### Backend Tarafı
 - [ ] Authorization request endpoint
@@ -41,6 +41,6 @@ Web-wallet'ta OpenID4VP ile credential presentation flow'u.
 
 ## Kabul Kriterleri
 
-- [ ] QR scan ile verification flow başlıyor
-- [ ] SD-JWT credential'larda claim selection çalışıyor
-- [ ] Verification sonucu wallet'ta gösteriliyor
+- [x] QR scan ile verification flow başlıyor
+- [ ] SD-JWT credential'larda claim selection çalışıyor (todo 007)
+- [x] Verification sonucu wallet'ta gösteriliyor

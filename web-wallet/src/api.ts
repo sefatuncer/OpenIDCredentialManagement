@@ -161,6 +161,24 @@ export async function verifyCredential(credential: string): Promise<{
   return response.json()
 }
 
+export async function presentCredential(verificationRequestUri: string): Promise<{
+  success: boolean
+  presentationSubmitted: boolean
+}> {
+  const response = await authFetch(`${API_BASE}/holder/credentials/present`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ verificationRequestUri }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error_description || error.message || 'Presentation failed')
+  }
+
+  return response.json()
+}
+
 export function parseJwt(token: string): Record<string, unknown> | null {
   try {
     const base64Url = token.split('.')[1]

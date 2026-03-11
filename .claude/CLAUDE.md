@@ -87,6 +87,7 @@ cd web-wallet && npm run dev
 - **[2026-03-11] OpenID4VCI:** Spec draft geçişlerinde tüm katmanlar aynı field adlarını kullanmalı. Farklı katmanların farklı draft versiyonları kullanması runtime interop bug'larına yol açar. Dual-write pattern ile geçiş yap. Bkz: `.claude/solutions/openid4vc-spec-compliance-migration.md`
 - **[2026-03-11] DID:** DID resolution tek merkezde olmalı (`didResolver.service.ts`). VP/SD-JWT/VCI servislerinde ayrı ayrı `did:key` kontrolü yerine `resolvePublicKeyFromDid()` kullan.
 - **[2026-03-11] TypeScript:** Aynı isimde local fonksiyon ve import çakışmasında `import { foo as fooAlias }` kullan. Rename import, conflict'i temiz çözer.
+- **[2026-03-11] Architecture:** Projede iki ayrı VP flow var: `verifier.agent.ts` (request_uri fetch) vs `openid4vp.service.ts` (inline params). Frontend ve wallet `verifier.agent.ts` path'ini kullanıyor. Yeni VP çalışmalarında hangi path'in kullanıldığını kontrol et. Bkz: todo 008.
 
 ## Pattern Library
 
