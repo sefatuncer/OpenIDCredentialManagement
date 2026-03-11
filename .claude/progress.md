@@ -67,13 +67,56 @@ Single environment development setup - no staging/production yet.
 - [x] IStorageAdapter with PostgreSQL backend
 - [x] VP sessions persistent across restarts
 
-## In Progress
+### SD-JWT VC Format Migration (2026-03-11)
+- [x] `issueCredential()` SD-JWT VC format branch (`sdjwtService.createSDJWTVC()`)
+- [x] SD claim definitions per credential type (`SD_CLAIMS_BY_TYPE`)
+- [x] Issuer metadata — dual format configs (jwt_vc_json + vc+sd-jwt)
+- [x] `_sdjwt` config ID suffix convention
+- [x] Holder agent — combined SD-JWT string storage + `isSDJWT` flag
+- [x] Frontend — format selector (default: vc+sd-jwt)
+- [x] Zod validation — `credentialFormatSchema` enum
+- [x] Backward compat — jwt_vc_json still supported
+
+## WP1: Hızlı Analiz ve Mimari Tasarım (Ay 1-3)
+
+- [ ] Cloud HSM ön değerlendirme (todo 025)
+
+## WP2: Temel Geliştirme — Alfa Prototip (Ay 4-6)
 
 - [ ] Batch credential issuance (todo 001)
-
-## Planned
-
-- [ ] Client-side VP flow for wallet-only credentials (todo 007)
-- [ ] Docker/Kubernetes production deployment (todo 003)
-- [ ] Production environment setup (todo 004)
+- [ ] PostgreSQL — kalan Map-based servisler (todo 002)
+- [x] SD-JWT VC format migration (todo 009) — 2026-03-11
+- [ ] Credential schema registry (todo 010)
 - [ ] Issuer SD-JWT credential form (todo 005)
+- [ ] Client-side VP flow (todo 007)
+- [ ] React Native mobil wallet (todo 023)
+
+## WP3: İleri Geliştirme + Blockchain — Beta Prototip (Ay 7-12)
+
+- [ ] Hyperledger Fabric entegrasyonu (todo 011)
+- [ ] OAuth 2.0 bridge adapter (todo 012)
+- [ ] DIDComm v1/v2 entegrasyonu (todo 013)
+- [ ] Multi-tenant credential izolasyonu (todo 014)
+- [ ] Gerçek zamanlı revocation — webhook (todo 015)
+- [ ] OPA/Cerbos fine-grained authorization (todo 024)
+
+## WP4: Test Altyapısı (Ay 4-6, 9-12 — Paralel)
+
+- [ ] Docker/Kubernetes deployment (todo 003)
+- [ ] Production environment setup (todo 004)
+- [ ] Performans test framework'ü (todo 016)
+- [ ] CI/CD pipeline (todo 017)
+
+## WP5: Deneysel Değerlendirme + Güvenlik (Ay 13-16)
+
+- [ ] 10K+ ajan ölçekleme testleri (todo 018)
+- [ ] Penetration test + güvenlik denetimi (todo 019)
+- [ ] Cloud HSM kapsamlı analiz (todo 025)
+
+## WP6: Finalizasyon (Ay 17-18)
+
+- [ ] Agent Identity SDK paketleme (todo 020)
+- [ ] API dokümantasyonu + referans mimari raporu (todo 021)
+- [ ] Demo uygulamalar — 3 senaryo (todo 026)
+- [ ] Akademik yayınlar — 2+ hakemli (todo 027)
+- [ ] Patent başvuruları (todo 028)

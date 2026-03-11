@@ -12,6 +12,8 @@ export const trustLevelSchema = z.enum(['basic', 'standard', 'elevated', 'high']
 
 export const agentTypeSchema = z.enum(['autonomous', 'semi-autonomous', 'supervised', 'tool'])
 
+export const credentialFormatSchema = z.enum(['jwt_vc_json', 'vc+sd-jwt'])
+
 // Issuer schemas
 export const agentIdentityCredentialSchema = z.object({
   holderDid: didSchema,
@@ -24,6 +26,7 @@ export const agentIdentityCredentialSchema = z.object({
   ownerName: z.string().optional(),
   trustLevel: trustLevelSchema.optional(),
   validUntil: isoDateSchema.optional(),
+  format: credentialFormatSchema.optional(),
 })
 
 export const delegationCredentialSchema = z.object({
@@ -38,6 +41,7 @@ export const delegationCredentialSchema = z.object({
   validFrom: isoDateSchema.optional(),
   validUntil: isoDateSchema.optional(),
   revocable: z.boolean().optional(),
+  format: credentialFormatSchema.optional(),
 })
 
 export const capabilityCredentialSchema = z.object({
@@ -48,6 +52,7 @@ export const capabilityCredentialSchema = z.object({
   conditions: z.record(z.unknown()).optional(),
   grantedBy: didSchema.optional(),
   validUntil: isoDateSchema.optional(),
+  format: credentialFormatSchema.optional(),
 })
 
 // Holder schemas

@@ -11,12 +11,23 @@ import {
 } from '../core/storage'
 import { eventBus } from '../core/event-bus'
 import { isFeatureEnabled } from '../core/feature-flags'
+import { sdjwtService, type SDJWTClaims } from './sdjwt.service'
 // Credo Service import - Credo varsa onu kullan, yoksa Jose fallback
 import {
   isUsingCredo,
   createCredentialOffer as credoCreateOffer,
   getIssuerDid as credoGetIssuerDid,
 } from './credo.service'
+
+/**
+ * Selective disclosure claim definitions per credential type.
+ * Claims listed here will be hidden by default and only revealed when holder chooses to disclose.
+ */
+const SD_CLAIMS_BY_TYPE: Record<string, string[]> = {
+  AIAgentIdentityCredential: ['agent_name', 'agent_version', 'capabilities', 'owner_name', 'trust_level'],
+  DelegationCredential: ['delegator_name', 'delegate_name', 'constraints', 'purpose'],
+  CapabilityCredential: ['conditions', 'granted_by'],
+}
 
 // EdDSA key pair for credential signing (Ed25519)
 // In production, these should be loaded from secure key management (HSM, KMS, etc.)
@@ -225,6 +236,125 @@ export function getIssuerBaseUrl(): string {
 }
 
 /**
+ * Base credential configuration definitions.
+ * SD-JWT VC variants are auto-generated from these with _sdjwt suffix.
+ */
+interface BaseCredentialConfig {
+  scope: string
+  credentialType: string
+  credentialSubject: Record<string, unknown>
+  displayName: string
+  description: string
+  backgroundColor: string
+  logo?: { uri: string; alt_text: string }
+}
+
+function buildCredentialConfigurations(baseUrl: string): Record<string, CredentialConfiguration> {
+  const baseConfigs: Record<string, BaseCredentialConfig> = {
+    AIAgentIdentityCredential: {
+      scope: 'agent_identity',
+      credentialType: 'AIAgentIdentityCredential',
+      credentialSubject: {
+        agent_id: { mandatory: true, display: [{ name: 'Agent ID' }] },
+        agent_type: { mandatory: true, display: [{ name: 'Agent Type' }] },
+        agent_name: { mandatory: true, display: [{ name: 'Agent Name' }] },
+        capabilities: { mandatory: false, display: [{ name: 'Capabilities' }] },
+        owner_did: { mandatory: true, display: [{ name: 'Owner DID' }] },
+        trust_level: { mandatory: false, display: [{ name: 'Trust Level' }] },
+      },
+      displayName: 'AI Agent Identity',
+      description: 'Credential proving the identity and capabilities of an AI agent',
+      backgroundColor: '#1E3A5F',
+      logo: { uri: `${baseUrl}/logo.png`, alt_text: 'AI Agent Identity Logo' },
+    },
+    DelegationCredential: {
+      scope: 'delegation',
+      credentialType: 'DelegationCredential',
+      credentialSubject: {
+        delegation_id: { mandatory: true },
+        delegator_did: { mandatory: true },
+        delegate_did: { mandatory: true },
+        scope: { mandatory: true },
+        valid_until: { mandatory: true },
+      },
+      displayName: 'Delegation Credential',
+      description: 'Credential representing delegated authority',
+      backgroundColor: '#2E7D32',
+    },
+    CapabilityCredential: {
+      scope: 'capability',
+      credentialType: 'CapabilityCredential',
+      credentialSubject: {
+        capability_id: { mandatory: true },
+        capability_type: { mandatory: true },
+        resource: { mandatory: true },
+        actions: { mandatory: true },
+      },
+      displayName: 'Capability Credential',
+      description: 'Credential granting specific capabilities',
+      backgroundColor: '#7B1FA2',
+    },
+  }
+
+  const configs: Record<string, CredentialConfiguration> = {}
+
+  for (const [id, base] of Object.entries(baseConfigs)) {
+    const commonFields = {
+      scope: base.scope,
+      cryptographic_binding_methods_supported: ['did:key'] as string[],
+      credential_signing_alg_values_supported: ['EdDSA'] as string[],
+      credential_definition: {
+        type: ['VerifiableCredential', base.credentialType],
+        credentialSubject: base.credentialSubject,
+      },
+    }
+
+    // JWT-VC format
+    configs[id] = {
+      ...commonFields,
+      format: 'jwt_vc_json',
+      display: [{
+        name: base.displayName,
+        locale: 'en-US',
+        ...(base.logo ? { logo: base.logo } : {}),
+        description: base.description,
+        background_color: base.backgroundColor,
+        text_color: '#FFFFFF',
+      }],
+    }
+
+    // SD-JWT VC format (eIDAS 2.0 / EUDI ARF compliant)
+    // SD claims marked as mandatory: false in the SD-JWT variant
+    const sdSubject = { ...base.credentialSubject }
+    const sdClaims = SD_CLAIMS_BY_TYPE[base.credentialType] || []
+    for (const claim of sdClaims) {
+      if (sdSubject[claim]) {
+        sdSubject[claim] = { ...(sdSubject[claim] as Record<string, unknown>), mandatory: false }
+      }
+    }
+
+    configs[`${id}_sdjwt`] = {
+      ...commonFields,
+      format: 'vc+sd-jwt',
+      credential_definition: {
+        type: ['VerifiableCredential', base.credentialType],
+        credentialSubject: sdSubject,
+      },
+      display: [{
+        name: `${base.displayName} (SD-JWT)`,
+        locale: 'en-US',
+        ...(base.logo ? { logo: base.logo } : {}),
+        description: `SD-JWT VC credential with selective disclosure for ${base.scope.replace('_', ' ')}`,
+        background_color: base.backgroundColor,
+        text_color: '#FFFFFF',
+      }],
+    }
+  }
+
+  return configs
+}
+
+/**
  * Get issuer metadata (/.well-known/openid-credential-issuer)
  */
 export function getIssuerMetadata(): IssuerMetadata {
@@ -235,87 +365,7 @@ export function getIssuerMetadata(): IssuerMetadata {
     credential_endpoint: `${baseUrl}/credential`,
     batch_credential_endpoint: `${baseUrl}/batch-credential`,
     deferred_credential_endpoint: `${baseUrl}/deferred-credential`,
-    credential_configurations_supported: {
-      AIAgentIdentityCredential: {
-        format: 'jwt_vc_json',
-        scope: 'agent_identity',
-        cryptographic_binding_methods_supported: ['did:key'],
-        credential_signing_alg_values_supported: ['EdDSA'],
-        credential_definition: {
-          type: ['VerifiableCredential', 'AIAgentIdentityCredential'],
-          credentialSubject: {
-            agent_id: { mandatory: true, display: [{ name: 'Agent ID' }] },
-            agent_type: { mandatory: true, display: [{ name: 'Agent Type' }] },
-            agent_name: { mandatory: true, display: [{ name: 'Agent Name' }] },
-            capabilities: { mandatory: false, display: [{ name: 'Capabilities' }] },
-            owner_did: { mandatory: true, display: [{ name: 'Owner DID' }] },
-            trust_level: { mandatory: false, display: [{ name: 'Trust Level' }] },
-          },
-        },
-        display: [
-          {
-            name: 'AI Agent Identity',
-            locale: 'en-US',
-            logo: {
-              uri: `${baseUrl}/logo.png`,
-              alt_text: 'AI Agent Identity Logo',
-            },
-            description: 'Credential proving the identity and capabilities of an AI agent',
-            background_color: '#1E3A5F',
-            text_color: '#FFFFFF',
-          },
-        ],
-      },
-      DelegationCredential: {
-        format: 'jwt_vc_json',
-        scope: 'delegation',
-        cryptographic_binding_methods_supported: ['did:key'],
-        credential_signing_alg_values_supported: ['EdDSA'],
-        credential_definition: {
-          type: ['VerifiableCredential', 'DelegationCredential'],
-          credentialSubject: {
-            delegation_id: { mandatory: true },
-            delegator_did: { mandatory: true },
-            delegate_did: { mandatory: true },
-            scope: { mandatory: true },
-            valid_until: { mandatory: true },
-          },
-        },
-        display: [
-          {
-            name: 'Delegation Credential',
-            locale: 'en-US',
-            description: 'Credential representing delegated authority',
-            background_color: '#2E7D32',
-            text_color: '#FFFFFF',
-          },
-        ],
-      },
-      CapabilityCredential: {
-        format: 'jwt_vc_json',
-        scope: 'capability',
-        cryptographic_binding_methods_supported: ['did:key'],
-        credential_signing_alg_values_supported: ['EdDSA'],
-        credential_definition: {
-          type: ['VerifiableCredential', 'CapabilityCredential'],
-          credentialSubject: {
-            capability_id: { mandatory: true },
-            capability_type: { mandatory: true },
-            resource: { mandatory: true },
-            actions: { mandatory: true },
-          },
-        },
-        display: [
-          {
-            name: 'Capability Credential',
-            locale: 'en-US',
-            description: 'Credential granting specific capabilities',
-            background_color: '#7B1FA2',
-            text_color: '#FFFFFF',
-          },
-        ],
-      },
-    },
+    credential_configurations_supported: buildCredentialConfigurations(baseUrl),
     display: [
       {
         name: 'AI Agent Identity System',
@@ -777,57 +827,78 @@ export async function issueCredential(
 
   // Determine credential type from request
   // Priority: credential_configuration_id > credential_definition.type
+  // Strip _sdjwt suffix from configuration ID to get the base credential type
+  const configId = request.credential_configuration_id || ''
+  const baseConfigId = configId.replace(/_sdjwt$/, '')
   const credentialTypes = request.credential_definition?.type
-    || (request.credential_configuration_id ? ['VerifiableCredential', request.credential_configuration_id] : null)
+    || (baseConfigId ? ['VerifiableCredential', baseConfigId] : null)
     || ['VerifiableCredential', 'AIAgentIdentityCredential']
   const credentialType = credentialTypes[credentialTypes.length - 1]
 
+  // Determine format: explicit request.format, or infer from _sdjwt config suffix
+  const requestedFormat = request.format
+    || (configId.endsWith('_sdjwt') ? 'vc+sd-jwt' : 'jwt_vc_json')
+
   try {
-    // Create JWT-VC credential directly
     const issuerDid = getIssuerDid()
-    const now = Math.floor(Date.now() / 1000)
     const expiresIn = 365 * 24 * 60 * 60 // 1 year
 
     // Build credential subject based on type
     const credentialSubject = buildCredentialSubject(credentialType, holderDid, offerData)
     const credentialId = `urn:uuid:${uuidv4()}`
 
-    // Create the Verifiable Credential
-    const vcPayload = {
-      iss: issuerDid,
-      sub: holderDid,
-      iat: now,
-      exp: now + expiresIn,
-      nbf: now,
-      jti: credentialId,
-      vc: {
-        '@context': [
-          'https://www.w3.org/2018/credentials/v1',
-          'https://www.w3.org/2018/credentials/examples/v1'
-        ],
-        type: credentialTypes,
-        issuer: issuerDid,
-        issuanceDate: new Date().toISOString(),
-        expirationDate: new Date(Date.now() + expiresIn * 1000).toISOString(),
-        credentialSubject: {
-          id: holderDid,
-          ...credentialSubject,
+    const { privateKey, keyId } = await getSigningKeyPair()
+    let credential: string
+
+    if (requestedFormat === 'vc+sd-jwt') {
+      // Issue as SD-JWT VC (eIDAS 2.0 / EUDI ARF compliant)
+      const sdClaims = SD_CLAIMS_BY_TYPE[credentialType] || []
+      const sdResult = await sdjwtService.createSDJWTVC(
+        issuerDid,
+        holderDid,
+        credentialType,
+        credentialSubject as SDJWTClaims,
+        sdClaims,
+        { expiresIn, credentialId, privateKey }
+      )
+      credential = sdResult.combined
+    } else {
+      // Issue as plain JWT-VC (backward compat)
+      const now = Math.floor(Date.now() / 1000)
+      const vcPayload = {
+        iss: issuerDid,
+        sub: holderDid,
+        iat: now,
+        exp: now + expiresIn,
+        nbf: now,
+        jti: credentialId,
+        vc: {
+          '@context': [
+            'https://www.w3.org/2018/credentials/v1',
+            'https://www.w3.org/2018/credentials/examples/v1'
+          ],
+          type: credentialTypes,
+          issuer: issuerDid,
+          issuanceDate: new Date().toISOString(),
+          expirationDate: new Date(Date.now() + expiresIn * 1000).toISOString(),
+          credentialSubject: {
+            id: holderDid,
+            ...credentialSubject,
+          },
         },
-      },
+      }
+
+      credential = await new jose.SignJWT(vcPayload)
+        .setProtectedHeader({
+          alg: 'EdDSA',
+          typ: 'JWT',
+          kid: `${issuerDid}#${keyId}`,
+        })
+        .sign(privateKey)
     }
 
-    // Sign the credential as JWT using EdDSA (Ed25519)
-    const { privateKey, keyId } = await getSigningKeyPair()
-    const credential = await new jose.SignJWT(vcPayload)
-      .setProtectedHeader({
-        alg: 'EdDSA',
-        typ: 'JWT',
-        kid: `${issuerDid}#${keyId}`,
-      })
-      .sign(privateKey)
-
     logger.info('Credential issued successfully', {
-      format: request.format,
+      format: requestedFormat,
       credentialType,
       holderDid,
       jti: credentialId,
@@ -839,6 +910,7 @@ export async function issueCredential(
       credentialType,
       issuerDid,
       holderDid,
+      format: requestedFormat,
     })
 
     // Generate new nonce for potential follow-up requests
@@ -855,7 +927,7 @@ export async function issueCredential(
     await getNonceStorage().save(newNonce, newStoredNonce)
 
     return {
-      format: request.format || 'jwt_vc_json',
+      format: requestedFormat,
       credential,
       c_nonce: newNonce,
       c_nonce_expires_in: newNonceExpiresIn,

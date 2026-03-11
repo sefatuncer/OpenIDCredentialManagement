@@ -70,7 +70,8 @@ export function getIssuerKid(): string {
  */
 export async function issueAgentIdentityCredential(
   holderDid: string,
-  subject: Partial<AgentIdentityCredentialSubject>
+  subject: Partial<AgentIdentityCredentialSubject>,
+  options: { format?: 'jwt_vc_json' | 'vc+sd-jwt' } = {}
 ): Promise<{ credentialOfferId: string; credentialOfferUri: string }> {
   const agent = getIssuerAgent()
   const offerId = uuidv4()
@@ -104,9 +105,10 @@ export async function issueAgentIdentityCredential(
   logger.info(`Agent Identity credential offer created: ${offerId}`)
 
   // OpenID4VCI credential offer URI
+  const configId = options.format === 'vc+sd-jwt' ? 'AIAgentIdentityCredential_sdjwt' : 'AIAgentIdentityCredential'
   const credentialOfferUri = `openid-credential-offer://?credential_offer=${encodeURIComponent(JSON.stringify({
     credential_issuer: issuerConfig.endpoint,
-    credential_configuration_ids: ['AIAgentIdentityCredential'],
+    credential_configuration_ids: [configId],
     grants: {
       'urn:ietf:params:oauth:grant-type:pre-authorized_code': {
         'pre-authorized_code': accessToken,
@@ -125,7 +127,8 @@ export async function issueAgentIdentityCredential(
  */
 export async function issueDelegationCredential(
   holderDid: string,
-  subject: Partial<DelegationCredentialSubject>
+  subject: Partial<DelegationCredentialSubject>,
+  options: { format?: 'jwt_vc_json' | 'vc+sd-jwt' } = {}
 ): Promise<{ credentialOfferId: string; credentialOfferUri: string }> {
   const agent = getIssuerAgent()
   const offerId = uuidv4()
@@ -156,9 +159,10 @@ export async function issueDelegationCredential(
 
   logger.info(`Delegation credential offer created: ${offerId}`)
 
+  const configId = options.format === 'vc+sd-jwt' ? 'DelegationCredential_sdjwt' : 'DelegationCredential'
   const credentialOfferUri = `openid-credential-offer://?credential_offer=${encodeURIComponent(JSON.stringify({
     credential_issuer: issuerConfig.endpoint,
-    credential_configuration_ids: ['DelegationCredential'],
+    credential_configuration_ids: [configId],
     grants: {
       'urn:ietf:params:oauth:grant-type:pre-authorized_code': {
         'pre-authorized_code': accessToken,
@@ -177,7 +181,8 @@ export async function issueDelegationCredential(
  */
 export async function issueCapabilityCredential(
   holderDid: string,
-  subject: Partial<CapabilityCredentialSubject>
+  subject: Partial<CapabilityCredentialSubject>,
+  options: { format?: 'jwt_vc_json' | 'vc+sd-jwt' } = {}
 ): Promise<{ credentialOfferId: string; credentialOfferUri: string }> {
   const agent = getIssuerAgent()
   const offerId = uuidv4()
@@ -205,9 +210,10 @@ export async function issueCapabilityCredential(
 
   logger.info(`Capability credential offer created: ${offerId}`)
 
+  const configId = options.format === 'vc+sd-jwt' ? 'CapabilityCredential_sdjwt' : 'CapabilityCredential'
   const credentialOfferUri = `openid-credential-offer://?credential_offer=${encodeURIComponent(JSON.stringify({
     credential_issuer: issuerConfig.endpoint,
-    credential_configuration_ids: ['CapabilityCredential'],
+    credential_configuration_ids: [configId],
     grants: {
       'urn:ietf:params:oauth:grant-type:pre-authorized_code': {
         'pre-authorized_code': accessToken,

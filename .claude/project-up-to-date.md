@@ -32,8 +32,8 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 | **OpenID4VCI** | Credential issuance (Pre-Authorized Code Flow) | OpenID4VCI Draft 13+ |
 | **OpenID4VP** | Credential verification (Direct Post) | OpenID4VP Draft 20+ |
 | **DID** | Decentralized identifier (did:key, did:web, did:peer) | W3C DID Core 1.0 |
-| **JWT-VC** | Verifiable Credential format (`jwt_vc_json`) | W3C VC Data Model 1.1 |
-| **SD-JWT** | Selective Disclosure JWT | IETF SD-JWT Draft |
+| **JWT-VC** | Verifiable Credential format (`jwt_vc_json`) — legacy | W3C VC Data Model 1.1 |
+| **SD-JWT VC** | Selective Disclosure JWT VC (`vc+sd-jwt`) — varsayılan format | IETF SD-JWT VC Draft, eIDAS 2.0 / EUDI ARF |
 | **StatusList2021** | Credential revocation | W3C StatusList2021 |
 | **EdDSA** | Signature algorithm (Ed25519) | C:\Users\sefa.tuncer\Desktop\docker-digital-id\fame-digital-idRFC 8032 |
 
@@ -53,8 +53,11 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 | Tip | Açıklama | İçerik |
 |-----|----------|--------|
 | `AIAgentIdentityCredential` | AI agent kimlik belgesi | agentId, agentType, agentName, capabilities, trustLevel |
+| `AIAgentIdentityCredential_sdjwt` | AI agent kimlik (SD-JWT VC) | Aynı alanlar, SD: agent_name, capabilities, trust_level |
 | `DelegationCredential` | Yetki devri belgesi | delegatorDid, delegateDid, scope, constraints |
+| `DelegationCredential_sdjwt` | Yetki devri (SD-JWT VC) | Aynı alanlar, SD: delegator_name, delegate_name, constraints |
 | `CapabilityCredential` | Yetenek belgesi | capabilityType, resource, actions, conditions |
+| `CapabilityCredential_sdjwt` | Yetenek (SD-JWT VC) | Aynı alanlar, SD: conditions, granted_by |
 
 ---
 
@@ -118,14 +121,16 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 **Credential Request (Draft 13+):**
 ```json
 {
-  "format": "jwt_vc_json",
-  "credential_configuration_id": "AIAgentIdentityCredential",
+  "format": "vc+sd-jwt",
+  "credential_configuration_id": "AIAgentIdentityCredential_sdjwt",
   "proof": {
     "proof_type": "jwt",
     "jwt": "<proof JWT with typ:openid4vci-proof+jwt, aud, nonce, iat>"
   }
 }
 ```
+> **Format:** `vc+sd-jwt` (varsayılan, eIDAS 2.0 uyumlu) veya `jwt_vc_json` (legacy).
+> **Config ID:** `_sdjwt` suffix'li ID'ler SD-JWT VC format, suffix'siz ID'ler JWT-VC format.
 > `credential_configuration_id` (Draft 13+) önceliklidir. Eski `credential_definition.type` de kabul edilir (backward compat).
 
 #### Issuer-Specific Endpoints
@@ -151,13 +156,14 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
   "ownerDid": "did:key:z...",
   "ownerName": "Owner",
   "trustLevel": "medium",
-  "validUntil": "2026-12-31T00:00:00Z"
+  "validUntil": "2026-12-31T00:00:00Z",
+  "format": "vc+sd-jwt"
 }
 ```
 
 **Response:**
 ```json
-{ "credentialOfferId": "...", "credentialOfferUri": "openid-credential-offer://..." }
+{ "credentialOfferId": "...", "credentialOfferUri": "openid-credential-offer://...", "format": "vc+sd-jwt" }
 ```
 
 ---
@@ -477,7 +483,8 @@ Agent Dashboard
 
 Credentials
   ├─▶ Local: AES-GCM encrypted localStorage (credential storage)
-  ├─▶ Local: SD-JWT client-side parsing (base64url decode)
+  ├─▶ Local: SD-JWT client-side parsing (base64url decode, ~ separator)
+  ├─▶ GET  /api/v1/holder/credentials   → format, combined, isSDJWT alanları
   ├─▶ POST /api/v1/sdjwt/presentation  (selective disclosure ile VP oluştur)
   └─▶ POST /api/v1/sdjwt/verify        (SD-JWT doğrulama)
 
@@ -533,7 +540,8 @@ Issuer Frontend                 Backend                        Wallet
      │                            │  POST /credential            │
      │                            │  (proof JWT + access_token)  │
      │                            │◀─────────────────────────────│
-     │                            │──── JWT-VC credential ──────▶│
+     │                            │──── SD-JWT VC credential ───▶│
+     │                            │  (jwt~disclosure1~disc2~...)  │
 ```
 
 ### Credential Verification Flow (OpenID4VP)
@@ -618,7 +626,7 @@ API dokümantasyonu: `GET /api/v1/docs`
 | Dosya | Rol |
 |-------|-----|
 | `backend/src/index.ts` | Express app setup, route mounting, middleware |
-| `backend/src/services/openid4vci.service.ts` | OpenID4VCI protocol implementation (Draft 13+, ~1108 satır) |
+| `backend/src/services/openid4vci.service.ts` | OpenID4VCI protocol implementation (Draft 13+, SD-JWT VC + JWT-VC dual format, ~1179 satır) |
 | `backend/src/services/openid4vp.service.ts` | OpenID4VP protocol implementation (877 satır) |
 | `backend/src/services/sdjwt.service.ts` | SD-JWT issuance, verification |
 | `backend/src/services/credo.service.ts` | Credo-TS entegrasyonu (PRIMARY — Askar varsa aktif) |
@@ -635,6 +643,7 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `web-wallet/src/pages/PresentCredential.tsx` | OpenID4VP presentation flow UI (QR scan + manual URI) |
 | `web-wallet/src/components/QRScanner.tsx` | html5-qrcode wrapper component |
 | `web-wallet/src/api.ts` | Wallet API calls (issue, verify, present) |
+| `backend/src/api/schemas/validation.schemas.ts` | Zod validation schemas (credential format, DID, trust level) |
 | `backend/src/agents/verifier.agent.ts` | Thin wrapper — delege eder openid4vp.service'e, DID/key management |
 | `backend/src/database/storage-adapter.ts` | IStorageAdapter<T> — PostgreSQL / memory fallback |
 | `docker-compose.dev.yml` | Dev environment (4 services: backend, wallet, frontend, postgres) |

@@ -8,8 +8,11 @@ interface CredentialFormProps {
   isLoading?: boolean;
 }
 
+type CredentialFormat = 'jwt_vc_json' | 'vc+sd-jwt';
+
 export function CredentialForm({ onSubmit, isLoading }: CredentialFormProps) {
   const [credentialType, setCredentialType] = useState<CredentialType>('agent-identity');
+  const [credentialFormat, setCredentialFormat] = useState<CredentialFormat>('vc+sd-jwt');
   const [holderDid, setHolderDid] = useState('');
   const [availableHolders, setAvailableHolders] = useState<string[]>([]);
   const [issuerDid, setIssuerDid] = useState('');
@@ -68,6 +71,7 @@ export function CredentialForm({ onSubmit, isLoading }: CredentialFormProps) {
           agentName: agentName || `Agent-${agentId}`,
           ownerDid: ownerDid || issuerDid,
           capabilities: capabilities ? capabilities.split(',').map(s => s.trim()) : [],
+          format: credentialFormat,
         };
         break;
       case 'delegation':
@@ -77,6 +81,7 @@ export function CredentialForm({ onSubmit, isLoading }: CredentialFormProps) {
           delegateDid: delegateDid || holderDid,
           scope: scope ? scope.split(',').map(s => s.trim()) : ['read'],
           validUntil: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+          format: credentialFormat,
         };
         break;
       case 'capability':
@@ -85,6 +90,7 @@ export function CredentialForm({ onSubmit, isLoading }: CredentialFormProps) {
           capabilityType: capabilityType || 'general',
           resource: resource || '*',
           actions: actions ? actions.split(',').map(s => s.trim()) : ['read'],
+          format: credentialFormat,
         };
         break;
     }
@@ -105,6 +111,23 @@ export function CredentialForm({ onSubmit, isLoading }: CredentialFormProps) {
           <option value="delegation">Delegation</option>
           <option value="capability">Capability</option>
         </select>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Credential Format</label>
+        <select
+          className="form-select"
+          value={credentialFormat}
+          onChange={(e) => setCredentialFormat(e.target.value as CredentialFormat)}
+        >
+          <option value="vc+sd-jwt">SD-JWT VC (Selective Disclosure)</option>
+          <option value="jwt_vc_json">JWT-VC (Plain JSON)</option>
+        </select>
+        <div className="form-helper">
+          {credentialFormat === 'vc+sd-jwt'
+            ? 'eIDAS 2.0 compliant — holder can selectively disclose claims'
+            : 'Legacy format — all claims visible to verifier'}
+        </div>
       </div>
 
       <div className="form-group">

@@ -4,22 +4,21 @@ title: "Client-Side VP Flow (Wallet-Only Credentials)"
 status: pending
 priority: medium
 category: feature
+wp: WP2
 created: 2026-03-11
-related: [006]
+depends_on: ["006"]
 ---
 
 ## Açıklama
 
-Şu an VP flow backend-driven: wallet URI'yi backend'e gönderiyor, backend kendi in-memory credential storage'ından matching credential bulup VP token oluşturuyor. Wallet'ın local encrypted storage'ındaki credential'lar backend holder agent'ta yok.
-
-Bu todo, wallet'ın kendi credential'larını kullanarak client-side VP flow yapabilmesini sağlar.
+Wallet'ın kendi local credential'larını kullanarak client-side VP flow yapabilmesi. Şu an VP flow tamamen backend-driven.
 
 ## Gereksinimler
 
-- [ ] Wallet local credential'lardan presentation definition'a matching yapma
+- [ ] Wallet local credential'lardan presentation definition'a matching
 - [ ] Client-side VP token oluşturma (jose ile JWT signing)
 - [ ] Direct_post endpoint'ine client-side submission
-- [ ] SD-JWT credential'lar için selective disclosure seçimi (mevcut CreatePresentationModal kullanılabilir)
+- [ ] SD-JWT credential'lar için selective disclosure seçimi
 - [ ] Credential selection UI (birden fazla matching credential varsa)
 
 ## Teknik Notlar
@@ -27,9 +26,9 @@ Bu todo, wallet'ın kendi credential'larını kullanarak client-side VP flow yap
 - Wallet'ta private key gerekli (VP token signing için)
 - `jose` library wallet'a eklenmeli
 - Backend `direct_post` endpoint'i zaten dış wallet'lardan submission kabul ediyor
-- `presentation_submission` descriptor map oluşturulmalı
-- Mevcut `CreatePresentationModal` SD-JWT disclosure seçimi için yeniden kullanılabilir
 
-## Önkoşul
+## Kabul Kriterleri
 
-- Todo 006 (OpenID4VP Wallet Integration) tamamlanmalı
+- [ ] Wallet local credential ile VP flow tamamlanıyor
+- [ ] SD-JWT selective disclosure çalışıyor
+- [ ] Backend ve client-side VP flow'lar birlikte çalışıyor

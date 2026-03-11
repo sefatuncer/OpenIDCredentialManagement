@@ -114,12 +114,14 @@ issuerRoutes.post(
       trust_level: trustLevel || 'basic',
     }
 
-    const result = await issueAgentIdentityCredential(holderDid, subject)
+    const format = req.body.format as 'jwt_vc_json' | 'vc+sd-jwt' | undefined
+    const result = await issueAgentIdentityCredential(holderDid, subject, { format })
 
     res.json({
       success: true,
       credentialOfferId: result.credentialOfferId,
       credentialOfferUri: result.credentialOfferUri,
+      format: format || 'jwt_vc_json',
     })
   })
 )
@@ -188,12 +190,14 @@ issuerRoutes.post(
       revocable: revocable !== false,
     }
 
-    const result = await issueDelegationCredential(holderDid, subject)
+    const delegFormat = req.body.format as 'jwt_vc_json' | 'vc+sd-jwt' | undefined
+    const result = await issueDelegationCredential(holderDid, subject, { format: delegFormat })
 
     res.json({
       success: true,
       credentialOfferId: result.credentialOfferId,
       credentialOfferUri: result.credentialOfferUri,
+      format: delegFormat || 'jwt_vc_json',
     })
   })
 )
@@ -255,12 +259,14 @@ issuerRoutes.post(
       valid_until: validUntil || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     }
 
-    const result = await issueCapabilityCredential(holderDid, subject)
+    const capFormat = req.body.format as 'jwt_vc_json' | 'vc+sd-jwt' | undefined
+    const result = await issueCapabilityCredential(holderDid, subject, { format: capFormat })
 
     res.json({
       success: true,
       credentialOfferId: result.credentialOfferId,
       credentialOfferUri: result.credentialOfferUri,
+      format: capFormat || 'jwt_vc_json',
     })
   })
 )

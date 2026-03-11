@@ -36,6 +36,8 @@ const storedCredentials = new Map<string, {
   id: string
   jwt: string
   type: string
+  format: string
+  combined?: string // SD-JWT combined string (jwt~disclosure1~disclosure2~...)
   issuerDid: string
   receivedAt: Date
   payload: VCPayload
@@ -146,6 +148,10 @@ export async function receiveCredentialOffer(
   const tokenData = await tokenResponse.json() as { access_token: string; c_nonce: string }
   const accessToken = tokenData.access_token
 
+  // Determine format from credential_configuration_id (e.g. _sdjwt suffix means vc+sd-jwt)
+  const configId = credentialConfigIds[0] || ''
+  const requestFormat = configId.endsWith('_sdjwt') ? 'vc+sd-jwt' : 'jwt_vc_json'
+
   // Credential request
   const credentialResponse = await fetch(`${issuerUrl}/api/v1/issuer/credential`, {
     method: 'POST',
@@ -154,8 +160,8 @@ export async function receiveCredentialOffer(
       'Authorization': `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
-      format: 'jwt_vc_json',
-      credential_configuration_id: credentialConfigIds[0],
+      format: requestFormat,
+      credential_configuration_id: configId,
       proof: {
         proof_type: 'jwt',
         jwt: await createHolderProof(tokenData.c_nonce),
@@ -167,21 +173,28 @@ export async function receiveCredentialOffer(
     throw new Error(`Credential request failed: ${await credentialResponse.text()}`)
   }
 
-  const credentialData = await credentialResponse.json() as { credential: string }
-  const jwt = credentialData.credential
+  const credentialData = await credentialResponse.json() as { credential: string; format?: string }
+  const credentialString = credentialData.credential
+  const responseFormat = credentialData.format || requestFormat
+
+  // Parse credential — SD-JWT combined format has ~ separators
+  const isSDJWT = responseFormat === 'vc+sd-jwt' || credentialString.includes('~')
+  const jwtPart = isSDJWT ? credentialString.split('~')[0] : credentialString
 
   // JWT'yi decode et
-  const parts = jwt.split('.')
+  const parts = jwtPart.split('.')
   const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
 
   // Credential'ı kaydet
   const recordId = uuidv4()
-  const type = payload.vc?.type?.[1] || credentialConfigIds[0] || 'VerifiableCredential'
+  const type = payload.vc?.type?.[1] || configId.replace(/_sdjwt$/, '') || 'VerifiableCredential'
 
   storedCredentials.set(recordId, {
     id: recordId,
-    jwt,
+    jwt: jwtPart,
     type,
+    format: responseFormat,
+    combined: isSDJWT ? credentialString : undefined,
     issuerDid: payload.iss,
     receivedAt: new Date(),
     payload,
@@ -396,6 +409,9 @@ async function createVpToken(credentialJwts: string[], nonce: string, audience: 
 export async function getStoredCredentials(): Promise<Array<{
   id: string
   type: string
+  format: string
+  combined?: string
+  isSDJWT: boolean
   issuerDid: string
   receivedAt: Date
   credentialSubject: Record<string, unknown>
@@ -403,6 +419,9 @@ export async function getStoredCredentials(): Promise<Array<{
   return Array.from(storedCredentials.values()).map(cred => ({
     id: cred.id,
     type: cred.type,
+    format: cred.format || 'jwt_vc_json',
+    combined: cred.combined,
+    isSDJWT: cred.format === 'vc+sd-jwt' || !!cred.combined,
     issuerDid: cred.issuerDid,
     receivedAt: cred.receivedAt,
     credentialSubject: cred.payload.vc?.credentialSubject || cred.payload.credentialSubject || {},
@@ -431,8 +450,12 @@ export function getCredential(credentialId: string) {
 /**
  * Credential ekle (manuel)
  */
-export function addCredential(jwt: string): string {
-  const parts = jwt.split('.')
+export function addCredential(credentialString: string): string {
+  // Detect SD-JWT format (contains ~ separators)
+  const isSDJWT = credentialString.includes('~')
+  const jwtPart = isSDJWT ? credentialString.split('~')[0] : credentialString
+
+  const parts = jwtPart.split('.')
   if (parts.length !== 3) {
     throw new Error('Invalid JWT format')
   }
@@ -443,14 +466,16 @@ export function addCredential(jwt: string): string {
 
   storedCredentials.set(recordId, {
     id: recordId,
-    jwt,
+    jwt: jwtPart,
     type,
+    format: isSDJWT ? 'vc+sd-jwt' : 'jwt_vc_json',
+    combined: isSDJWT ? credentialString : undefined,
     issuerDid: payload.iss,
     receivedAt: new Date(),
     payload,
   })
 
-  logger.info(`Credential added manually: ${recordId}`)
+  logger.info(`Credential added manually: ${recordId}`, { format: isSDJWT ? 'vc+sd-jwt' : 'jwt_vc_json' })
 
   return recordId
 }

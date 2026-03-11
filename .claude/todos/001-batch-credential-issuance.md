@@ -4,6 +4,7 @@ title: "Batch Credential Issuance"
 status: pending
 priority: high
 category: feature
+wp: WP2
 created: 2026-03-09
 ---
 
@@ -13,26 +14,28 @@ Birden fazla credential'ı tek seferde issue edebilme özelliği.
 
 ## Gereksinimler
 
-- [ ] Backend: Batch issuance endpoint (`POST /api/v1/credentials/batch`)
-- [ ] Backend: Transaction support (all-or-nothing)
+- [ ] Backend: Batch issuance service (`batch-issuance.service.ts`)
+- [ ] Backend: Batch endpoint (`POST /issuer/credentials/batch`)
+- [ ] Backend: Zod validation schema (batchIssuanceSchema)
 - [ ] Backend: Rate limiting for batch operations
-- [ ] Frontend Issuer: Batch issuance form
-- [ ] Frontend Issuer: CSV/JSON import desteği
-- [ ] Progress tracking ve error reporting
+- [ ] Frontend: Batch issuance page (`/issuer/issue-batch`)
+- [ ] Frontend: CSV/JSON import desteği
+- [ ] Frontend: Progress tracking ve result summary UI
 
 ## Teknik Notlar
 
 - Max batch size: 100 credentials
-- Async processing with job queue (optional)
-- Partial failure handling strategy needed
+- Tek credential type per batch
+- Serial processing (loop), partial failure handling
+- Feature flag: `module.batch-issuance` (zaten mevcut, default enabled)
 
 ## Bağımlılıklar
 
-- OpenID4VCI service
-- Credential schema registry
+- Issuer agent credential issuance fonksiyonları (mevcut)
 
 ## Kabul Kriterleri
 
 - [ ] 100 credential tek request'te issue edilebilir
-- [ ] Hata durumunda transaction rollback
-- [ ] İlerleme durumu UI'da gösterilir
+- [ ] Hata durumunda partial success (biri fail olursa diğerleri devam)
+- [ ] İlerleme durumu ve sonuç summary UI'da gösterilir
+- [ ] CSV ve JSON import çalışıyor

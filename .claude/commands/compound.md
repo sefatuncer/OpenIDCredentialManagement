@@ -64,6 +64,19 @@ If the solution represents a reusable pattern, add a reference to the "Pattern L
 - Update `.claude/progress.md` if this work completed an implementation step
 - Update the relevant todo files in `.claude/todos/` (rename with `done` status)
 
+### 6. Update Project Reference (project-up-to-date.md)
+
+Her compound çalıştırıldığında `.claude/project-up-to-date.md` dosyasını güncel tut:
+
+- Yeni eklenen endpoint'leri API Endpoints bölümüne ekle
+- Yeni eklenen dosyaları Temel Dosyalar tablosuna ekle
+- Bileşen → Endpoint Etkileşim Haritası'nı güncelle (yeni page'ler, yeni API call'lar)
+- Akış Diyagramları'nı güncelle (değişen flow'lar)
+- Mimari değişiklikleri (yeni servisler, yeni bağımlılıklar) Genel Mimari bölümüne yansıt
+- Güvenlik veya protokol değişikliklerini ilgili bölümlere ekle
+
+Bu dosya projenin güncel API ve mimari referansıdır — her cycle sonunda senkronize olmalı.
+
 ## Rules
 - Only document genuine learnings — not trivial observations
 - Keep CLAUDE.md entries concise (1-2 lines each)

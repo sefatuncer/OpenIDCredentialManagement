@@ -4,6 +4,7 @@ title: "Docker/Kubernetes Deployment"
 status: pending
 priority: medium
 category: infrastructure
+wp: WP4
 created: 2026-03-09
 depends_on: ["002"]
 ---
@@ -18,7 +19,6 @@ Production-ready container ve orchestration yapılandırması.
 - [ ] Backend Dockerfile optimizasyonu (multi-stage build)
 - [ ] Web-wallet Dockerfile (nginx static serve)
 - [ ] Frontend-issuer-verifier Dockerfile
-- [ ] docker-compose.yml (development)
 - [ ] docker-compose.prod.yml (production)
 
 ### Kubernetes
@@ -27,8 +27,8 @@ Production-ready container ve orchestration yapılandırması.
 - [ ] Frontend Deployments + Services
 - [ ] PostgreSQL StatefulSet
 - [ ] ConfigMaps ve Secrets
-- [ ] Ingress yapılandırması
-- [ ] HorizontalPodAutoscaler
+- [ ] Ingress yapılandırması (TLS termination)
+- [ ] HorizontalPodAutoscaler (HPA)
 - [ ] Health/Readiness probes
 
 ### Monitoring
@@ -36,22 +36,9 @@ Production-ready container ve orchestration yapılandırması.
 - [ ] Grafana dashboards
 - [ ] Alert rules
 
-## Dosya Yapısı
-
-```
-backend/
-├── Dockerfile
-├── docker/
-│   └── docker-compose.yml
-└── k8s/
-    ├── namespace.yaml
-    ├── backend/
-    ├── frontend/
-    └── monitoring/
-```
-
 ## Kabul Kriterleri
 
-- [ ] `docker-compose up` ile tüm servisler ayağa kalkıyor
+- [ ] `docker-compose up` ile tüm servisler ayağa kalkıyor (prod config)
 - [ ] K8s cluster'a deploy edilebilir
 - [ ] Zero-downtime deployment mümkün
+- [ ] HPA ile otomatik ölçekleme çalışıyor
