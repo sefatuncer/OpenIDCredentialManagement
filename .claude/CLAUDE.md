@@ -87,7 +87,9 @@ cd web-wallet && npm run dev
 - **[2026-03-11] OpenID4VCI:** Spec draft geçişlerinde tüm katmanlar aynı field adlarını kullanmalı. Farklı katmanların farklı draft versiyonları kullanması runtime interop bug'larına yol açar. Dual-write pattern ile geçiş yap. Bkz: `.claude/solutions/openid4vc-spec-compliance-migration.md`
 - **[2026-03-11] DID:** DID resolution tek merkezde olmalı (`didResolver.service.ts`). VP/SD-JWT/VCI servislerinde ayrı ayrı `did:key` kontrolü yerine `resolvePublicKeyFromDid()` kullan.
 - **[2026-03-11] TypeScript:** Aynı isimde local fonksiyon ve import çakışmasında `import { foo as fooAlias }` kullan. Rename import, conflict'i temiz çözer.
-- **[2026-03-11] Architecture:** Projede iki ayrı VP flow var: `verifier.agent.ts` (request_uri fetch) vs `openid4vp.service.ts` (inline params). Frontend ve wallet `verifier.agent.ts` path'ini kullanıyor. Yeni VP çalışmalarında hangi path'in kullanıldığını kontrol et. Bkz: todo 008.
+- **[2026-03-11] Architecture:** VP flow birleştirildi: `openid4vp.service.ts` tek VP motoru, `verifier.agent.ts` thin wrapper. Agent dosyaları yalnızca kimlik (DID, key) yönetir, protokol mantığı service'lerde olmalı. Bkz: `.claude/solutions/vp-flow-unification-thin-wrapper.md`
+- **[2026-03-11] Architecture:** Credo-TS PRIMARY, Jose FALLBACK mimarisi. Credo route'ları ana Express app'e kayıtlı, `/oid4vci` ve `/oid4vp` ayrı base path'ler. Boot sırası: Express app → Credo init → `finalizeServer()` (error handlers).
+- **[2026-03-11] Security:** Async Express route handler'ları mutlaka `asyncHandler()` ile sarılmalı. Aksi halde promise rejection yakalanmaz ve process crash olabilir.
 
 ## Pattern Library
 
@@ -98,3 +100,4 @@ cd web-wallet && npm run dev
 | SD-JWT Selective Disclosure UI | Client-side parsing + claim selection UI | `.claude/solutions/sdjwt-selective-disclosure-ui.md` |
 | OpenID4VC Spec Migration | Draft 11→13+ field migration with backward compat | `.claude/solutions/openid4vc-spec-compliance-migration.md` |
 | Universal DID Resolution | Centralized `resolvePublicKeyFromDid()` for all DID methods | `.claude/solutions/openid4vc-spec-compliance-migration.md` |
+| VP Flow Unification | Thin wrapper pattern: agent delegates to service, preserves API contract | `.claude/solutions/vp-flow-unification-thin-wrapper.md` |
