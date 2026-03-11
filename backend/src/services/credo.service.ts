@@ -147,7 +147,7 @@ export async function createCredentialOffer(
   credentialConfigurationIds: string[],
   options?: {
     preAuthorizedCodeFlowConfig?: {
-      userPinRequired?: boolean
+      txCode?: { inputMode?: string; length?: number }
     }
   }
 ): Promise<{

@@ -27,6 +27,7 @@ import {
   getEnabledFeatures,
 } from './core'
 import { initializeFeatures, getFeatureSummary } from './config/features.config'
+import { initializeCredoService, isUsingCredo, shutdownCredoService } from './services/credo.service'
 
 dotenv.config()
 
@@ -80,6 +81,15 @@ async function main() {
     ])
 
     logger.info('All agents initialized successfully')
+
+    // Initialize Credo service (optional - enhances with full OpenID4VC support)
+    logger.info('Initializing Credo service...')
+    const credoActive = await initializeCredoService()
+    if (credoActive) {
+      logger.info('Credo service active - using Credo-TS for OpenID4VCI/VP')
+    } else {
+      logger.info('Credo service inactive - using Jose-based implementation')
+    }
 
     // Create Express app
     const app = createServer()
@@ -158,6 +168,7 @@ async function main() {
     logger.info('')
     logger.info('Core Status:')
     logger.info(`  Storage:  ${getStorageType()}`)
+    logger.info(`  SSI Mode: ${isUsingCredo() ? 'Credo-TS (full OpenID4VC)' : 'Jose (lightweight)'}`)
     logger.info(`  Features: ${getEnabledFeatures().length} enabled`)
 
     // Graceful shutdown
@@ -178,6 +189,9 @@ async function main() {
         verifierAgent.shutdown(),
         holderAgent.shutdown(),
       ])
+
+      // Shutdown Credo service
+      await shutdownCredoService()
 
       // Shutdown core infrastructure
       await shutdownCore()

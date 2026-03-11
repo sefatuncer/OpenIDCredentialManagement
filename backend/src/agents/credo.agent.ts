@@ -3,8 +3,7 @@
  * OpenID4VCI ve OpenID4VP desteği
  *
  * NOT: Bu dosya Credo entegrasyonu için hazırlanmıştır.
- * Native askar modülü için Visual Studio Build Tools gereklidir.
- * Kurulum için: scripts/setup-credo.ps1 scriptini admin olarak çalıştırın.
+ * Native askar modülü için build tools gereklidir.
  *
  * Askar kurulmadan Jose-based fallback kullanılır.
  */
@@ -56,9 +55,9 @@ export async function checkAskarAvailability(): Promise<boolean> {
   try {
     // Askar modülünü dinamik olarak import et
     const askarModule = await import('@credo-ts/askar')
-    const ariesAskarNodejs = await import('@hyperledger/aries-askar-nodejs')
+    const ariesAskarNodejs = await import('@openwallet-foundation/askar-nodejs')
 
-    if (askarModule && ariesAskarNodejs && ariesAskarNodejs.ariesAskarNodeJS) {
+    if (askarModule && ariesAskarNodejs && ariesAskarNodejs.askarNodeJS) {
       logger.info('Askar module available - using Credo mode')
       askarAvailable = true
       return true
@@ -86,8 +85,12 @@ async function credentialRequestToCredentialMapper(
 
   logger.debug('Credential mapper called', { credentialConfigurationId })
 
-  // Holder DID'ini al
-  const holderDid = holderBinding.didUrl || 'unknown'
+  // Holder DID'ini al - discriminated union'a göre
+  let holderDid = 'unknown'
+  if (holderBinding.bindingMethod === 'did' && holderBinding.keys.length > 0) {
+    holderDid = holderBinding.keys[0].didUrl
+  }
+
   const now = new Date()
   const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
 
@@ -190,28 +193,30 @@ export async function initializeCredoAgent(config: CredoAgentConfig): Promise<Ag
   try {
     // Askar modülünü dinamik olarak import et
     const { AskarModule } = await import('@credo-ts/askar')
-    const { ariesAskarNodeJS } = await import('@hyperledger/aries-askar-nodejs')
+    const { askarNodeJS } = await import('@openwallet-foundation/askar-nodejs')
+    const { registerAskar } = await import('@openwallet-foundation/askar-shared')
+
+    // Askar backend'i kaydet - agent oluşturmadan ÖNCE yapılmalı
+    registerAskar({ askar: askarNodeJS as any })
 
     // Express app oluştur - Credo kendi tipini bekliyor
     credoApp = express() as any
 
-    // Agent configuration
-    const agentConfig: InitConfig = {
-      label: config.label,
-      walletConfig: {
-        id: config.walletId,
-        key: config.walletKey,
-      },
-    }
+    // Agent configuration - v0.6.x'de label InitConfig'den kaldırıldı
+    const agentConfig: InitConfig = {}
 
     // Agent oluştur
     credoAgent = new Agent({
       config: agentConfig,
       dependencies: agentDependencies,
       modules: {
-        // Askar wallet module
+        // Askar wallet module - v0.6.x'de 'askar' ve 'store' gerekli
         askar: new AskarModule({
-          ariesAskar: ariesAskarNodeJS,
+          askar: askarNodeJS as any,
+          store: {
+            id: config.walletId,
+            key: config.walletKey,
+          },
         }),
         // DID modülü
         dids: new DidsModule(),
@@ -245,9 +250,12 @@ export async function initializeCredoAgent(config: CredoAgentConfig): Promise<Ag
 
     return credoAgent
   } catch (error) {
+    const err = error as any
     logger.error('Failed to initialize Credo agent', {
-      error: (error as Error).message,
-      stack: (error as Error).stack,
+      error: err.message,
+      cause: err.cause?.message || err.cause,
+      causeStack: err.cause?.stack,
+      stack: err.stack,
     })
     return null
   }
@@ -267,16 +275,25 @@ async function ensureAgentDid(agent: Agent): Promise<string> {
       return did
     }
 
-    // Yeni DID oluştur
+    // Yeni DID oluştur - v0.6.x: önce KMS ile key oluştur, sonra keyId ile DID oluştur
+    const keyResult = await agent.kms.createKey({ type: { kty: 'OKP', crv: 'Ed25519' } })
+    logger.debug('KMS key created', { keyId: keyResult.keyId })
+
     const didResult = await agent.dids.create({
       method: 'key',
       options: {
-        keyType: 'Ed25519',
+        keyId: keyResult.keyId,
       },
     })
 
+    logger.debug('DID creation result', {
+      state: didResult.didState.state,
+      did: didResult.didState.did,
+      reason: (didResult.didState as any).reason,
+    })
+
     if (!didResult.didState.did) {
-      throw new Error('Failed to create DID')
+      throw new Error(`Failed to create DID: state=${didResult.didState.state}, reason=${(didResult.didState as any).reason || 'unknown'}`)
     }
 
     logger.info('Created new DID', { did: didResult.didState.did })
