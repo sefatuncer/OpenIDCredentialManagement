@@ -1,6 +1,24 @@
 name: oidcm
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ssi-postgres
+    environment:
+      POSTGRES_USER: ssi_dev
+      POSTGRES_PASSWORD: ssi_dev_pass
+      POSTGRES_DB: ssi_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ssi_dev -d ssi_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -15,8 +33,12 @@ services:
       - JWT_SECRET=dev-jwt-secret-docker-only
       - API_KEY=dev-api-key-docker-only
       - WEB_WALLET_SECRET=dev-wallet-secret-docker-only
+      - DATABASE_URL=postgresql://ssi_dev:ssi_dev_pass@postgres:5432/ssi_dev
     volumes:
       - ./backend/data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
       interval: 10s
@@ -50,3 +72,7 @@ services:
 networks:
   default:
     name: ssi-network
+
+volumes:
+  postgres_dev_data:
+    driver: local
