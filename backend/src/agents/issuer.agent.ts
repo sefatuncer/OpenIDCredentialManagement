@@ -18,25 +18,51 @@ import {
   DelegationCredentialSubject,
   CapabilityCredentialSubject,
 } from '../config/credentials.config'
+import {
+  IStorageAdapter,
+  createStorageAdapter,
+  getStorageType,
+} from '../core/storage'
 
 let issuerAgent: BaseAgentInstance | null = null
 
-// Credential offer storage
-const credentialOffers = new Map<string, {
+// Storage types
+interface StoredCredentialOffer {
+  offerId: string
   type: string
   subject: Record<string, unknown>
   holderDid: string
   createdAt: Date
   accessToken?: string
-}>()
+}
 
-// Issued credentials storage
-const issuedCredentials = new Map<string, {
+interface StoredIssuedCredential {
+  credentialId: string
   jwt: string
   type: string
   holderDid: string
   issuedAt: Date
-}>()
+}
+
+// Persistent storage (PostgreSQL via IStorageAdapter)
+let offersStorage: IStorageAdapter<StoredCredentialOffer> | null = null
+let issuedStorage: IStorageAdapter<StoredIssuedCredential> | null = null
+
+function getOffersStorage(): IStorageAdapter<StoredCredentialOffer> {
+  if (!offersStorage) {
+    offersStorage = createStorageAdapter<StoredCredentialOffer>('issuer_credential_offers')
+    logger.info('Issuer credential offers storage initialized', { type: getStorageType() })
+  }
+  return offersStorage
+}
+
+function getIssuedStorage(): IStorageAdapter<StoredIssuedCredential> {
+  if (!issuedStorage) {
+    issuedStorage = createStorageAdapter<StoredIssuedCredential>('issuer_issued_credentials')
+    logger.info('Issuer issued credentials storage initialized', { type: getStorageType() })
+  }
+  return issuedStorage
+}
 
 export async function initializeIssuerAgent(): Promise<BaseAgentInstance> {
   if (issuerAgent) {
@@ -94,7 +120,8 @@ export async function issueAgentIdentityCredential(
   }
 
   // Offer'ı kaydet
-  credentialOffers.set(offerId, {
+  await getOffersStorage().save(offerId, {
+    offerId,
     type: 'AIAgentIdentityCredential',
     subject: fullSubject as unknown as Record<string, unknown>,
     holderDid,
@@ -149,7 +176,8 @@ export async function issueDelegationCredential(
     revocable: subject.revocable ?? true,
   }
 
-  credentialOffers.set(offerId, {
+  await getOffersStorage().save(offerId, {
+    offerId,
     type: 'DelegationCredential',
     subject: fullSubject as unknown as Record<string, unknown>,
     holderDid,
@@ -200,7 +228,8 @@ export async function issueCapabilityCredential(
     valid_until: subject.valid_until || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   }
 
-  credentialOffers.set(offerId, {
+  await getOffersStorage().save(offerId, {
+    offerId,
     type: 'CapabilityCredential',
     subject: fullSubject as unknown as Record<string, unknown>,
     holderDid,
@@ -230,24 +259,27 @@ export async function issueCapabilityCredential(
 /**
  * Token exchange - pre-authorized code ile access token al
  */
-export function exchangePreAuthorizedCode(preAuthorizedCode: string): {
+export async function exchangePreAuthorizedCode(preAuthorizedCode: string): Promise<{
   access_token: string
   token_type: string
   expires_in: number
   c_nonce: string
   c_nonce_expires_in: number
-} | null {
-  // Pre-authorized code ile offer bul
-  for (const [offerId, offer] of credentialOffers.entries()) {
-    if (offer.accessToken === preAuthorizedCode) {
-      const c_nonce = uuidv4()
-      return {
-        access_token: preAuthorizedCode,
-        token_type: 'Bearer',
-        expires_in: 86400,
-        c_nonce,
-        c_nonce_expires_in: 86400,
-      }
+} | null> {
+  // Pre-authorized code ile offer bul (query by accessToken field)
+  const result = await getOffersStorage().query({
+    where: { accessToken: preAuthorizedCode },
+    limit: 1,
+  })
+
+  if (result.data.length > 0) {
+    const c_nonce = uuidv4()
+    return {
+      access_token: preAuthorizedCode,
+      token_type: 'Bearer',
+      expires_in: 86400,
+      c_nonce,
+      c_nonce_expires_in: 86400,
     }
   }
   return null
@@ -260,61 +292,72 @@ export async function claimCredential(
   accessToken: string,
   holderDid: string
 ): Promise<{ credential: string; format: string } | null> {
-  // Access token ile offer bul
-  for (const [offerId, offer] of credentialOffers.entries()) {
-    if (offer.accessToken === accessToken) {
-      const agent = getIssuerAgent()
+  // Access token ile offer bul (query by accessToken field)
+  const result = await getOffersStorage().query({
+    where: { accessToken },
+    limit: 1,
+  })
 
-      // JWT-VC oluştur
-      const jwt = await createJwtVc(
-        agent.keyPair.privateKey,
-        agent.getDid(),
-        agent.getKid(),
-        {
-          credentialSubject: {
-            id: holderDid,
-            ...offer.subject,
-          },
-          type: ['VerifiableCredential', offer.type],
-        }
-      )
-
-      // Issued credential'ı kaydet
-      issuedCredentials.set(offerId, {
-        jwt,
-        type: offer.type,
-        holderDid,
-        issuedAt: new Date(),
-      })
-
-      // Offer'ı sil
-      credentialOffers.delete(offerId)
-
-      logger.info(`Credential issued: ${offer.type} to ${holderDid}`)
-
-      return {
-        credential: jwt,
-        format: 'jwt_vc_json',
-      }
-    }
+  if (result.data.length === 0) {
+    return null
   }
 
-  return null
+  const offer = result.data[0]
+  const agent = getIssuerAgent()
+
+  // JWT-VC oluştur
+  const jwt = await createJwtVc(
+    agent.keyPair.privateKey,
+    agent.getDid(),
+    agent.getKid(),
+    {
+      credentialSubject: {
+        id: holderDid,
+        ...offer.subject,
+      },
+      type: ['VerifiableCredential', offer.type],
+    }
+  )
+
+  // Issued credential'ı kaydet (offerId as key)
+  await getIssuedStorage().save(offer.offerId, {
+    credentialId: offer.offerId,
+    jwt,
+    type: offer.type,
+    holderDid,
+    issuedAt: new Date(),
+  })
+
+  // Offer'ı sil (offerId stored in data for key lookup)
+  await getOffersStorage().delete(offer.offerId)
+
+  logger.info(`Credential issued: ${offer.type} to ${holderDid}`)
+
+  return {
+    credential: jwt,
+    format: 'jwt_vc_json',
+  }
 }
 
 /**
  * Credential offer bilgisini getir
  */
-export function getCredentialOffer(offerId: string) {
-  return credentialOffers.get(offerId)
+export async function getCredentialOffer(offerId: string): Promise<StoredCredentialOffer | null> {
+  return getOffersStorage().get(offerId)
 }
 
 /**
  * Tüm credential offer'ları getir
  */
-export function getAllCredentialOffers() {
-  return Array.from(credentialOffers.entries()).map(([id, offer]) => ({
-    id,
+export async function getAllCredentialOffers(): Promise<Array<{
+  id: string
+  type: string
+  holderDid: string
+  createdAt: Date
+}>> {
+  const offers = await getOffersStorage().list()
+  return offers.map(offer => ({
+    id: offer.offerId,
     type: offer.type,
     holderDid: offer.holderDid,
     createdAt: offer.createdAt,
@@ -324,16 +367,22 @@ export function getAllCredentialOffers() {
 /**
  * Issued credential bilgisini getir
  */
-export function getIssuedCredential(credentialId: string) {
-  return issuedCredentials.get(credentialId)
+export async function getIssuedCredential(credentialId: string): Promise<StoredIssuedCredential | null> {
+  return getIssuedStorage().get(credentialId)
 }
 
 /**
  * Tüm issued credentials'ı getir
  */
-export function getAllIssuedCredentials() {
-  return Array.from(issuedCredentials.entries()).map(([id, cred]) => ({
-    id,
+export async function getAllIssuedCredentials(): Promise<Array<{
+  id: string
+  type: string
+  holderDid: string
+  issuedAt: Date
+}>> {
+  const credentials = await getIssuedStorage().list()
+  return credentials.map(cred => ({
+    id: cred.credentialId,
     type: cred.type,
     holderDid: cred.holderDid,
     issuedAt: cred.issuedAt,

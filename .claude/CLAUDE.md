@@ -92,6 +92,8 @@ cd web-wallet && npm run dev
 - **[2026-03-11] Security:** Async Express route handler'ları mutlaka `asyncHandler()` ile sarılmalı. Aksi halde promise rejection yakalanmaz ve process crash olabilir.
 - **[2026-03-11] OpenID4VCI:** SD-JWT VC format migration: `_sdjwt` suffix convention ile config ID'den format çıkarılır. Yeni credential type eklerken `SD_CLAIMS_BY_TYPE` + `buildCredentialConfigurations()` güncelle. Bkz: `.claude/solutions/sdjwt-vc-format-migration.md`
 - **[2026-03-11] Security:** Yeni API field eklerken Zod validation schema'yı da güncelle. `req.body` cast'ları validation'dan sonra güvenlidir, öncesinde değil.
+- **[2026-03-11] Architecture:** Map→Adapter migration'da `list()`/`query()` key dönmez. Silme gereken entity'lerde key'i data içinde de sakla (`offerId` pattern). Bkz: `.claude/solutions/map-to-storage-adapter-migration.md`
+- **[2026-03-11] TypeScript:** sync→async dönüşümü tüm caller zincirini etkiler. `tsc --noEmit` ile erken doğrula — compiler kaçırılan `await`'leri yakalar.
 
 ## Pattern Library
 
@@ -104,3 +106,4 @@ cd web-wallet && npm run dev
 | Universal DID Resolution | Centralized `resolvePublicKeyFromDid()` for all DID methods | `.claude/solutions/openid4vc-spec-compliance-migration.md` |
 | VP Flow Unification | Thin wrapper pattern: agent delegates to service, preserves API contract | `.claude/solutions/vp-flow-unification-thin-wrapper.md` |
 | SD-JWT VC Format Migration | jwt_vc_json → vc+sd-jwt dual format with _sdjwt config ID convention | `.claude/solutions/sdjwt-vc-format-migration.md` |
+| Map→Adapter Migration | In-memory Map → IStorageAdapter with key-in-data pattern | `.claude/solutions/map-to-storage-adapter-migration.md` |

@@ -6,13 +6,14 @@ priority: high
 category: infrastructure
 wp: WP2
 created: 2026-03-09
+updated: 2026-03-11
 ---
 
 ## Açıklama
 
-Kritik servisler zaten PostgreSQL'e geçirildi. Kalan in-memory Map kullanan servislerin storage adapter'a geçişi.
+Kritik servisler zaten PostgreSQL'e geçirildi (IStorageAdapter pattern). Kalan in-memory Map kullanan servislerin storage adapter'a geçişi.
 
-## Tamamlanan
+## Tamamlanan (Önceki Cycle)
 
 - [x] Credentials storage (openid4vci.service.ts)
 - [x] Revocation lists (revocation.service.ts)
@@ -21,15 +22,39 @@ Kritik servisler zaten PostgreSQL'e geçirildi. Kalan in-memory Map kullanan ser
 - [x] Nonce management (openid4vci.service.ts)
 - [x] VP sessions (openid4vp.service.ts)
 - [x] Connection pooling, health check, migrations
+- [x] Multi-tenant storage (multiTenant.service.ts)
 
-## Kalan İş
+## Fase 1 — CRITICAL (restart = veri kaybı) ✅ TAMAMLANDI
 
-- [ ] `issuer.agent.ts` — credentialOffers Map → storage adapter
-- [ ] `issuer.agent.ts` — issuedCredentials Map → storage adapter
-- [ ] Batch issuance tracking (todo 001 ile birlikte)
-- [ ] Expiration cleanup — storage adapter üzerinden
+- [x] `holder.agent.ts` — storedCredentials Map → storage adapter (`holder_credentials`)
+- [x] `issuer.agent.ts` — credentialOffers Map → storage adapter (`issuer_credential_offers`)
+- [x] `issuer.agent.ts` — issuedCredentials Map → storage adapter (`issuer_issued_credentials`)
+- [x] `agentCredentialRequest.service.ts` — partnerKeys + orgAgentCounts Map → storage adapter (`partner_keys`, `org_agent_counts`)
+
+## Fase 2 — HIGH (session kaybı)
+
+- [ ] `oidc.service.ts` — sessions + configs + metadataCache Map → storage adapter
+- [ ] `batchIssuance.service.ts` — jobs Map → storage adapter
+
+## Fase 3 — MEDIUM (defer edilebilir)
+
+- [ ] `expirationNotifier.service.ts` — credentials + notifiedCredentials Map → storage adapter
+- [ ] `encryption.service.ts` — keys Map → storage adapter
+- [ ] `schemaRegistry.service.ts` — schemas Map → storage adapter
+- [ ] `capabilityDiscovery.service.ts` — agents Map → storage adapter
+
+## Fase 4 — LOW (bırakılabilir, transient state)
+
+- [ ] `websocket.service.ts` — clients Map (transient, reconnect OK)
+- [ ] `event-bus.ts` — eventHistory array (debug only)
+- [ ] `feature-flags.ts` — featureState Map (env var fallback OK)
+- [ ] `plugin-registry.ts` — plugins Map (re-init on boot OK)
+- [ ] `simulation/` — tüm Map'ler (izole modül, migration gereksiz)
 
 ## Kabul Kriterleri
 
-- [ ] Tüm data PostgreSQL'de persist ediliyor (Map kullanan servisler kaldı)
-- [ ] Server restart sonrası tüm data korunuyor
+- [x] Fase 1 tamamlandı — CRITICAL data PostgreSQL'de persist ediliyor
+- [x] Mevcut API kontratları değişmiyor (backward compat)
+- [x] IStorageAdapter pattern kullanılıyor (yeni repo yazmaya gerek yok)
+- [x] TypeScript compile — zero errors
+- [ ] Server restart sonrası holder credentials, issuer offers, partner keys korunuyor (manual test gerekli)

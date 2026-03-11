@@ -306,7 +306,7 @@ issuerRoutes.post(
       return
     }
 
-    const tokenResponse = exchangePreAuthorizedCode(preAuthorizedCode)
+    const tokenResponse = await exchangePreAuthorizedCode(preAuthorizedCode)
 
     if (!tokenResponse) {
       res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid pre-authorized code' })

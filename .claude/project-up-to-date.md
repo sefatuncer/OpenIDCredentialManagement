@@ -586,6 +586,12 @@ Verifier Frontend               Backend                        Wallet
 - Credo aktifken: `/oid4vp/{verifierId}/authorization-requests/{id}` endpoint'leri otomatik
 - Jose fallback: Inline params (`presentation_definition` URI'da embedded)
 
+**PostgreSQL Persistence — Fase 1 (todo 002):**
+- Holder credentials, issuer offers/issued, partner keys → `IStorageAdapter` (PostgreSQL)
+- 5 yeni JSONB collection: `storage_holder_credentials`, `storage_issuer_credential_offers`, `storage_issuer_issued_credentials`, `storage_partner_keys`, `storage_org_agent_counts`
+- Auto-create tablolar (migration gereksiz), GIN index
+- `holder.agent.ts`, `issuer.agent.ts`, `agentCredentialRequest.service.ts` tamamen persistent
+
 ---
 
 ## Güvenlik
@@ -646,4 +652,6 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `backend/src/api/schemas/validation.schemas.ts` | Zod validation schemas (credential format, DID, trust level) |
 | `backend/src/agents/verifier.agent.ts` | Thin wrapper — delege eder openid4vp.service'e, DID/key management |
 | `backend/src/database/storage-adapter.ts` | IStorageAdapter<T> — PostgreSQL / memory fallback |
+| `backend/src/core/storage/index.ts` | Storage factory — `createStorageAdapter<T>()`, auto/postgres/memory/redis |
+| `backend/src/core/storage/PostgresStorageAdapter.ts` | JSONB-based persistent storage, auto-table creation |
 | `docker-compose.dev.yml` | Dev environment (4 services: backend, wallet, frontend, postgres) |

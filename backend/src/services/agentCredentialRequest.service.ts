@@ -10,6 +10,11 @@ import { logger } from '../utils/logger'
 import { getTrustedEntity, getEntityTrustLevel, TrustLevel } from './trustRegistry.service'
 import { getAgentByDid, registerAgent, logAgentActivity, TrustLevel as AgentTrustLevel } from './agent.service'
 import { query, queryOne } from '../database/connection'
+import {
+  IStorageAdapter,
+  createStorageAdapter,
+  getStorageType,
+} from '../core/storage'
 
 // Capability definitions with risk levels
 export const CAPABILITIES = {
@@ -42,11 +47,37 @@ const TRUST_LEVEL_CAPABILITIES: Record<AgentTrustLevel, string[]> = {
   verified: Object.keys(CAPABILITIES),
 }
 
-// Partner API keys storage (in production, this should be in database)
-const partnerKeys: Map<string, { organizationDid: string; organizationName: string; trustLevel: AgentTrustLevel }> = new Map()
+// Storage types for persistent partner keys and org agent counts
+interface StoredPartnerKey {
+  organizationDid: string
+  organizationName: string
+  trustLevel: AgentTrustLevel
+}
 
-// Rate limiting storage
-const organizationAgentCounts: Map<string, number> = new Map()
+interface StoredOrgAgentCount {
+  count: number
+}
+
+// Persistent storage (PostgreSQL via IStorageAdapter)
+let partnerKeysStorage: IStorageAdapter<StoredPartnerKey> | null = null
+let orgAgentCountsStorage: IStorageAdapter<StoredOrgAgentCount> | null = null
+
+function getPartnerKeysStorage(): IStorageAdapter<StoredPartnerKey> {
+  if (!partnerKeysStorage) {
+    partnerKeysStorage = createStorageAdapter<StoredPartnerKey>('partner_keys')
+    logger.info('Partner keys storage initialized', { type: getStorageType() })
+  }
+  return partnerKeysStorage
+}
+
+function getOrgAgentCountsStorage(): IStorageAdapter<StoredOrgAgentCount> {
+  if (!orgAgentCountsStorage) {
+    orgAgentCountsStorage = createStorageAdapter<StoredOrgAgentCount>('org_agent_counts')
+    logger.info('Organization agent counts storage initialized', { type: getStorageType() })
+  }
+  return orgAgentCountsStorage
+}
+
 const MAX_AGENTS_PER_ORG = 100
 
 export interface CredentialRequestInput {
@@ -133,7 +164,8 @@ export async function processCredentialRequest(input: CredentialRequestInput): P
   const trustLevel = proofResult.trustLevel!
 
   // Step 2: Check organization limits
-  const currentCount = organizationAgentCounts.get(organizationDid) || 0
+  const countRecord = await getOrgAgentCountsStorage().get(organizationDid)
+  const currentCount = countRecord?.count || 0
   if (currentCount >= MAX_AGENTS_PER_ORG) {
     return {
       success: false,
@@ -194,7 +226,7 @@ export async function processCredentialRequest(input: CredentialRequestInput): P
   })
 
   // Step 7: Update organization agent count
-  organizationAgentCounts.set(organizationDid, currentCount + 1)
+  await getOrgAgentCountsStorage().save(organizationDid, { count: currentCount + 1 })
 
   // Step 8: Log activity
   await logAgentActivity(registeredAgent.id, 'credential_requested', 'success', undefined, {
@@ -414,8 +446,8 @@ async function validatePartnerKey(proof: PartnerKeyProof): Promise<{
 }> {
   const { apiKey, apiSecret } = proof
 
-  // Check partner key (in production, verify against secure storage)
-  const partner = partnerKeys.get(apiKey)
+  // Check partner key from persistent storage
+  const partner = await getPartnerKeysStorage().get(apiKey)
   if (!partner) {
     return {
       valid: false,
@@ -627,36 +659,38 @@ function getRestrictions(trustLevel: AgentTrustLevel): {
 /**
  * Register a partner API key
  */
-export function registerPartnerKey(
+export async function registerPartnerKey(
   apiKey: string,
   organizationDid: string,
   organizationName: string,
   trustLevel: AgentTrustLevel
-): void {
-  partnerKeys.set(apiKey, { organizationDid, organizationName, trustLevel })
+): Promise<void> {
+  await getPartnerKeysStorage().save(apiKey, { organizationDid, organizationName, trustLevel })
   logger.info('Partner key registered', { organizationDid, organizationName })
 }
 
 /**
  * Revoke a partner API key
  */
-export function revokePartnerKey(apiKey: string): boolean {
-  return partnerKeys.delete(apiKey)
+export async function revokePartnerKey(apiKey: string): Promise<boolean> {
+  return getPartnerKeysStorage().delete(apiKey)
 }
 
 /**
  * Get organization agent count
  */
-export function getOrganizationAgentCount(organizationDid: string): number {
-  return organizationAgentCounts.get(organizationDid) || 0
+export async function getOrganizationAgentCount(organizationDid: string): Promise<number> {
+  const record = await getOrgAgentCountsStorage().get(organizationDid)
+  return record?.count || 0
 }
 
 /**
  * Decrement organization agent count (when agent is deleted)
  */
-export function decrementOrganizationAgentCount(organizationDid: string): void {
-  const current = organizationAgentCounts.get(organizationDid) || 0
+export async function decrementOrganizationAgentCount(organizationDid: string): Promise<void> {
+  const record = await getOrgAgentCountsStorage().get(organizationDid)
+  const current = record?.count || 0
   if (current > 0) {
-    organizationAgentCounts.set(organizationDid, current - 1)
+    await getOrgAgentCountsStorage().save(organizationDid, { count: current - 1 })
   }
 }

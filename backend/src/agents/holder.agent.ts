@@ -19,6 +19,11 @@ import {
   acceptCredentialOffer as credoAcceptOffer,
   presentCredential as credoPresentCredential,
 } from '../services/credo.service'
+import {
+  IStorageAdapter,
+  createStorageAdapter,
+  getStorageType,
+} from '../core/storage'
 
 let holderAgent: BaseAgentInstance | null = null
 
@@ -31,8 +36,8 @@ interface VCPayload extends jose.JWTPayload {
   credentialSubject?: Record<string, unknown>
 }
 
-// Credential storage (in-memory wallet)
-const storedCredentials = new Map<string, {
+// Credential storage type
+interface StoredCredential {
   id: string
   jwt: string
   type: string
@@ -41,7 +46,18 @@ const storedCredentials = new Map<string, {
   issuerDid: string
   receivedAt: Date
   payload: VCPayload
-}>()
+}
+
+// Persistent credential storage (PostgreSQL via IStorageAdapter)
+let holderCredentialsStorage: IStorageAdapter<StoredCredential> | null = null
+
+function getHolderCredentialsStorage(): IStorageAdapter<StoredCredential> {
+  if (!holderCredentialsStorage) {
+    holderCredentialsStorage = createStorageAdapter<StoredCredential>('holder_credentials')
+    logger.info('Holder credentials storage initialized', { type: getStorageType() })
+  }
+  return holderCredentialsStorage
+}
 
 export async function initializeHolderAgent(): Promise<BaseAgentInstance> {
   if (holderAgent) {
@@ -189,7 +205,7 @@ export async function receiveCredentialOffer(
   const recordId = uuidv4()
   const type = payload.vc?.type?.[1] || configId.replace(/_sdjwt$/, '') || 'VerifiableCredential'
 
-  storedCredentials.set(recordId, {
+  await getHolderCredentialsStorage().save(recordId, {
     id: recordId,
     jwt: jwtPart,
     type,
@@ -299,7 +315,7 @@ export async function presentCredential(
     logger.info(`Verification request: ${presentationDefinition.id}`)
 
     // Matching credentials bul
-    const matchingCredentials = findMatchingCredentials(presentationDefinition)
+    const matchingCredentials = await findMatchingCredentials(presentationDefinition)
     if (matchingCredentials.length === 0) {
       logger.warn('No matching credentials found')
       return { presentationSubmitted: false }
@@ -351,13 +367,14 @@ export async function presentCredential(
 /**
  * Presentation definition'a göre matching credentials bul
  */
-function findMatchingCredentials(presentationDefinition: any): string[] {
+async function findMatchingCredentials(presentationDefinition: any): Promise<string[]> {
   const matchingJwts: string[] = []
+  const allCredentials = await getHolderCredentialsStorage().list()
 
   for (const descriptor of presentationDefinition.input_descriptors || []) {
     const requiredPaths = descriptor.constraints?.fields?.map((f: any) => f.path[0]) || []
 
-    for (const [id, cred] of storedCredentials) {
+    for (const cred of allCredentials) {
       // Credential subject'ta required field'lar var mı kontrol et
       const credSubject = cred.payload.vc?.credentialSubject || cred.payload.credentialSubject || {}
 
@@ -416,7 +433,8 @@ export async function getStoredCredentials(): Promise<Array<{
   receivedAt: Date
   credentialSubject: Record<string, unknown>
 }>> {
-  return Array.from(storedCredentials.values()).map(cred => ({
+  const allCredentials = await getHolderCredentialsStorage().list()
+  return allCredentials.map(cred => ({
     id: cred.id,
     type: cred.type,
     format: cred.format || 'jwt_vc_json',
@@ -432,25 +450,26 @@ export async function getStoredCredentials(): Promise<Array<{
  * Credential sil
  */
 export async function deleteCredential(credentialId: string): Promise<void> {
-  if (!storedCredentials.has(credentialId)) {
+  const exists = await getHolderCredentialsStorage().exists(credentialId)
+  if (!exists) {
     throw new Error(`Credential not found: ${credentialId}`)
   }
 
-  storedCredentials.delete(credentialId)
+  await getHolderCredentialsStorage().delete(credentialId)
   logger.info(`Credential deleted: ${credentialId}`)
 }
 
 /**
  * Credential getir
  */
-export function getCredential(credentialId: string) {
-  return storedCredentials.get(credentialId)
+export async function getCredential(credentialId: string): Promise<StoredCredential | null> {
+  return getHolderCredentialsStorage().get(credentialId)
 }
 
 /**
  * Credential ekle (manuel)
  */
-export function addCredential(credentialString: string): string {
+export async function addCredential(credentialString: string): Promise<string> {
   // Detect SD-JWT format (contains ~ separators)
   const isSDJWT = credentialString.includes('~')
   const jwtPart = isSDJWT ? credentialString.split('~')[0] : credentialString
@@ -464,7 +483,7 @@ export function addCredential(credentialString: string): string {
   const recordId = uuidv4()
   const type = payload.vc?.type?.[1] || 'VerifiableCredential'
 
-  storedCredentials.set(recordId, {
+  await getHolderCredentialsStorage().save(recordId, {
     id: recordId,
     jwt: jwtPart,
     type,

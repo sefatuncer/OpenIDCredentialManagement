@@ -142,21 +142,25 @@ export function createServer(): Express {
 
   // OpenID4VCI token and credential endpoints (no auth required - part of credential issuance flow)
   // These endpoints use pre-authorized codes or access tokens from the issuer
-  app.post(`${API_BASE_PATH}/issuer/token`, async (req: Request, res: Response) => {
-    const { exchangePreAuthorizedCode } = await import('../agents/issuer.agent')
-    const preAuthorizedCode = req.body['pre-authorized_code']
+  app.post(`${API_BASE_PATH}/issuer/token`, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { exchangePreAuthorizedCode } = await import('../agents/issuer.agent')
+      const preAuthorizedCode = req.body['pre-authorized_code']
 
-    if (!preAuthorizedCode) {
-      return res.status(400).json({ error: 'invalid_request', error_description: 'Missing pre-authorized_code' })
+      if (!preAuthorizedCode) {
+        return res.status(400).json({ error: 'invalid_request', error_description: 'Missing pre-authorized_code' })
+      }
+
+      const tokenResponse = await exchangePreAuthorizedCode(preAuthorizedCode)
+
+      if (!tokenResponse) {
+        return res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid pre-authorized code' })
+      }
+
+      res.json(tokenResponse)
+    } catch (error) {
+      next(error)
     }
-
-    const tokenResponse = exchangePreAuthorizedCode(preAuthorizedCode)
-
-    if (!tokenResponse) {
-      return res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid pre-authorized code' })
-    }
-
-    res.json(tokenResponse)
   })
 
   app.post(`${API_BASE_PATH}/issuer/credential`, async (req: Request, res: Response) => {

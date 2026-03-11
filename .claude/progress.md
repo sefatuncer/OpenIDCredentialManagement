@@ -66,6 +66,8 @@ Single environment development setup - no staging/production yet.
 - [x] docker-compose.dev.yml PostgreSQL service
 - [x] IStorageAdapter with PostgreSQL backend
 - [x] VP sessions persistent across restarts
+- [x] Fase 1: Holder credentials, issuer offers/issued, partner keys → PostgreSQL
+- [x] 5 Map → IStorageAdapter migration (holder_credentials, issuer_credential_offers, issuer_issued_credentials, partner_keys, org_agent_counts)
 
 ### SD-JWT VC Format Migration (2026-03-11)
 - [x] `issueCredential()` SD-JWT VC format branch (`sdjwtService.createSDJWTVC()`)
