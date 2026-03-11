@@ -1,14 +1,11 @@
 import { Router, Request, Response } from 'express'
-import { logger } from '../../utils/logger'
 import { asyncHandler } from '../middleware/error.middleware'
 import {
   verificationRateLimiter,
-  defaultRateLimiter,
 } from '../middleware/rateLimit.middleware'
 import {
   createAuthorizationRequest,
   getVerificationSession,
-  handleDirectPost,
   getVerificationResult,
   listVerificationSessions,
   getAvailablePresentationDefinitions,
@@ -253,82 +250,8 @@ openid4vpRoutes.get(
   })
 )
 
-/**
- * @swagger
- * /direct_post:
- *   post:
- *     summary: Direct post endpoint for VP submission
- *     description: Receives VP token submissions from wallets (response_mode=direct_post)
- *     tags: [OpenID4VP]
- *     requestBody:
- *       required: true
- *       content:
- *         application/x-www-form-urlencoded:
- *           schema:
- *             type: object
- *             required:
- *               - vp_token
- *               - presentation_submission
- *               - state
- *             properties:
- *               vp_token:
- *                 type: string
- *               presentation_submission:
- *                 type: string
- *               state:
- *                 type: string
- *     responses:
- *       200:
- *         description: Presentation received and processed
- *       400:
- *         description: Invalid request
- */
-openid4vpRoutes.post(
-  '/direct_post',
-  asyncHandler(async (req: Request, res: Response) => {
-    const { vp_token, presentation_submission, state } = req.body
-
-    logger.debug('Direct post received', {
-      hasVpToken: !!vp_token,
-      hasSubmission: !!presentation_submission,
-      state,
-    })
-
-    if (!vp_token || !state) {
-      return res.status(400).json({
-        error: 'invalid_request',
-        error_description: 'vp_token and state are required',
-      })
-    }
-
-    // Parse presentation_submission if it's a string
-    let submission
-    try {
-      submission =
-        typeof presentation_submission === 'string'
-          ? JSON.parse(presentation_submission)
-          : presentation_submission
-    } catch {
-      submission = { id: 'submission', definition_id: 'unknown', descriptor_map: [] }
-    }
-
-    const result = await handleDirectPost(vp_token, submission, state)
-
-    if (result.error) {
-      return res.status(400).json(result)
-    }
-
-    // Success - return empty 200 or redirect
-    if (result.redirect_uri) {
-      return res.redirect(result.redirect_uri)
-    }
-
-    res.json({
-      status: 'received',
-      message: 'Presentation received and processed',
-    })
-  })
-)
+// NOTE: direct_post endpoint is registered globally in server.ts (before auth middleware)
+// as required by OpenID4VP spec — wallets must be able to POST without authentication.
 
 /**
  * @swagger

@@ -7,7 +7,6 @@ import {
   delegationPresentationDefinition,
   combinedPresentationDefinition,
 } from '../../agents/verifier.agent'
-import { logger } from '../../utils/logger'
 import { asyncHandler } from '../middleware/error.middleware'
 import { verificationRateLimiter } from '../middleware/rateLimit.middleware'
 

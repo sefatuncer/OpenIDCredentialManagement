@@ -14,6 +14,11 @@ import {
 } from './base.agent'
 import { holderConfig } from '../config/agent.config'
 import { logger } from '../utils/logger'
+import {
+  isUsingCredo,
+  acceptCredentialOffer as credoAcceptOffer,
+  presentCredential as credoPresentCredential,
+} from '../services/credo.service'
 
 let holderAgent: BaseAgentInstance | null = null
 
@@ -65,10 +70,37 @@ export function getHolderKid(): string {
 
 /**
  * OpenID4VCI credential offer'ı işle
+ * Credo aktifken Credo holder API'sini kullanır
  */
 export async function receiveCredentialOffer(
   credentialOfferUri: string
 ): Promise<{ credentialRecordId: string; type: string }> {
+  // Credo-first: use Credo holder API when available
+  if (isUsingCredo()) {
+    try {
+      const credoResult = await credoAcceptOffer(credentialOfferUri)
+      if (credoResult && credoResult.credentials.length > 0) {
+        const recordId = uuidv4()
+        const credType = 'VerifiableCredential' // Credo manages its own credential store
+
+        logger.info('Credential received via Credo holder API', {
+          recordId,
+          count: credoResult.credentials.length,
+        })
+
+        return {
+          credentialRecordId: recordId,
+          type: credType,
+        }
+      }
+    } catch (error) {
+      logger.warn('Credo credential offer acceptance failed, falling back to Jose', {
+        error: (error as Error).message,
+      })
+    }
+  }
+
+  // Jose-based fallback
   const agent = getHolderAgent()
 
   logger.info(`Receiving credential offer: ${credentialOfferUri}`)
@@ -185,10 +217,27 @@ async function createHolderProof(nonce: string): Promise<string> {
 
 /**
  * OpenID4VP verification request'i işle
+ * Credo aktifken Credo holder API'sini kullanır
  */
 export async function presentCredential(
   verificationRequestUri: string
 ): Promise<{ presentationSubmitted: boolean; redirectUri?: string }> {
+  // Credo-first: use Credo holder API for presentation
+  if (isUsingCredo()) {
+    try {
+      const credoResult = await credoPresentCredential(verificationRequestUri)
+      if (credoResult && credoResult.submitted) {
+        logger.info('Presentation submitted via Credo holder API')
+        return { presentationSubmitted: true }
+      }
+    } catch (error) {
+      logger.warn('Credo presentation failed, falling back to Jose', {
+        error: (error as Error).message,
+      })
+    }
+  }
+
+  // Jose-based fallback
   const agent = getHolderAgent()
 
   logger.info(`Processing verification request: ${verificationRequestUri}`)
@@ -199,28 +248,40 @@ export async function presentCredential(
     const clientId = url.searchParams.get('client_id')
     const requestUri = url.searchParams.get('request_uri')
 
-    if (!requestUri) {
-      throw new Error('No request_uri in verification request')
-    }
+    let presentationDefinition: { id: string; input_descriptors: Array<{ id: string; constraints?: { fields?: Array<{ path: string[] }> } }> }
+    let nonce: string
+    let state: string
+    let submitUrl: string | undefined
 
-    // Request'i al
-    const requestResponse = await fetch(requestUri)
-    if (!requestResponse.ok) {
-      throw new Error(`Failed to fetch request: ${await requestResponse.text()}`)
-    }
+    if (requestUri) {
+      // request_uri pattern: fetch authorization request from endpoint
+      const requestResponse = await fetch(requestUri)
+      if (!requestResponse.ok) {
+        throw new Error(`Failed to fetch request: ${await requestResponse.text()}`)
+      }
 
-    const authRequest = await requestResponse.json() as {
-      presentation_definition: { id: string; input_descriptors: Array<{ id: string; constraints?: { fields?: Array<{ path: string[] }> } }> }
-      nonce: string
-      state: string
-      response_uri?: string
-      redirect_uri?: string
+      const authRequest = await requestResponse.json() as {
+        presentation_definition: typeof presentationDefinition
+        nonce: string
+        state: string
+        response_uri?: string
+        redirect_uri?: string
+      }
+      presentationDefinition = authRequest.presentation_definition
+      nonce = authRequest.nonce
+      state = authRequest.state
+      submitUrl = authRequest.response_uri || authRequest.redirect_uri
+    } else {
+      // Inline params pattern (Draft 13+): all params embedded in URI
+      const pdParam = url.searchParams.get('presentation_definition')
+      if (!pdParam) {
+        throw new Error('No request_uri or presentation_definition in verification request')
+      }
+      presentationDefinition = JSON.parse(pdParam)
+      nonce = url.searchParams.get('nonce') || ''
+      state = url.searchParams.get('state') || ''
+      submitUrl = url.searchParams.get('response_uri') || url.searchParams.get('redirect_uri') || undefined
     }
-    const presentationDefinition = authRequest.presentation_definition
-    const nonce = authRequest.nonce
-    const state = authRequest.state
-    // OpenID4VP: response_uri for direct_post, redirect_uri as fallback
-    const submitUrl = authRequest.response_uri || authRequest.redirect_uri
 
     logger.info(`Verification request: ${presentationDefinition.id}`)
 

@@ -1,34 +1,23 @@
 /**
- * Verifier Agent - JWT-VC verification (PRIMARY)
+ * Verifier Agent - Thin wrapper over openid4vp.service.ts
  *
- * Ana credential verification implementation. Native modül gerektirmez.
- * OpenID4VP standardını destekler.
+ * Manages the verifier agent instance (DID, keys) and delegates all VP
+ * session logic to the unified openid4vp.service.
  */
 
-import { v4 as uuidv4 } from 'uuid'
-import * as jose from 'jose'
 import {
   createBaseAgent,
-  verifyJwtVc,
-  resolveDidKey,
   BaseAgentInstance,
 } from './base.agent'
 import { verifierConfig } from '../config/agent.config'
 import { logger } from '../utils/logger'
 import { PresentationDefinition, VerificationResult } from '../types/credential.types'
+import {
+  createAuthorizationRequest as openid4vpCreateAuthRequest,
+  getVerificationResult as openid4vpGetResult,
+} from '../services/openid4vp.service'
 
 let verifierAgent: BaseAgentInstance | null = null
-
-// Verification sessions storage
-const verificationSessions = new Map<string, {
-  id: string
-  presentationDefinition: PresentationDefinition
-  state: 'created' | 'response_received' | 'verified' | 'error'
-  createdAt: Date
-  presentation?: string
-  verificationResult?: VerificationResult
-  nonce: string
-}>()
 
 export async function initializeVerifierAgent(): Promise<BaseAgentInstance> {
   if (verifierAgent) {
@@ -53,7 +42,7 @@ export function getVerifierDid(): string {
   return getVerifierAgent().getDid()
 }
 
-// Presentation definitions
+// Presentation definitions (used by verifier.routes.ts)
 export const agentIdentityPresentationDefinition: PresentationDefinition = {
   id: 'agent-identity-verification',
   input_descriptors: [
@@ -137,191 +126,30 @@ export const combinedPresentationDefinition: PresentationDefinition = {
 }
 
 /**
- * OpenID4VP authorization request oluştur
+ * Create OpenID4VP authorization request.
+ * Delegates entirely to openid4vp.service (which handles Credo-first + Jose fallback).
  */
 export async function createVerificationRequest(
   presentationDefinition: PresentationDefinition
 ): Promise<{ requestUri: string; verificationSessionId: string }> {
-  const agent = getVerifierAgent()
-  const sessionId = uuidv4()
-  const nonce = uuidv4()
-
-  // Session oluştur
-  verificationSessions.set(sessionId, {
-    id: sessionId,
-    presentationDefinition,
-    state: 'created',
-    createdAt: new Date(),
-    nonce,
+  const result = await openid4vpCreateAuthRequest('', {
+    customDefinition: presentationDefinition,
   })
 
-  logger.info(`Verification request created: ${sessionId}`)
-
-  // OpenID4VP authorization request
-  const authRequest = {
-    response_type: 'vp_token',
-    client_id: agent.getDid(),
-    redirect_uri: `${verifierConfig.endpoint}/api/v1/verifier/callback`,
-    presentation_definition: presentationDefinition,
-    nonce,
-    state: sessionId,
-    response_mode: 'direct_post',
-  }
-
-  // Request URI oluştur
-  const requestUri = `openid4vp://?${new URLSearchParams({
-    client_id: authRequest.client_id,
-    request_uri: `${verifierConfig.endpoint}/api/v1/verifier/request/${sessionId}`,
-  }).toString()}`
-
   return {
-    requestUri,
-    verificationSessionId: sessionId,
+    requestUri: result.authorizationRequestUri,
+    verificationSessionId: result.sessionId,
   }
 }
 
 /**
- * Authorization request bilgisini getir (request_uri için)
- */
-export function getAuthorizationRequest(sessionId: string) {
-  const session = verificationSessions.get(sessionId)
-  if (!session) return null
-
-  const agent = getVerifierAgent()
-
-  return {
-    response_type: 'vp_token',
-    client_id: agent.getDid(),
-    redirect_uri: `${verifierConfig.endpoint}/api/v1/verifier/callback`,
-    presentation_definition: session.presentationDefinition,
-    nonce: session.nonce,
-    state: sessionId,
-    response_mode: 'direct_post',
-  }
-}
-
-/**
- * VP token submit et
- */
-export async function submitPresentation(
-  sessionId: string,
-  vpToken: string
-): Promise<VerificationResult> {
-  const session = verificationSessions.get(sessionId)
-  if (!session) {
-    return { verified: false, errors: ['Session not found'] }
-  }
-
-  session.presentation = vpToken
-  session.state = 'response_received'
-
-  // VP token'ı doğrula
-  const result = await verifyVpToken(vpToken, session.nonce)
-
-  session.verificationResult = result
-  session.state = result.verified ? 'verified' : 'error'
-
-  verificationSessions.set(sessionId, session)
-
-  return result
-}
-
-/**
- * VP token doğrula
- */
-async function verifyVpToken(vpToken: string, expectedNonce: string): Promise<VerificationResult> {
-  try {
-    // JWT decode et (header + payload)
-    const parts = vpToken.split('.')
-    if (parts.length !== 3) {
-      return { verified: false, errors: ['Invalid JWT format'] }
-    }
-
-    const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString())
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
-
-    // Issuer DID'ini al
-    const issuerDid = payload.iss
-    if (!issuerDid) {
-      return { verified: false, errors: ['Missing issuer'] }
-    }
-
-    // Issuer public key'i çöz
-    const publicKey = await resolveDidKey(issuerDid)
-    if (!publicKey) {
-      return { verified: false, errors: ['Could not resolve issuer DID'] }
-    }
-
-    // İmzayı doğrula
-    const verifyResult = await verifyJwtVc(vpToken, publicKey)
-    if (!verifyResult.verified) {
-      return { verified: false, errors: [verifyResult.error || 'Signature verification failed'] }
-    }
-
-    // Nonce kontrolü
-    if (payload.nonce && payload.nonce !== expectedNonce) {
-      return { verified: false, errors: ['Nonce mismatch'] }
-    }
-
-    // Expiration kontrolü
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      return { verified: false, errors: ['Credential expired'] }
-    }
-
-    // VC içeriğini al
-    const vc = payload.vc || {}
-    const credentialSubject = vc.credentialSubject || payload.credentialSubject || {}
-
-    logger.info('Presentation verified successfully')
-
-    return {
-      verified: true,
-      credentialSubject,
-      issuerDid,
-      issuanceDate: payload.iat ? new Date(payload.iat * 1000).toISOString() : undefined,
-      expirationDate: payload.exp ? new Date(payload.exp * 1000).toISOString() : undefined,
-    }
-  } catch (error) {
-    logger.error('VP token verification error', { error })
-    return { verified: false, errors: [(error as Error).message] }
-  }
-}
-
-/**
- * Session durumunu getir
- */
-export function getVerificationSession(sessionId: string) {
-  return verificationSessions.get(sessionId)
-}
-
-/**
- * Session'ı doğrulama sonucuyla güncelle
+ * Get verification result for a session.
+ * Delegates to openid4vp.service for unified session lookup.
  */
 export async function verifyPresentation(sessionId: string): Promise<VerificationResult> {
-  const session = verificationSessions.get(sessionId)
-  if (!session) {
+  const result = await openid4vpGetResult(sessionId)
+  if (!result) {
     return { verified: false, errors: ['Session not found'] }
   }
-
-  if (session.state === 'created') {
-    return { verified: false, errors: ['No presentation submitted'] }
-  }
-
-  if (session.verificationResult) {
-    return session.verificationResult
-  }
-
-  return { verified: false, errors: ['Unknown error'] }
-}
-
-/**
- * Tüm verification session'larını getir
- */
-export function getAllVerificationSessions() {
-  return Array.from(verificationSessions.entries()).map(([id, session]) => ({
-    id,
-    definitionId: session.presentationDefinition.id,
-    state: session.state,
-    createdAt: session.createdAt,
-  }))
+  return result
 }

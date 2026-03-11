@@ -1,7 +1,7 @@
 ---
 id: "008"
 title: "VP Flow Birleştirme (verifier.agent vs openid4vp.service)"
-status: pending
+status: done
 priority: low
 category: architecture
 created: 2026-03-11
@@ -35,6 +35,6 @@ Projede iki ayrı VP flow implementasyonu var:
 
 ## Kabul Kriterleri
 
-- [ ] Tek bir VP flow implementasyonu
-- [ ] Frontend verifier ve wallet yeni path'i kullanıyor
-- [ ] Eski route'lar deprecated/redirect
+- [x] Tek bir VP flow implementasyonu (openid4vp.service.ts)
+- [x] Frontend verifier ve wallet aynı session storage'ı kullanıyor
+- [x] verifier.agent.ts thin wrapper olarak yeniden yazıldı
