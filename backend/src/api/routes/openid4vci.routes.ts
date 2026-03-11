@@ -45,7 +45,7 @@ export const openid4vciRoutes = Router()
  */
 openid4vciRoutes.get(
   '/.well-known/openid-credential-issuer',
-  async (req: Request, res: Response) => {
+  asyncHandler(async (req: Request, res: Response) => {
     // Credo metadata takes priority when Credo is active
     if (isUsingCredo()) {
       const credoMetadata = await getCredoIssuerMetadata()
@@ -56,7 +56,7 @@ openid4vciRoutes.get(
     // Jose fallback
     const metadata = getIssuerMetadata()
     res.json(metadata)
-  }
+  })
 )
 
 /**
