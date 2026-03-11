@@ -162,6 +162,40 @@ export const issuerApi = {
         body: JSON.stringify(data),
       }
     ),
+
+  issueBatch: (data: {
+    credentialType: string;
+    format?: string;
+    recipients: Array<{ holderDid: string; claims: Record<string, unknown> }>;
+  }) =>
+    request<{ jobId: string; totalRequests: number }>(
+      '/issuer/credentials/batch',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    ),
+
+  getBatchStatus: (jobId: string) =>
+    request<{
+      jobId: string;
+      status: 'pending' | 'processing' | 'completed' | 'failed';
+      totalRequests: number;
+      processedCount: number;
+      successCount: number;
+      failureCount: number;
+    }>(`/issuer/credentials/batch/${encodeURIComponent(jobId)}`),
+
+  getBatchResults: (jobId: string) =>
+    request<{
+      results: Array<{
+        id: string;
+        success: boolean;
+        credentialId?: string;
+        credential?: string;
+        error?: string;
+      }>;
+    }>(`/issuer/credentials/batch/${encodeURIComponent(jobId)}/results`),
 };
 
 // Revocation API

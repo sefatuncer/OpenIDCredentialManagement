@@ -23,6 +23,7 @@ import {
   createStorageAdapter,
   getStorageType,
 } from '../core/storage'
+import { batchIssuanceService } from '../services/batchIssuance.service'
 
 let issuerAgent: BaseAgentInstance | null = null
 
@@ -72,6 +73,12 @@ export async function initializeIssuerAgent(): Promise<BaseAgentInstance> {
   issuerAgent = await createBaseAgent(issuerConfig, 'issuer')
 
   logger.info(`Issuer agent initialized with DID: ${issuerAgent.getDid()}`)
+
+  // Wire batch issuance service
+  batchIssuanceService.setIssuer(async (req) => {
+    return issueCredentialDirect(req.subjectDid, req.credentialType, req.claims)
+  })
+  logger.info('Batch issuance service wired to issuer agent')
 
   return issuerAgent
 }
@@ -254,6 +261,44 @@ export async function issueCapabilityCredential(
     credentialOfferId: offerId,
     credentialOfferUri,
   }
+}
+
+/**
+ * Offer flow bypass — doğrudan JWT-VC oluştur ve issuedStorage'a kaydet.
+ * Batch issuance service callback'i olarak kullanılır.
+ */
+export async function issueCredentialDirect(
+  holderDid: string,
+  credentialType: string,
+  claims: Record<string, unknown>
+): Promise<{ credentialId: string; credential: string }> {
+  const agent = getIssuerAgent()
+  const credentialId = uuidv4()
+
+  const jwt = await createJwtVc(
+    agent.keyPair.privateKey,
+    agent.getDid(),
+    agent.getKid(),
+    {
+      credentialSubject: {
+        id: holderDid,
+        ...claims,
+      },
+      type: ['VerifiableCredential', credentialType],
+    }
+  )
+
+  await getIssuedStorage().save(credentialId, {
+    credentialId,
+    jwt,
+    type: credentialType,
+    holderDid,
+    issuedAt: new Date(),
+  })
+
+  logger.info(`Direct credential issued: ${credentialType} to ${holderDid}`)
+
+  return { credentialId, credential: jwt }
 }
 
 /**

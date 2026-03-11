@@ -20,7 +20,9 @@ import {
   agentIdentityCredentialSchema,
   delegationCredentialSchema,
   capabilityCredentialSchema,
+  batchIssuanceSchema,
 } from '../schemas/validation.schemas'
+import { batchIssuanceService, BatchCredentialRequest } from '../../services/batchIssuance.service'
 import { credentialIssuanceRateLimiter } from '../middleware/rateLimit.middleware'
 
 export const issuerRoutes = Router()
@@ -376,5 +378,75 @@ issuerRoutes.post(
     }
 
     res.json(result)
+  })
+)
+
+// ─── Batch Issuance Endpoints ───────────────────────────────────────────
+
+/**
+ * POST /credentials/batch — Create a batch issuance job
+ */
+issuerRoutes.post(
+  '/credentials/batch',
+  credentialIssuanceRateLimiter,
+  validateBody(batchIssuanceSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { credentialType, recipients } = req.body
+
+    const requests: BatchCredentialRequest[] = recipients.map(
+      (r: { holderDid: string; claims: Record<string, unknown> }, index: number) => ({
+        id: String(index),
+        subjectDid: r.holderDid,
+        credentialType,
+        claims: r.claims,
+      })
+    )
+
+    const jobId = await batchIssuanceService.createBatchJob(requests)
+
+    res.status(202).json({ jobId, totalRequests: requests.length })
+  })
+)
+
+/**
+ * GET /credentials/batch/:jobId — Get batch job status
+ */
+issuerRoutes.get(
+  '/credentials/batch/:jobId',
+  asyncHandler(async (req: Request, res: Response) => {
+    const job = batchIssuanceService.getJobStatus(req.params.jobId)
+
+    if (!job) {
+      res.status(404).json({ error: 'Job not found' })
+      return
+    }
+
+    res.json({
+      jobId: job.jobId,
+      status: job.status,
+      totalRequests: job.totalRequests,
+      processedCount: job.processedCount,
+      successCount: job.successCount,
+      failureCount: job.failureCount,
+    })
+  })
+)
+
+/**
+ * GET /credentials/batch/:jobId/results — Get batch job results
+ */
+issuerRoutes.get(
+  '/credentials/batch/:jobId/results',
+  asyncHandler(async (req: Request, res: Response) => {
+    const job = batchIssuanceService.getJobStatus(req.params.jobId)
+
+    if (!job) {
+      res.status(404).json({ error: 'Job not found' })
+      return
+    }
+
+    const results = batchIssuanceService.getJobResults(req.params.jobId)
+
+    res.json({ results })
   })
 )

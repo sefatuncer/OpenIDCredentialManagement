@@ -4,6 +4,7 @@ import { IssuerDashboard } from './pages/IssuerDashboard';
 import { VerifierDashboard } from './pages/VerifierDashboard';
 import { IssueCredential } from './pages/IssueCredential';
 import { Revocation } from './pages/Revocation';
+import { BatchIssue } from './pages/BatchIssue';
 import { VerifyRequest } from './pages/VerifyRequest';
 import { VerifyResults } from './pages/VerifyResults';
 import { TrustManagement } from './pages/TrustManagement';
@@ -50,6 +51,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="issuer">
               <IssueCredential />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/issuer/issue-batch"
+          element={
+            <ProtectedRoute requiredRole="issuer">
+              <BatchIssue />
             </ProtectedRoute>
           }
         />

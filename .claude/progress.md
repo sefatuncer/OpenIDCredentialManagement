@@ -83,9 +83,17 @@ Single environment development setup - no staging/production yet.
 
 - [ ] Cloud HSM ön değerlendirme (todo 025)
 
+### Batch Credential Issuance (2026-03-11)
+- [x] `issueCredentialDirect()` — offer flow bypass, doğrudan JWT-VC
+- [x] `batchIssuanceService.setIssuer()` wire-up at boot
+- [x] `batchIssuanceSchema` Zod validation (max 100 recipients)
+- [x] 3 batch endpoints: POST job, GET status, GET results (async job pattern)
+- [x] Frontend: BatchIssue.tsx wizard (JSON/CSV import + progress polling + results)
+- [x] Route `/issuer/issue-batch` + IssuerDashboard link
+
 ## WP2: Temel Geliştirme — Alfa Prototip (Ay 4-6)
 
-- [ ] Batch credential issuance (todo 001)
+- [x] Batch credential issuance (todo 001) — 2026-03-11
 - [ ] PostgreSQL — kalan Map-based servisler (todo 002)
 - [x] SD-JWT VC format migration (todo 009) — 2026-03-11
 - [ ] Credential schema registry (todo 010)

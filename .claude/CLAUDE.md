@@ -94,6 +94,7 @@ cd web-wallet && npm run dev
 - **[2026-03-11] Security:** Yeni API field eklerken Zod validation schema'yı da güncelle. `req.body` cast'ları validation'dan sonra güvenlidir, öncesinde değil.
 - **[2026-03-11] Architecture:** Map→Adapter migration'da `list()`/`query()` key dönmez. Silme gereken entity'lerde key'i data içinde de sakla (`offerId` pattern). Bkz: `.claude/solutions/map-to-storage-adapter-migration.md`
 - **[2026-03-11] TypeScript:** sync→async dönüşümü tüm caller zincirini etkiler. `tsc --noEmit` ile erken doğrula — compiler kaçırılan `await`'leri yakalar.
+- **[2026-03-11] Architecture:** Mevcut standalone servis varsa yeni yazmak yerine wire-up et. `setIssuer()` callback pattern'i ile servisi agent'a bağla, endpoint'lerden servise delege et. `issueCredentialDirect()` offer flow bypass eder.
 
 ## Pattern Library
 

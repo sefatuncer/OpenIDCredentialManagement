@@ -143,6 +143,9 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 | POST | `/api/v1/issuer/credentials/capability` | Auth | 30/min | Capability credential offer oluştur |
 | POST | `/api/v1/issuer/token` | - | - | Token endpoint (spec gereği public) |
 | POST | `/api/v1/issuer/credential` | - | - | Credential endpoint (spec gereği public) |
+| POST | `/api/v1/issuer/credentials/batch` | Auth | 30/min | Batch issuance job oluştur → 202 + jobId |
+| GET | `/api/v1/issuer/credentials/batch/{jobId}` | Auth | - | Batch job status (polling) |
+| GET | `/api/v1/issuer/credentials/batch/{jobId}/results` | Auth | - | Batch job sonuçları |
 
 **Agent Identity Request:**
 ```json
@@ -445,6 +448,11 @@ Issuer Dashboard
   ├─▶ POST /api/v1/issuer/credentials/delegation       → credentialOfferUri + QR
   └─▶ POST /api/v1/issuer/credentials/capability        → credentialOfferUri + QR
 
+Batch Issue (/issuer/issue-batch)
+  ├─▶ POST /api/v1/issuer/credentials/batch        → 202 + jobId
+  ├─▶ GET  /api/v1/issuer/credentials/batch/{jobId}          (polling, 2sn)
+  └─▶ GET  /api/v1/issuer/credentials/batch/{jobId}/results  (on complete)
+
 Verifier Dashboard
   ├─▶ POST /api/v1/verifier/verify/agent-identity → sessionId + requestUri + QR
   ├─▶ POST /api/v1/verifier/verify/delegation     → sessionId + requestUri + QR
@@ -649,7 +657,9 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `web-wallet/src/pages/PresentCredential.tsx` | OpenID4VP presentation flow UI (QR scan + manual URI) |
 | `web-wallet/src/components/QRScanner.tsx` | html5-qrcode wrapper component |
 | `web-wallet/src/api.ts` | Wallet API calls (issue, verify, present) |
-| `backend/src/api/schemas/validation.schemas.ts` | Zod validation schemas (credential format, DID, trust level) |
+| `backend/src/api/schemas/validation.schemas.ts` | Zod validation schemas (credential format, DID, trust level, batch issuance) |
+| `backend/src/services/batchIssuance.service.ts` | Batch issuance — parallel processing, retry, job tracking |
+| `frontend-issuer-verifier/src/pages/BatchIssue.tsx` | Batch issue wizard (JSON/CSV import, progress, results) |
 | `backend/src/agents/verifier.agent.ts` | Thin wrapper — delege eder openid4vp.service'e, DID/key management |
 | `backend/src/database/storage-adapter.ts` | IStorageAdapter<T> — PostgreSQL / memory fallback |
 | `backend/src/core/storage/index.ts` | Storage factory — `createStorageAdapter<T>()`, auto/postgres/memory/redis |

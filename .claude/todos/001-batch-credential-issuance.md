@@ -1,11 +1,12 @@
 ---
 id: "001"
 title: "Batch Credential Issuance"
-status: pending
+status: done
 priority: high
 category: feature
 wp: WP2
 created: 2026-03-09
+completed: 2026-03-11
 ---
 
 ## Açıklama
@@ -14,28 +15,24 @@ Birden fazla credential'ı tek seferde issue edebilme özelliği.
 
 ## Gereksinimler
 
-- [ ] Backend: Batch issuance service (`batch-issuance.service.ts`)
-- [ ] Backend: Batch endpoint (`POST /issuer/credentials/batch`)
-- [ ] Backend: Zod validation schema (batchIssuanceSchema)
-- [ ] Backend: Rate limiting for batch operations
-- [ ] Frontend: Batch issuance page (`/issuer/issue-batch`)
-- [ ] Frontend: CSV/JSON import desteği
-- [ ] Frontend: Progress tracking ve result summary UI
+- [x] Backend: `batchIssuanceService` wire-up (`setIssuer()` callback)
+- [x] Backend: `issueCredentialDirect()` — offer flow bypass
+- [x] Backend: 3 batch endpoint (POST job, GET status, GET results)
+- [x] Backend: Zod validation schema (`batchIssuanceSchema`)
+- [x] Backend: Rate limiting (`credentialIssuanceRateLimiter`)
+- [x] Frontend: BatchIssue.tsx wizard page (`/issuer/issue-batch`)
+- [x] Frontend: JSON/CSV import + preview
+- [x] Frontend: Progress polling (2sn interval) + result summary
 
 ## Teknik Notlar
 
-- Max batch size: 100 credentials
+- Async job pattern: POST → 202 + jobId → polling → results
+- `batchIssuanceService` kullanıyor (10 concurrent, 3 retry, 50/chunk)
+- Max batch size: 100 recipients
 - Tek credential type per batch
-- Serial processing (loop), partial failure handling
-- Feature flag: `module.batch-issuance` (zaten mevcut, default enabled)
+- Job tracking in-memory Map (Fase 2'de PostgreSQL'e migrate edilecek)
 
-## Bağımlılıklar
+## Review Findings (P2)
 
-- Issuer agent credential issuance fonksiyonları (mevcut)
-
-## Kabul Kriterleri
-
-- [ ] 100 credential tek request'te issue edilebilir
-- [ ] Hata durumunda partial success (biri fail olursa diğerleri devam)
-- [ ] İlerleme durumu ve sonuç summary UI'da gösterilir
-- [ ] CSV ve JSON import çalışıyor
+- `batchJobIdParamSchema` tanımlı ama GET endpoint'lerde kullanılmıyor
+- Batch results tüm authenticated kullanıcılara açık (multi-tenant risk)

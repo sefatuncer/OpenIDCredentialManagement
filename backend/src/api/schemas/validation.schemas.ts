@@ -55,6 +55,24 @@ export const capabilityCredentialSchema = z.object({
   format: credentialFormatSchema.optional(),
 })
 
+// Batch issuance schema
+export const batchIssuanceSchema = z.object({
+  credentialType: z.enum(['AIAgentIdentityCredential', 'DelegationCredential', 'CapabilityCredential']),
+  format: credentialFormatSchema.optional().default('jwt_vc_json'),
+  recipients: z.array(z.object({
+    holderDid: z.string().regex(/^did:(key|web|peer):[a-zA-Z0-9._%-]+$/),
+    claims: z.record(z.unknown()),
+  })).min(1).max(100),
+})
+
+export const batchJobIdParamSchema = z.object({
+  jobId: z.string().regex(/^batch-\d+-[a-z0-9]+$/, 'Invalid batch job ID format'),
+})
+
+// Batch issuance types
+export type BatchIssuanceInput = z.infer<typeof batchIssuanceSchema>
+export type BatchJobIdParam = z.infer<typeof batchJobIdParamSchema>
+
 // Holder schemas
 export const credentialReceiveSchema = z.object({
   credentialOfferUri: z.string().url('Invalid credential offer URI'),

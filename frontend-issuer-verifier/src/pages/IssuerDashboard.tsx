@@ -129,6 +129,18 @@ export function IssuerDashboard() {
 
         <div className="card">
           <div className="card-header">
+            <h3 className="card-title">Batch Issue</h3>
+          </div>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+            Issue multiple credentials at once via CSV or JSON import.
+          </p>
+          <Link to="/issuer/issue-batch" className="btn btn-issuer">
+            Batch Issue
+          </Link>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
             <h3 className="card-title">🚫 Revocation Management</h3>
           </div>
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
