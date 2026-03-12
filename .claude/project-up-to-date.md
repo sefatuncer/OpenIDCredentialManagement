@@ -34,6 +34,7 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 | **DID** | Decentralized identifier (did:key, did:web, did:peer) | W3C DID Core 1.0 |
 | **JWT-VC** | Verifiable Credential format (`jwt_vc_json`) — legacy | W3C VC Data Model 1.1 |
 | **SD-JWT VC** | Selective Disclosure JWT VC (`vc+sd-jwt`) — varsayılan format | IETF SD-JWT VC Draft, eIDAS 2.0 / EUDI ARF |
+| **RFC 8693** | VC ↔ OAuth token exchange (bridge) | IETF RFC 8693 Token Exchange |
 | **StatusList2021** | Credential revocation | W3C StatusList2021 |
 | **EdDSA** | Signature algorithm (Ed25519) | C:\Users\sefa.tuncer\Desktop\docker-digital-id\fame-digital-idRFC 8032 |
 
@@ -45,6 +46,7 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 | Web Wallet | Client Credentials | clientId + clientSecret → access token |
 | OpenID4VCI spec endpoints | Token/No Auth | Spec gereği bazı endpoint'ler public |
 | OpenID4VP direct_post | No Auth | Wallet'tan gelen VP submission |
+| OAuth Bridge | VC JWT (self-auth) | VC credential'i kendisi authentication gorevi gorur |
 
 ---
 
@@ -440,6 +442,40 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 
 ---
 
+### OAuth 2.0 Bridge (RFC 8693 Token Exchange)
+
+| Method | Path | Auth | Rate Limit | Aciklama |
+|--------|------|------|------------|----------|
+| POST | `/api/v1/oauth/token-exchange` | - (VC is auth) | 10/15min | VC JWT → OAuth access token |
+| POST | `/api/v1/oauth/introspect` | - | 10/15min | Bridge token introspection |
+| GET | `/api/v1/oauth/scope-mappings` | - | - | Credential type → scope mappings |
+| GET | `/api/v1/oauth/.well-known/oauth-bridge` | - | - | Bridge metadata discovery |
+
+**Token Exchange Request (RFC 8693):**
+```json
+{
+  "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+  "subject_token": "<VC JWT>",
+  "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+  "scope": "read write"
+}
+```
+
+**Response:**
+```json
+{
+  "access_token": "<bridge token>",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "scope": "read write credential:AIAgentIdentityCredential",
+  "issued_token_type": "urn:ietf:params:oauth:token-type:access_token"
+}
+```
+
+**Scope Mapping:** `AIAgentIdentityCredential.capabilities` / `DelegationCredential.scope` / `CapabilityCredential.actions` → OAuth scopes. Trust level adds `trust:basic/verified/certified`.
+
+---
+
 ### Legacy Redirects
 
 | Eski Path | Yeni Path | Status |
@@ -496,6 +532,11 @@ Trust Management
   ├─▶ POST   /api/v1/trust/entities
   ├─▶ DELETE  /api/v1/trust/entities/{did}
   └─▶ GET    /api/v1/trust/policies
+
+OAuth Bridge (/issuer/oauth-bridge)
+  ├─▶ POST /api/v1/oauth/token-exchange   → VC JWT → OAuth access token
+  ├─▶ POST /api/v1/oauth/introspect       → bridge token dogrulama
+  └─▶ GET  /api/v1/oauth/scope-mappings   → credential type → scope mappings
 
 Audit Logs
   ├─▶ GET /api/v1/audit/logs?page&limit&action&from&to
@@ -658,6 +699,7 @@ Verifier Frontend               Backend                        Wallet
 | Credential issuance | 30 req / min |
 | Verification | 50 req / min |
 | Trust/Revocation | Strict (daha düşük) |
+| OAuth Bridge (exchange/introspect) | 10 req / 15 min |
 
 ### Middleware
 - **CORS:** Whitelist (localhost:3000, 5173, 5174)
@@ -723,4 +765,7 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `backend/src/services/capabilityDiscovery.service.ts` | Agent capability discovery registry (PostgreSQL persistent) |
 | `frontend-issuer-verifier/src/pages/IssueAdvanced.tsx` | Schema-driven 3-step issuance wizard (SD claim selection, preview, QR) |
 | `frontend-issuer-verifier/src/pages/SchemaManagement.tsx` | Schema management UI (list/detail/create) |
+| `backend/src/services/oauth-bridge.service.ts` | OAuth 2.0 Bridge — VC verification, scope mapping, token exchange (RFC 8693) |
+| `backend/src/api/routes/oauth-bridge.routes.ts` | OAuth bridge endpoints (token-exchange, introspect, scope-mappings, well-known) |
+| `frontend-issuer-verifier/src/pages/OAuthBridge.tsx` | OAuth bridge admin UI (exchange, introspect, mappings tabs) |
 | `docker-compose.dev.yml` | Dev environment (4 services: backend, wallet, frontend, postgres) |

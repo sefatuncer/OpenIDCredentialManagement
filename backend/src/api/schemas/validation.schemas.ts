@@ -148,6 +148,22 @@ export const credentialIdParamSchema = z.object({
   credentialId: z.string().min(1, 'Credential ID is required'),
 })
 
+// OAuth 2.0 Bridge — RFC 8693 Token Exchange
+export const tokenExchangeSchema = z.object({
+  grant_type: z.literal('urn:ietf:params:oauth:grant-type:token-exchange'),
+  subject_token: z.string().min(1, 'Subject token (VC JWT) is required'),
+  subject_token_type: z.string().min(1, 'Subject token type is required'),
+  scope: z.string().optional(),
+  resource: z.string().url().optional(),
+})
+
+export const bridgeIntrospectSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+})
+
+export type TokenExchangeInput = z.infer<typeof tokenExchangeSchema>
+export type BridgeIntrospectInput = z.infer<typeof bridgeIntrospectSchema>
+
 // Type exports
 export type AgentIdentityCredentialInput = z.infer<typeof agentIdentityCredentialSchema>
 export type DelegationCredentialInput = z.infer<typeof delegationCredentialSchema>

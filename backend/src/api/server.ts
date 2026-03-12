@@ -23,6 +23,7 @@ import { walletRoutes } from './routes/wallet.routes'
 import { delegationRoutes } from './routes/delegation.routes'
 import { agentTrustRoutes } from './routes/agentTrust.routes'
 import { schemaRoutes } from './routes/schema.routes'
+import { oauthBridgeRoutes } from './routes/oauth-bridge.routes'
 import simulationRoutes from './routes/simulation.routes'
 import {
   requestIdMiddleware,
@@ -396,6 +397,9 @@ export function createServer(): Express {
       next(error)
     }
   })
+
+  // OAuth 2.0 Bridge — RFC 8693 Token Exchange (no auth required — VC itself is authentication)
+  app.use(`${API_BASE_PATH}/oauth`, oauthBridgeRoutes)
 
   // Apply global rate limiting to API routes
   app.use(API_BASE_PATH, defaultRateLimiter)

@@ -7,6 +7,7 @@ import { Revocation } from './pages/Revocation';
 import { BatchIssue } from './pages/BatchIssue';
 import { IssueAdvanced } from './pages/IssueAdvanced';
 import { SchemaManagement } from './pages/SchemaManagement';
+import { OAuthBridge } from './pages/OAuthBridge';
 import { VerifyRequest } from './pages/VerifyRequest';
 import { VerifyResults } from './pages/VerifyResults';
 import { TrustManagement } from './pages/TrustManagement';
@@ -93,6 +94,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="issuer">
               <AuditLogs role="issuer" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/issuer/oauth-bridge"
+          element={
+            <ProtectedRoute requiredRole="issuer">
+              <OAuthBridge />
             </ProtectedRoute>
           }
         />

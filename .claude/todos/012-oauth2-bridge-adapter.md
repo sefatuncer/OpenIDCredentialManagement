@@ -1,7 +1,7 @@
 ---
 id: "012"
 title: "OAuth 2.0 Bridge Adapter"
-status: pending
+status: done
 priority: medium
 category: feature
 wp: WP3

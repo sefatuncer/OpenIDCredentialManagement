@@ -13,6 +13,7 @@ const issuerNavItems = [
   { path: '/issuer/issue', label: 'Issue Credential', icon: '🎫' },
   { path: '/issuer/issue-advanced', label: 'Advanced Issue', icon: '🔐' },
   { path: '/issuer/revocation', label: 'Revocation', icon: '🚫' },
+  { path: '/issuer/oauth-bridge', label: 'OAuth Bridge', icon: '🔗' },
   { path: '/issuer/audit', label: 'Audit Logs', icon: '📋' },
 ];
 

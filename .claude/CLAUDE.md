@@ -104,6 +104,8 @@ cd web-wallet && npm run dev
 - **[2026-03-12] Security:** Browser'da key material (private key JWK) sessionStorage'a yazarken AES-GCM-256 ile şifrele. Plaintext storage XSS ile açığa çıkar. Bkz: `.claude/solutions/client-side-vp-flow.md`
 - **[2026-03-12] OpenID4VP:** Client-side VP flow'da `did:key` ephemeral wallet identity olarak idealdir — self-contained (resolution gerekmez), registration gerekmez, verifier `resolvePublicKeyFromDid()` ile doğrudan çözer.
 - **[2026-03-12] TypeScript:** jose browser bundle'da `KeyLike` type export edilmez. Browser context'te `CryptoKey` type assertion kullan.
+- **[2026-03-12] Security:** Global rate limiter'dan önce mount edilen route'lar rate limiting'i bypass eder. Pre-auth endpoint'lere her zaman per-route `authRateLimiter` ekle. Bkz: `.claude/solutions/oauth2-bridge-rfc8693.md`
+- **[2026-03-12] Architecture:** Aynı veri (ör. scope mapping, trust level) hem service hem route'ta tanımlanmamalı. Service'den export et, route sadece pass-through yapsın — veri tutarsızlığını önler.
 
 ## Pattern Library
 
@@ -121,3 +123,4 @@ cd web-wallet && npm run dev
 | Envelope Encryption Key Storage | KEK env var ile data key'leri wrap edip DB'ye yaz, boot'ta unwrap | `.claude/solutions/encryption-envelope-key-storage.md` |
 | Schema-Driven Issuance Wizard | 3-step wizard: schema→claims→SD options→preview→QR, type-to-function routing | `.claude/solutions/schema-driven-issuance-wizard.md` |
 | Client-Side VP Flow | Wallet-local Ed25519 key, DID:key, encrypted storage, direct_post, SD-JWT disclosure selection | `.claude/solutions/client-side-vp-flow.md` |
+| OAuth 2.0 Bridge RFC 8693 | VC → OAuth token exchange, scope mapping, pre-auth endpoint pattern | `.claude/solutions/oauth2-bridge-rfc8693.md` |

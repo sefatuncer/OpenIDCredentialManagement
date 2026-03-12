@@ -105,7 +105,7 @@ Single environment development setup - no staging/production yet.
 ## WP3: İleri Geliştirme + Blockchain — Beta Prototip (Ay 7-12)
 
 - [ ] Hyperledger Fabric entegrasyonu (todo 011)
-- [ ] OAuth 2.0 bridge adapter (todo 012)
+- [x] OAuth 2.0 bridge adapter (todo 012) — 2026-03-12
 - [ ] DIDComm v1/v2 entegrasyonu (todo 013)
 - [ ] Multi-tenant credential izolasyonu (todo 014)
 - [ ] Gerçek zamanlı revocation — webhook (todo 015)

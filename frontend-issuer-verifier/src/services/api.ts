@@ -454,6 +454,46 @@ export const schemaApi = {
     }),
 };
 
+// OAuth 2.0 Bridge
+export const oauthBridgeApi = {
+  exchangeToken: (subjectToken: string, scope?: string) =>
+    request<{
+      access_token: string;
+      token_type: string;
+      expires_in: number;
+      scope: string;
+      issued_token_type: string;
+    }>('/oauth/token-exchange', {
+      method: 'POST',
+      body: JSON.stringify({
+        grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+        subject_token: subjectToken,
+        subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+        ...(scope && { scope }),
+      }),
+    }),
+
+  introspect: (token: string) =>
+    request<{
+      active: boolean;
+      sub?: string;
+      scope?: string;
+      exp?: number;
+      iat?: number;
+      source_credential_type?: string;
+      issuer_did?: string;
+    }>('/oauth/introspect', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
+
+  getScopeMappings: () =>
+    request<{
+      mappings: Record<string, { field: string; example: string[] }>;
+      trust_levels: Record<string, string[]>;
+    }>('/oauth/scope-mappings'),
+};
+
 // Health check
 export const healthApi = {
   check: () => request<{ status: string }>('/health', {}, { showErrorToast: false }),
@@ -467,5 +507,6 @@ export default {
   trust: trustApi,
   audit: auditApi,
   schema: schemaApi,
+  oauthBridge: oauthBridgeApi,
   health: healthApi,
 };
