@@ -523,6 +523,32 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 
 ---
 
+### Tenant Management (Multi-Tenant)
+
+| Method | Path | Auth | Permission | Açıklama |
+|--------|------|------|------------|----------|
+| GET | `/api/v1/tenants` | Auth | tenants:read | Tüm tenant'ları listele (`?status=active\|suspended\|pending`) |
+| GET | `/api/v1/tenants/stats` | Auth | tenants:read | Tenant istatistikleri (total, active, suspended, credentials) |
+| GET | `/api/v1/tenants/:id` | Auth | tenants:read / own | Tenant detayı (admin veya kendi tenant'ı) |
+| POST | `/api/v1/tenants` | Auth | tenants:write | Yeni tenant oluştur (name, slug, config) |
+| PUT | `/api/v1/tenants/:id` | Auth | tenants:write | Tenant güncelle |
+| POST | `/api/v1/tenants/:id/suspend` | Auth | tenants:write | Tenant askıya al (opsiyonel reason, max 500 char) |
+| POST | `/api/v1/tenants/:id/activate` | Auth | tenants:write | Tenant aktifleştir |
+| DELETE | `/api/v1/tenants/:id` | Auth | tenants:write | Tenant sil |
+| GET | `/api/v1/tenants/:id/usage` | Auth | tenants:read / own | Tenant kullanım verileri |
+
+**Feature Flag:** `module.multi-tenant` — devre dışıyken middleware skip, tenant endpoint'ler erişilebilir ama servis boş döner.
+
+**Tenant Context Extraction (öncelik sırası):**
+1. `X-Tenant-ID` header (UUID lookup)
+2. `X-Tenant-Slug` header (slug lookup)
+3. Subdomain (`tenant.example.com` → slug)
+4. `tenantId` query parameter
+
+**Middleware:** `optionalTenant()` global — tenant context varsa ekler, yoksa pass-through (backward compat).
+
+---
+
 ### Legacy Redirects
 
 | Eski Path | Yeni Path | Status |
@@ -597,6 +623,14 @@ OAuth Bridge (/issuer/oauth-bridge)
   ├─▶ POST /api/v1/oauth/token-exchange   → VC JWT → OAuth access token
   ├─▶ POST /api/v1/oauth/introspect       → bridge token dogrulama
   └─▶ GET  /api/v1/oauth/scope-mappings   → credential type → scope mappings
+
+Tenant Management (/issuer/tenants)
+  ├─▶ GET    /api/v1/tenants                      → tenant listesi (filter by status)
+  ├─▶ GET    /api/v1/tenants/stats                 → tenant istatistikleri
+  ├─▶ POST   /api/v1/tenants                       → yeni tenant oluştur (name, slug)
+  ├─▶ POST   /api/v1/tenants/{id}/suspend           → tenant askıya al
+  ├─▶ POST   /api/v1/tenants/{id}/activate           → tenant aktifleştir
+  └─▶ DELETE /api/v1/tenants/{id}                   → tenant sil
 
 Audit Logs
   ├─▶ GET /api/v1/audit/logs?page&limit&action&from&to
@@ -765,11 +799,12 @@ Verifier Frontend               Backend                        Wallet
 | Webhook mutations (create/update/delete/test) | Strict |
 
 ### Middleware
-- **CORS:** Whitelist (localhost:3000, 5173, 5174)
+- **CORS:** Whitelist (localhost:3000, 5173, 5174), `X-Tenant-ID` + `X-Tenant-Slug` allowed headers
 - **Helmet:** Security headers
 - **Request ID:** Her request'e UUID
 - **Request Logging:** `/health`, `/metrics` hariç tüm endpoint'ler loglanır
 - **Error Format:** RFC 7807 Problem Detail
+- **Multi-Tenant:** `optionalTenant()` global middleware — tenant context ekler (feature-flag gated: `module.multi-tenant`)
 
 ### Kriptografi
 | Amaç | Yöntem |
@@ -849,3 +884,8 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `frontend-issuer-verifier/src/services/keycloak.ts` | Frontend PKCE flow — native crypto, state/verifier management |
 | `backend/docker/keycloak/ssi-realm.json` | Keycloak realm import (3 clients, 4 roles, 2 test users) |
 | `docker-compose.dev.yml` | Dev environment (5 services: backend, wallet, frontend, postgres, keycloak) |
+| `backend/src/api/middleware/tenant.middleware.ts` | Multi-tenant middleware — `optionalTenant()`, `requireTenant()`, tenant context extraction |
+| `backend/src/services/tenant-storage.service.ts` | Tenant-scoped storage helpers — `saveTenantData()`, `listTenantData()`, `queryTenantData()` |
+| `backend/src/api/routes/tenant.routes.ts` | Tenant CRUD endpoints (9 routes: list, stats, get, create, update, suspend, activate, delete, usage) |
+| `backend/src/services/multiTenant.service.ts` | Multi-tenant business logic — CRUD, suspend/activate, usage, stats (528L) |
+| `frontend-issuer-verifier/src/pages/TenantManagement.tsx` | Tenant management admin UI (list, create, suspend/activate, delete, stats cards) |

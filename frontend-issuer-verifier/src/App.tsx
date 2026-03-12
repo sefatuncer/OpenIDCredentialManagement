@@ -9,6 +9,7 @@ import { IssueAdvanced } from './pages/IssueAdvanced';
 import { SchemaManagement } from './pages/SchemaManagement';
 import { OAuthBridge } from './pages/OAuthBridge';
 import { WebhookManagement } from './pages/WebhookManagement';
+import { TenantManagement } from './pages/TenantManagement';
 import { VerifyRequest } from './pages/VerifyRequest';
 import { VerifyResults } from './pages/VerifyResults';
 import { TrustManagement } from './pages/TrustManagement';
@@ -105,6 +106,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="issuer">
               <WebhookManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/issuer/tenants"
+          element={
+            <ProtectedRoute requiredRole="issuer">
+              <TenantManagement />
             </ProtectedRoute>
           }
         />

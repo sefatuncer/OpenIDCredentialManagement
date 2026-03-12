@@ -9,6 +9,7 @@ import {
   getStorageType,
 } from '../core/storage'
 import { isCredentialRevoked, getRevocationStatus } from './revocation.service'
+import { saveTenantData, listTenantData } from './tenant-storage.service'
 // Credo Service import - Credo varsa onu kullan, yoksa Jose fallback
 import {
   isUsingCredo,
@@ -360,6 +361,7 @@ export async function createAuthorizationRequest(
     customDefinition?: PresentationDefinition
     expiresInSeconds?: number
     redirectUri?: string
+    tenantId?: string
   } = {}
 ): Promise<{
   sessionId: string
@@ -394,7 +396,7 @@ export async function createAuthorizationRequest(
         expiresAt: new Date(Date.now() + (options.expiresInSeconds || 300) * 1000),
         status: 'pending',
       }
-      await getVPSessionsStorage().save(sessionId, session)
+      await saveTenantData(getVPSessionsStorage(), sessionId, options.tenantId, session)
 
       logger.info('Created authorization request via Credo', {
         sessionId,
@@ -458,7 +460,7 @@ export async function createAuthorizationRequest(
     expiresAt: new Date(Date.now() + expiresIn * 1000),
     status: 'pending',
   }
-  await getVPSessionsStorage().save(sessionId, session)
+  await saveTenantData(getVPSessionsStorage(), sessionId, options.tenantId, session)
 
   // Create authorization request URI
   const params = new URLSearchParams()
@@ -810,7 +812,7 @@ export async function getVerificationResult(sessionId: string): Promise<Verifica
 /**
  * List all verification sessions (admin)
  */
-export async function listVerificationSessions(): Promise<Array<{
+export async function listVerificationSessions(tenantId?: string): Promise<Array<{
   sessionId: string
   presentationDefinitionId: string
   status: string
@@ -818,7 +820,7 @@ export async function listVerificationSessions(): Promise<Array<{
   expiresAt: Date
   expired: boolean
 }>> {
-  const allSessions = await getVPSessionsStorage().list()
+  const allSessions = await listTenantData(getVPSessionsStorage(), tenantId)
   const now = new Date()
 
   return allSessions.map((session) => ({

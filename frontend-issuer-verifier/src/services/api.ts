@@ -587,6 +587,54 @@ export const webhookApi = {
     }>(`/webhooks/${encodeURIComponent(id)}/deliveries`),
 };
 
+// Tenant API
+export const tenantApi = {
+  list: (status?: string) =>
+    request<{ tenants: Array<{
+      id: string; name: string; slug: string;
+      status: 'active' | 'suspended' | 'pending';
+      config: { maxCredentials?: number; maxIssuers?: number; maxHolders?: number; allowedCredentialTypes: string[]; features: { sdjwt: boolean; revocation: boolean; batchIssuance: boolean; webhooks: boolean }; rateLimit?: { requestsPerMinute: number; requestsPerHour: number } };
+      metadata: Record<string, unknown>; createdAt: string; updatedAt: string;
+    }>; total: number }>(status ? `/tenants?status=${status}` : '/tenants'),
+
+  getStats: () =>
+    request<{ totalTenants: number; activeTenants: number; suspendedTenants: number; totalCredentialsIssued: number; totalApiCalls: number; storageType: string }>('/tenants/stats'),
+
+  get: (id: string) =>
+    request<{ tenant: unknown }>(`/tenants/${encodeURIComponent(id)}`),
+
+  create: (name: string, slug: string, config?: Record<string, unknown>) =>
+    request<{ tenant: unknown }>('/tenants', {
+      method: 'POST',
+      body: JSON.stringify({ name, slug, config }),
+    }),
+
+  update: (id: string, updates: Record<string, unknown>) =>
+    request<{ tenant: unknown }>(`/tenants/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    }),
+
+  suspend: (id: string, reason?: string) =>
+    request<{ message: string }>(`/tenants/${encodeURIComponent(id)}/suspend`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  activate: (id: string) =>
+    request<{ message: string }>(`/tenants/${encodeURIComponent(id)}/activate`, {
+      method: 'POST',
+    }),
+
+  delete: (id: string) =>
+    request<{ message: string }>(`/tenants/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  getUsage: (id: string) =>
+    request<{ usage: { tenantId: string; credentialsIssued: number; credentialsRevoked: number; presentationsVerified: number; apiCalls: number; storageUsedBytes: number; updatedAt: string } }>(`/tenants/${encodeURIComponent(id)}/usage`),
+};
+
 // Health check
 export const healthApi = {
   check: () => request<{ status: string }>('/health', {}, { showErrorToast: false }),
@@ -602,5 +650,6 @@ export default {
   schema: schemaApi,
   oauthBridge: oauthBridgeApi,
   webhook: webhookApi,
+  tenant: tenantApi,
   health: healthApi,
 };

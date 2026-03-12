@@ -12,6 +12,8 @@ export interface AuthenticatedRequest extends Request {
   }
   apiKeyId?: string
   authMethod?: 'keycloak' | 'jwt' | 'apikey'
+  tenantId?: string
+  tenant?: import('../../services/multiTenant.service').Tenant
 }
 
 export interface AuthConfig {

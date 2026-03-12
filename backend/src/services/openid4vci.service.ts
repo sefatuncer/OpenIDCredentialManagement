@@ -12,6 +12,7 @@ import {
 import { eventBus } from '../core/event-bus'
 import { isFeatureEnabled } from '../core/feature-flags'
 import { sdjwtService, type SDJWTClaims } from './sdjwt.service'
+import { saveTenantData, listTenantData } from './tenant-storage.service'
 // Credo Service import - Credo varsa onu kullan, yoksa Jose fallback
 import {
   isUsingCredo,
@@ -404,6 +405,7 @@ export async function createCredentialOffer(
     txCode?: { input_mode: string; length: number; description?: string }
     userPinRequired?: boolean // deprecated, mapped to txCode
     expiresInSeconds?: number
+    tenantId?: string
   } = {}
 ): Promise<{
   offerId: string
@@ -474,7 +476,7 @@ export async function createCredentialOffer(
     claimed: false,
   }
 
-  await getOffersStorage().save(offerId, storedOffer)
+  await saveTenantData(getOffersStorage(), offerId, options.tenantId, storedOffer)
 
   // Create offer URI (can be used as QR code or deep link)
   const offerJson = encodeURIComponent(JSON.stringify(credentialOffer))
@@ -1084,7 +1086,7 @@ export async function getDeferredCredential(
 /**
  * List all credential offers (for admin purposes)
  */
-export async function listCredentialOffers(): Promise<Array<{
+export async function listCredentialOffers(tenantId?: string): Promise<Array<{
   offerId: string
   credentialTypes: string[]
   createdAt: Date
@@ -1092,7 +1094,7 @@ export async function listCredentialOffers(): Promise<Array<{
   claimed: boolean
   expired: boolean
 }>> {
-  const offers = await getOffersStorage().list()
+  const offers = await listTenantData(getOffersStorage(), tenantId)
   const now = new Date()
 
   return offers.map((offer) => ({

@@ -1,7 +1,7 @@
 ---
 id: "014"
 title: "Multi-Tenant Credential İzolasyonu"
-status: pending
+status: done
 priority: high
 category: security
 wp: WP3

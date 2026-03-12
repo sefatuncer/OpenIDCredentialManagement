@@ -25,6 +25,7 @@ import { agentTrustRoutes } from './routes/agentTrust.routes'
 import { schemaRoutes } from './routes/schema.routes'
 import { oauthBridgeRoutes } from './routes/oauth-bridge.routes'
 import { webhookRoutes } from './routes/webhook.routes'
+import { tenantRoutes } from './routes/tenant.routes'
 import simulationRoutes from './routes/simulation.routes'
 import {
   requestIdMiddleware,
@@ -32,6 +33,7 @@ import {
   notFoundMiddleware,
 } from './middleware/error.middleware'
 import { authenticateAny } from './middleware/auth.middleware'
+import { optionalTenant } from './middleware/tenant.middleware'
 import { defaultRateLimiter } from './middleware/rateLimit.middleware'
 import { requestLoggerMiddleware } from './middleware/requestLogger.middleware'
 import { setupSwagger } from './swagger'
@@ -107,7 +109,7 @@ export function createServer(): Express {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Request-ID'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Request-ID', 'X-Tenant-ID', 'X-Tenant-Slug'],
     maxAge: 86400, // 24 hours preflight cache
   }))
 
@@ -409,6 +411,9 @@ export function createServer(): Express {
   // Comment out the next line to disable authentication for development
   app.use(API_BASE_PATH, authenticateAny())
 
+  // Optional tenant context (attaches tenant if multi-tenant enabled and header present)
+  app.use(API_BASE_PATH, optionalTenant())
+
   // API v1 Routes
   app.use(`${API_BASE_PATH}/issuer`, issuerRoutes)
   app.use(`${API_BASE_PATH}/verifier`, verifierRoutes)
@@ -429,6 +434,7 @@ export function createServer(): Express {
   app.use(`${API_BASE_PATH}/agent-trust`, agentTrustRoutes)
   app.use(`${API_BASE_PATH}/schemas`, schemaRoutes)
   app.use(`${API_BASE_PATH}/webhooks`, webhookRoutes)
+  app.use(`${API_BASE_PATH}/tenants`, tenantRoutes)
 
   // Legacy routes (for backward compatibility) - redirects to v1
   app.use('/api/issuer', (req: Request, res: Response) => {

@@ -15,6 +15,7 @@ const issuerNavItems = [
   { path: '/issuer/revocation', label: 'Revocation', icon: '🚫' },
   { path: '/issuer/oauth-bridge', label: 'OAuth Bridge', icon: '🔗' },
   { path: '/issuer/webhooks', label: 'Webhooks', icon: '🔔' },
+  { path: '/issuer/tenants', label: 'Tenants', icon: '🏢' },
   { path: '/issuer/audit', label: 'Audit Logs', icon: '📋' },
 ];
 

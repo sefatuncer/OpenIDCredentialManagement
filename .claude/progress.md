@@ -81,6 +81,14 @@ Single environment development setup - no staging/production yet.
 - [x] Zod validation — `credentialFormatSchema` enum
 - [x] Backward compat — jwt_vc_json still supported
 
+### Multi-Tenant Credential Isolation (2026-03-12) ✅ TAMAMLANDI
+- [x] Tenant middleware (`optionalTenant()` global, `requireTenant()` per-route)
+- [x] Tenant-scoped storage helpers (`saveTenantData()`, `listTenantData()`)
+- [x] Tenant CRUD routes (9 endpoints: list, stats, get, create, update, suspend, activate, delete, usage)
+- [x] VCI + VP service integration (optional `tenantId` param)
+- [x] Frontend TenantManagement page (admin UI)
+- [x] Feature-flag gated (`module.multi-tenant`)
+
 ### Real-time Revocation Webhooks (2026-03-12) ✅ TAMAMLANDI
 - [x] EventBus → WebSocket + HTTP webhook bridge (single handler per event)
 - [x] Webhook CRUD + HMAC-SHA256 delivery + retry (3x exponential backoff)
@@ -118,7 +126,7 @@ Single environment development setup - no staging/production yet.
 ### Faz A — Protokol ve Blockchain (Ay 7-9)
 - [ ] Hyperledger Fabric entegrasyonu (todo 011)
 - [ ] DIDComm v1/v2 entegrasyonu (todo 013)
-- [ ] Multi-tenant credential izolasyonu (todo 014) — priority: HIGH
+- [x] Multi-tenant credential izolasyonu (todo 014) — 2026-03-12
 
 ### Faz B — Platform Olgunlaştırma (Ay 10-12)
 - [x] OAuth 2.0 bridge adapter (todo 012) — 2026-03-12
@@ -152,6 +160,6 @@ Single environment development setup - no staging/production yet.
 
 | Durum | Sayı |
 |-------|------|
-| Tamamlandı (done) | 11 |
-| Beklemede (pending) | 24 |
+| Tamamlandı (done) | 12 |
+| Beklemede (pending) | 23 |
 | **Toplam** | **35** |

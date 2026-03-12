@@ -243,6 +243,40 @@ export const keycloakCallbackSchema = z.object({
 
 export type KeycloakCallbackInput = z.infer<typeof keycloakCallbackSchema>
 
+// Tenant management schemas
+export const tenantCreateSchema = z.object({
+  name: z.string().min(1, 'Tenant name is required').max(200),
+  slug: z.string().min(1).max(100).regex(
+    /^[a-z0-9-]+$/,
+    'Slug must contain only lowercase letters, numbers, and hyphens',
+  ),
+  config: z.object({
+    maxCredentials: z.number().int().positive().optional(),
+    maxIssuers: z.number().int().positive().optional(),
+    maxHolders: z.number().int().positive().optional(),
+    allowedCredentialTypes: z.array(z.string()).optional(),
+    features: z.object({
+      sdjwt: z.boolean().optional(),
+      revocation: z.boolean().optional(),
+      batchIssuance: z.boolean().optional(),
+      webhooks: z.boolean().optional(),
+    }).optional(),
+    rateLimit: z.object({
+      requestsPerMinute: z.number().int().positive(),
+      requestsPerHour: z.number().int().positive(),
+    }).optional(),
+  }).optional(),
+})
+
+export const tenantUpdateSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  config: tenantCreateSchema.shape.config.optional(),
+  metadata: z.record(z.unknown()).optional(),
+})
+
+export type TenantCreateInput = z.infer<typeof tenantCreateSchema>
+export type TenantUpdateInput = z.infer<typeof tenantUpdateSchema>
+
 // Type exports
 export type AgentIdentityCredentialInput = z.infer<typeof agentIdentityCredentialSchema>
 export type DelegationCredentialInput = z.infer<typeof delegationCredentialSchema>
