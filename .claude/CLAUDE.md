@@ -128,6 +128,9 @@ cd web-wallet && npm run dev
 - **[2026-03-12] Security:** Push notification backend endpoint yoksa silent fail et (log + return false). Mobile app başlatılmadan push çalışmaz — crash yerine graceful degrade.
 - **[2026-03-12] Security:** Outbound fetch yapan her client-side servis (VP fetch, webhook delivery) SSRF koruması gerektirir — aynı private IP pattern'i backend ve mobile'da tekrar kullan. `validateUrl()` helper'ı her yeni outbound fetch noktasına ekle.
 - **[2026-03-12] Security:** Presentation definition gibi dışarıdan gelen yapısal veride `JSON.parse()` sonrası mutlaka runtime type guard uygula. Type assertion (`as T`) güvenli değil — `validatePresentationDefinition()` gibi type predicate fonksiyonu yaz.
+- **[2026-03-12] Architecture:** Ağır opsiyonel modülleri (HLF SDK, ML kütüphaneleri vb.) dynamic import + feature-flag ile entegre et. Static import compile-time bağımlılık yaratır, `@ts-ignore` + dynamic import SDK yokken de çalışmayı sağlar. Bkz: `.claude/solutions/hyperledger-fabric-hash-anchoring.md`
+- **[2026-03-12] Architecture:** Blockchain/ledger entegrasyonlarında write-ahead pattern kullan: önce lokal DB'ye `pending` yaz, sonra on-chain confirm et. Ana akışı consensus gecikmesine (1-3s) bağlama. Retry job ile failed/pending record'ları işle.
+- **[2026-03-12] Architecture:** Ağır altyapı bileşenlerini (HLF network, Kafka cluster vb.) ana `docker-compose.dev.yml`'den ayır. Ayrı compose dosyası + ayrı network ile dev ortam maliyetini minimize et.
 
 ## Pattern Library
 
@@ -151,3 +154,4 @@ cd web-wallet && npm run dev
 | Delegation Chain Attenuation | A→B→C sub-delegation, scope narrowing, cascade revoke, VC↔DB integration | `.claude/solutions/delegation-chain-attenuation.md` |
 | Keycloak SSO PKCE Integration | 3-strategy auth chain, PKCE flow, dual client (public+confidential), graceful degradation | `.claude/solutions/keycloak-sso-pkce-integration.md` |
 | React Native Mobile Wallet | Expo cross-platform SSI wallet, 60% web-wallet reuse, jose pure JS crypto, biometric+QR+push | `.claude/solutions/react-native-mobile-wallet-cross-platform.md` |
+| HLF Hash Anchoring | Feature-flag gated, write-ahead PostgreSQL, async HLF confirm, dynamic SDK import, retry job | `.claude/solutions/hyperledger-fabric-hash-anchoring.md` |

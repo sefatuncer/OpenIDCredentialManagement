@@ -98,6 +98,14 @@ export const featureFlagDefinitions: Record<string, FeatureFlag> = {
     envVar: 'FEATURE_MULTI_TENANT',
   },
 
+  'module.hlf-anchoring': {
+    name: 'module.hlf-anchoring',
+    category: 'module',
+    description: 'Hyperledger Fabric immutable hash anchoring for revocation and delegation events',
+    defaultValue: false,
+    envVar: 'FEATURE_HLF_ANCHORING',
+  },
+
   // Storage features
   'storage.postgres': {
     name: 'storage.postgres',

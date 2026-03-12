@@ -1,7 +1,7 @@
 ---
 id: "011"
 title: "Hyperledger Fabric Entegrasyonu"
-status: pending
+status: done
 priority: high
 category: feature
 wp: WP3

@@ -1,0 +1,28 @@
+##
+## Crypto Material Configuration
+## Generate with: cryptogen generate --config=crypto-config.yaml
+##
+
+OrdererOrgs:
+  - Name: Orderer
+    Domain: ssi.network
+    EnableNodeOUs: true
+    Specs:
+      - Hostname: orderer
+
+PeerOrgs:
+  - Name: Org1
+    Domain: org1.ssi.network
+    EnableNodeOUs: true
+    Template:
+      Count: 2
+    Users:
+      Count: 1
+
+  - Name: Org2
+    Domain: org2.ssi.network
+    EnableNodeOUs: true
+    Template:
+      Count: 2
+    Users:
+      Count: 1

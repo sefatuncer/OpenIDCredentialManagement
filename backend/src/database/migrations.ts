@@ -352,6 +352,33 @@ const migrations: Array<{
       ALTER TABLE delegations DROP COLUMN IF EXISTS credential_id;
     `,
   },
+  {
+    version: 19,
+    name: 'create_fabric_anchor_records',
+    up: `
+      CREATE TABLE IF NOT EXISTS fabric_anchor_records (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        record_type VARCHAR(50) NOT NULL,
+        reference_id VARCHAR(255) NOT NULL,
+        data_hash VARCHAR(64) NOT NULL,
+        fabric_tx_id VARCHAR(255),
+        fabric_block_number INTEGER,
+        status VARCHAR(20) DEFAULT 'pending',
+        retry_count INTEGER DEFAULT 0,
+        payload JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        confirmed_at TIMESTAMP,
+        error_message TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_fabric_anchor_reference ON fabric_anchor_records(reference_id);
+      CREATE INDEX IF NOT EXISTS idx_fabric_anchor_status ON fabric_anchor_records(status);
+    `,
+    down: `
+      DROP INDEX IF EXISTS idx_fabric_anchor_status;
+      DROP INDEX IF EXISTS idx_fabric_anchor_reference;
+      DROP TABLE IF EXISTS fabric_anchor_records;
+    `,
+  },
 ]
 
 /**

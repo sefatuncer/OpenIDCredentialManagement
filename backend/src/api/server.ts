@@ -26,6 +26,7 @@ import { schemaRoutes } from './routes/schema.routes'
 import { oauthBridgeRoutes } from './routes/oauth-bridge.routes'
 import { webhookRoutes } from './routes/webhook.routes'
 import { tenantRoutes } from './routes/tenant.routes'
+import { fabricRoutes } from './routes/fabric.routes'
 import simulationRoutes from './routes/simulation.routes'
 import {
   requestIdMiddleware,
@@ -435,6 +436,7 @@ export function createServer(): Express {
   app.use(`${API_BASE_PATH}/schemas`, schemaRoutes)
   app.use(`${API_BASE_PATH}/webhooks`, webhookRoutes)
   app.use(`${API_BASE_PATH}/tenants`, tenantRoutes)
+  app.use(`${API_BASE_PATH}/fabric`, fabricRoutes)
 
   // Legacy routes (for backward compatibility) - redirects to v1
   app.use('/api/issuer', (req: Request, res: Response) => {

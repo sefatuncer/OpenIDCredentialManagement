@@ -119,6 +119,17 @@ Single environment development setup - no staging/production yet.
 - [x] P2: DID format validation
 - [x] P2: Credential matching field filter support (const/enum/pattern)
 
+### Hyperledger Fabric Integration (2026-03-12) ✅ TAMAMLANDI
+- [x] HLF network Docker Compose (2 org, 4 peer, Raft orderer)
+- [x] Credential-anchor chaincode (TypeScript, fabric-contract-api)
+- [x] fabricAnchor.service.ts — SHA-256 hash anchoring + graceful degradation
+- [x] Fabric API routes (4 endpoints: status, list, get, verify)
+- [x] Feature-flag gated (`module.hlf-anchoring`, default: false)
+- [x] EventBus wiring: credential.revoked, delegation.created/revoked → HLF anchor
+- [x] Background retry job (60s interval, max 3 retries)
+- [x] PostgreSQL migration v19: fabric_anchor_records table
+- [x] Channel setup script + crypto config
+
 ## WP1: Hızlı Analiz ve Mimari Tasarım (Ay 1-3)
 
 - [ ] Cloud HSM ön değerlendirme (todo 025)
@@ -148,7 +159,7 @@ Single environment development setup - no staging/production yet.
 ## WP3: İleri Geliştirme + Blockchain — Beta Prototip (Ay 7-12)
 
 ### Faz A — Protokol ve Blockchain (Ay 7-9)
-- [ ] Hyperledger Fabric entegrasyonu (todo 011)
+- [x] Hyperledger Fabric entegrasyonu (todo 011) — 2026-03-12
 - [ ] DIDComm v1/v2 entegrasyonu (todo 013)
 - [x] Multi-tenant credential izolasyonu (todo 014) — 2026-03-12
 
@@ -184,6 +195,6 @@ Single environment development setup - no staging/production yet.
 
 | Durum | Sayı |
 |-------|------|
-| Tamamlandı (done) | 15 |
-| Beklemede (pending) | 20 |
+| Tamamlandı (done) | 16 |
+| Beklemede (pending) | 19 |
 | **Toplam** | **35** |

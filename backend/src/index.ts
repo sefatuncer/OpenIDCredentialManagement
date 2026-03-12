@@ -27,6 +27,7 @@ import {
   getEnabledFeatures,
 } from './core'
 import { initializeFeatures, getFeatureSummary } from './config/features.config'
+import { isFeatureEnabled } from './core/feature-flags'
 import { initializeCredoService, isUsingCredo, shutdownCredoService } from './services/credo.service'
 import { encryptionService } from './services/encryption.service'
 import { schemaRegistry } from './services/schemaRegistry.service'
@@ -80,6 +81,21 @@ async function main() {
     // Initialize services that depend on storage
     await encryptionService.initialize()
     await schemaRegistry.initialize()
+
+    // Initialize Hyperledger Fabric anchor service (optional)
+    if (isFeatureEnabled('module.hlf-anchoring')) {
+      const fabricAnchor = await import('./services/fabricAnchor.service')
+      await fabricAnchor.initialize({
+        peerEndpoint: process.env.HLF_PEER_ENDPOINT || 'localhost:7051',
+        mspId: process.env.HLF_MSP_ID || 'Org1MSP',
+        channelName: process.env.HLF_CHANNEL_NAME || 'ssi-channel',
+        chaincodeName: process.env.HLF_CHAINCODE_NAME || 'credential-anchor',
+        certPath: process.env.HLF_CERT_PATH,
+        keyPath: process.env.HLF_KEY_PATH,
+        tlsCertPath: process.env.HLF_TLS_CERT_PATH,
+      })
+      logger.info('Hyperledger Fabric anchor service initialized')
+    }
 
     // Initialize Keycloak SSO (optional — graceful if not configured)
     const keycloakRealmUrl = process.env.KEYCLOAK_REALM_URL
@@ -194,6 +210,15 @@ async function main() {
           { type: 'credential.revoked', credentialId: d.credentialId },
         ).catch((err) => logger.error('Push notification failed', { error: err }))
       })
+      // Anchor revocation hash to HLF (non-blocking)
+      if (isFeatureEnabled('module.hlf-anchoring')) {
+        import('./services/fabricAnchor.service').then(({ anchorRecord }) => {
+          anchorRecord('revocation', d.credentialId as string, {
+            reason: d.reason,
+            revokedAt: new Date().toISOString(),
+          }).catch((err) => logger.error('HLF anchor failed', { event: 'credential.revoked', error: err }))
+        })
+      }
     })
     eventBus.on('credential.issued', (e) => {
       const d = e.data as Record<string, unknown>
@@ -201,6 +226,38 @@ async function main() {
       deliverWebhookEvent('credential.issued', e.data).catch((err) =>
         logger.error('Webhook delivery failed', { event: 'credential.issued', error: err }),
       )
+    })
+    // Anchor delegation events to HLF (non-blocking)
+    eventBus.on('delegation.created', (e) => {
+      const d = e.data as Record<string, unknown>
+      deliverWebhookEvent('delegation.created', e.data).catch((err) =>
+        logger.error('Webhook delivery failed', { event: 'delegation.created', error: err }),
+      )
+      if (isFeatureEnabled('module.hlf-anchoring')) {
+        import('./services/fabricAnchor.service').then(({ anchorRecord }) => {
+          anchorRecord('delegation_created', d.delegationId as string, {
+            delegatorDid: d.delegatorDid,
+            delegateeDid: d.delegateeDid,
+            scope: d.scope,
+            createdAt: new Date().toISOString(),
+          }).catch((err) => logger.error('HLF anchor failed', { event: 'delegation.created', error: err }))
+        })
+      }
+    })
+    eventBus.on('delegation.revoked', (e) => {
+      const d = e.data as Record<string, unknown>
+      deliverWebhookEvent('delegation.revoked', e.data).catch((err) =>
+        logger.error('Webhook delivery failed', { event: 'delegation.revoked', error: err }),
+      )
+      if (isFeatureEnabled('module.hlf-anchoring')) {
+        import('./services/fabricAnchor.service').then(({ anchorRecord }) => {
+          anchorRecord('delegation_revoked', d.delegationId as string, {
+            revokedBy: d.revokedBy,
+            reason: d.reason,
+            revokedAt: new Date().toISOString(),
+          }).catch((err) => logger.error('HLF anchor failed', { event: 'delegation.revoked', error: err }))
+        })
+      }
     })
     eventBus.on('credential.unrevoked', (e) => {
       const d = e.data as Record<string, unknown>
@@ -212,6 +269,18 @@ async function main() {
 
     // Start expiration notifier
     expirationNotifier.start()
+
+    // HLF anchor retry job — retry pending/failed anchors every 60s
+    let anchorRetryInterval: ReturnType<typeof setInterval> | null = null
+    if (isFeatureEnabled('module.hlf-anchoring')) {
+      anchorRetryInterval = setInterval(() => {
+        import('./services/fabricAnchor.service').then(({ retryPendingAnchors }) => {
+          retryPendingAnchors().catch((err) =>
+            logger.error('HLF anchor retry failed', { error: err }),
+          )
+        })
+      }, 60_000)
+    }
 
     // Prune old webhook deliveries every hour
     const deliveryPruneInterval = setInterval(() => {
@@ -256,6 +325,7 @@ async function main() {
       wsService.close()
       expirationNotifier.stop()
       clearInterval(deliveryPruneInterval)
+      if (anchorRetryInterval) clearInterval(anchorRetryInterval)
 
       server.close(() => {
         logger.info('Server closed')
