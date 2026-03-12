@@ -186,6 +186,14 @@ async function main() {
       deliverWebhookEvent('credential.revoked', e.data).catch((err) =>
         logger.error('Webhook delivery failed', { event: 'credential.revoked', error: err }),
       )
+      // Push notification to mobile wallet holders
+      import('./services/push-notification.service').then(({ broadcastPushNotification }) => {
+        broadcastPushNotification(
+          'Credential Revoked',
+          `Credential ${(d.credentialId as string)?.slice(0, 8)}... has been revoked`,
+          { type: 'credential.revoked', credentialId: d.credentialId },
+        ).catch((err) => logger.error('Push notification failed', { error: err }))
+      })
     })
     eventBus.on('credential.issued', (e) => {
       const d = e.data as Record<string, unknown>

@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "SSI Mobile Wallet",
+    "slug": "ssi-mobile-wallet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "openid4vp",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a2e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ssi.mobilewallet",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is used to scan QR codes for credential offers and verification requests.",
+        "NSFaceIDUsageDescription": "Biometric authentication protects your wallet and private keys."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a1a2e"
+      },
+      "package": "com.ssi.mobilewallet",
+      "permissions": ["CAMERA", "USE_BIOMETRIC", "USE_FINGERPRINT"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SSI Wallet to access your camera for QR code scanning."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow SSI Wallet to use Face ID for secure authentication."
+        }
+      ]
+    ]
+  }
+}

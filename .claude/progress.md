@@ -95,6 +95,20 @@ Single environment development setup - no staging/production yet.
 - [x] SSRF protection + HTTPS enforcement (production)
 - [x] Frontend: WebhookManagement + WebSocket auto-reconnect + toast notifications
 
+### React Native Mobile Wallet (2026-03-12) ✅ TAMAMLANDI
+- [x] Expo managed workflow project setup (mobile-wallet/)
+- [x] 8 screens: Home, Credentials, Scan, PresentCredential, Delegations, Agent, Trust, Settings
+- [x] 5 components: AgentIdentityCard, DelegationCard, CapabilityCard, SDJWTCredentialCard, BiometricGate
+- [x] 8 services: api, agent, auth, notification, secure-storage, vp, sdjwt, wallet-key
+- [x] Secure storage (expo-secure-store — Keychain/Keystore)
+- [x] Biometric auth (FaceID/TouchID via expo-local-authentication)
+- [x] QR scanning (expo-camera) + deep linking (openid4vp://, openid-credential-offer://)
+- [x] Push notifications (expo-notifications + backend Expo Push API)
+- [x] Client-side VP flow (reused from web-wallet — jose + DID:key)
+- [x] SD-JWT selective disclosure UI (reused from web-wallet)
+- [x] WebSocket real-time events (useWebSocket hook)
+- [x] Backend: push-notification.service + POST /holder/push-token endpoint
+
 ## WP1: Hızlı Analiz ve Mimari Tasarım (Ay 1-3)
 
 - [ ] Cloud HSM ön değerlendirme (todo 025)
@@ -118,8 +132,8 @@ Single environment development setup - no staging/production yet.
 - [x] Client-side VP flow (todo 007) — 2026-03-12
 - [x] AI Agent credential schemas — 3-type (todo 029) — 2026-03-12
 - [x] P1 review fixes: credential_id migration + sub-delegation auth + webhook events (todo 034/035/036) — 2026-03-12
-- [ ] Keycloak OAuth2/OIDC SSO (todo 030) ← YENİ
-- [ ] React Native mobil wallet (todo 023)
+- [x] Keycloak OAuth2/OIDC SSO (todo 030) — 2026-03-12
+- [x] React Native mobil wallet (todo 023) — 2026-03-12
 
 ## WP3: İleri Geliştirme + Blockchain — Beta Prototip (Ay 7-12)
 
@@ -160,6 +174,6 @@ Single environment development setup - no staging/production yet.
 
 | Durum | Sayı |
 |-------|------|
-| Tamamlandı (done) | 12 |
-| Beklemede (pending) | 23 |
+| Tamamlandı (done) | 14 |
+| Beklemede (pending) | 21 |
 | **Toplam** | **35** |

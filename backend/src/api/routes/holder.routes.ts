@@ -14,6 +14,8 @@ import {
   credentialPresentSchema,
 } from '../schemas/validation.schemas'
 import { defaultRateLimiter } from '../middleware/rateLimit.middleware'
+import { registerPushToken } from '../../services/push-notification.service'
+import { z } from 'zod'
 
 export const holderRoutes = Router()
 
@@ -211,5 +213,26 @@ holderRoutes.delete(
     const { credentialId } = req.params
     await deleteCredential(credentialId)
     res.json({ success: true })
+  })
+)
+
+// --- Push Token Registration (Mobile Wallet) ---
+
+const pushTokenSchema = z.object({
+  token: z.string().min(1),
+  platform: z.enum(['ios', 'android', 'web']),
+})
+
+holderRoutes.post(
+  '/push-token',
+  defaultRateLimiter,
+  validateBody(pushTokenSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { token, platform } = req.body
+    // Use authenticated user ID or fallback to token hash as holder ID
+    const holderId = ((req as unknown as Record<string, unknown>).userId as string) ||
+      `holder_${Buffer.from(token).toString('base64url').slice(0, 16)}`
+    await registerPushToken(holderId, token, platform)
+    res.json({ success: true, message: 'Push token registered' })
   })
 )
