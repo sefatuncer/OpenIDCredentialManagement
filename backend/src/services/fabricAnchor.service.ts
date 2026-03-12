@@ -275,10 +275,48 @@ function mapRecord(row: Record<string, unknown>): AnchorRecord {
 }
 
 /**
+ * Connect to Fabric Gateway — shared helper for submit/query
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function connectToFabric(): Promise<{ gateway: any; client: any; contract: any }> {
+  if (!fabricConfig) throw new Error('Fabric not initialized')
+
+  // @ts-ignore — optional peer dependency
+  const { connect, signers } = await import('@hyperledger/fabric-gateway')
+  // @ts-ignore — optional peer dependency
+  const grpc = await import('@grpc/grpc-js')
+  const fs = await import('fs')
+
+  const certPath = fabricConfig.certPath
+  const keyPath = fabricConfig.keyPath
+
+  if (!certPath || !keyPath) {
+    throw new Error('HLF_CERT_PATH and HLF_KEY_PATH required for Fabric Gateway')
+  }
+
+  const credentials = grpc.credentials.createInsecure()
+  const client = new grpc.Client(fabricConfig.peerEndpoint, credentials)
+
+  const certificate = fs.readFileSync(certPath)
+  const privateKey = fs.readFileSync(keyPath)
+  const signer = signers.newPrivateKeySigner(
+    (await import('crypto')).createPrivateKey(privateKey),
+  )
+
+  const gateway = connect({
+    client,
+    identity: { mspId: fabricConfig.mspId, credentials: certificate },
+    signer,
+  })
+
+  const network = gateway.getNetwork(fabricConfig.channelName)
+  const contract = network.getContract(fabricConfig.chaincodeName)
+
+  return { gateway, client, contract }
+}
+
+/**
  * Submit anchor to Fabric Gateway
- *
- * Uses @hyperledger/fabric-gateway when available.
- * Falls back to direct gRPC if SDK not installed.
  */
 async function submitToFabric(
   recordType: string,
@@ -286,57 +324,18 @@ async function submitToFabric(
   dataHash: string,
   timestamp: string,
 ): Promise<string> {
-  if (!fabricConfig) throw new Error('Fabric not initialized')
-
   try {
-    // Dynamic import — @hyperledger/fabric-gateway is optional
-    // @ts-ignore — optional peer dependency
-    const { connect, signers } = await import('@hyperledger/fabric-gateway')
-    // @ts-ignore — optional peer dependency
-    const grpc = await import('@grpc/grpc-js')
-    const fs = await import('fs')
-
-    const certPath = fabricConfig.certPath
-    const keyPath = fabricConfig.keyPath
-
-    if (!certPath || !keyPath) {
-      throw new Error('HLF_CERT_PATH and HLF_KEY_PATH required for Fabric Gateway')
-    }
-
-    const credentials = grpc.credentials.createInsecure()
-    const client = new grpc.Client(fabricConfig.peerEndpoint, credentials)
-
-    const certificate = fs.readFileSync(certPath)
-    const privateKey = fs.readFileSync(keyPath)
-    const signer = signers.newPrivateKeySigner(
-      (await import('crypto')).createPrivateKey(privateKey),
-    )
-
-    const gateway = connect({
-      client,
-      identity: { mspId: fabricConfig.mspId, credentials: certificate },
-      signer,
-    })
-
+    const { gateway, client, contract } = await connectToFabric()
     try {
-      const network = gateway.getNetwork(fabricConfig.channelName)
-      const contract = network.getContract(fabricConfig.chaincodeName)
-
       const result = await contract.submitTransaction(
-        'writeAnchor',
-        recordType,
-        referenceId,
-        dataHash,
-        timestamp,
+        'writeAnchor', recordType, referenceId, dataHash, timestamp,
       )
-
       return new TextDecoder().decode(result)
     } finally {
       gateway.close()
       client.close()
     }
   } catch (err) {
-    // If SDK not installed, throw with clear message
     if (err instanceof Error && err.message.includes('Cannot find module')) {
       throw new Error(
         'Fabric Gateway SDK not installed. Run: npm install @hyperledger/fabric-gateway @grpc/grpc-js',
@@ -353,39 +352,9 @@ async function queryFabric(
   referenceId: string,
   recordType: string,
 ): Promise<{ dataHash: string } | null> {
-  if (!fabricConfig) return null
-
   try {
-    // @ts-ignore — optional peer dependency
-    const { connect, signers } = await import('@hyperledger/fabric-gateway')
-    // @ts-ignore — optional peer dependency
-    const grpc = await import('@grpc/grpc-js')
-    const fs = await import('fs')
-
-    const certPath = fabricConfig.certPath
-    const keyPath = fabricConfig.keyPath
-
-    if (!certPath || !keyPath) return null
-
-    const credentials = grpc.credentials.createInsecure()
-    const client = new grpc.Client(fabricConfig.peerEndpoint, credentials)
-
-    const certificate = fs.readFileSync(certPath)
-    const privateKey = fs.readFileSync(keyPath)
-    const signer = signers.newPrivateKeySigner(
-      (await import('crypto')).createPrivateKey(privateKey),
-    )
-
-    const gateway = connect({
-      client,
-      identity: { mspId: fabricConfig.mspId, credentials: certificate },
-      signer,
-    })
-
+    const { gateway, client, contract } = await connectToFabric()
     try {
-      const network = gateway.getNetwork(fabricConfig.channelName)
-      const contract = network.getContract(fabricConfig.chaincodeName)
-
       const result = await contract.evaluateTransaction('readAnchor', referenceId, recordType)
       return JSON.parse(new TextDecoder().decode(result))
     } finally {

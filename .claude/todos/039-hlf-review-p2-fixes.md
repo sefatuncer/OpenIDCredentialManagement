@@ -1,7 +1,7 @@
 ---
 id: "039"
 title: "HLF Integration P2 Review Fixes"
-status: pending
+status: done
 priority: medium
 category: bugfix
 created: 2026-03-12

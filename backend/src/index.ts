@@ -217,7 +217,7 @@ async function main() {
             reason: d.reason,
             revokedAt: new Date().toISOString(),
           }).catch((err) => logger.error('HLF anchor failed', { event: 'credential.revoked', error: err }))
-        })
+        }).catch((err) => logger.error('HLF import failed', { error: err }))
       }
     })
     eventBus.on('credential.issued', (e) => {
@@ -241,7 +241,7 @@ async function main() {
             scope: d.scope,
             createdAt: new Date().toISOString(),
           }).catch((err) => logger.error('HLF anchor failed', { event: 'delegation.created', error: err }))
-        })
+        }).catch((err) => logger.error('HLF import failed', { error: err }))
       }
     })
     eventBus.on('delegation.revoked', (e) => {
@@ -256,7 +256,7 @@ async function main() {
             reason: d.reason,
             revokedAt: new Date().toISOString(),
           }).catch((err) => logger.error('HLF anchor failed', { event: 'delegation.revoked', error: err }))
-        })
+        }).catch((err) => logger.error('HLF import failed', { error: err }))
       }
     })
     eventBus.on('credential.unrevoked', (e) => {
@@ -278,7 +278,7 @@ async function main() {
           retryPendingAnchors().catch((err) =>
             logger.error('HLF anchor retry failed', { error: err }),
           )
-        })
+        }).catch((err) => logger.error('HLF import failed', { error: err }))
       }, 60_000)
     }
 
