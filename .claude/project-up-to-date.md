@@ -143,6 +143,7 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 | POST | `/api/v1/issuer/credentials/capability` | Auth | 30/min | Capability credential offer oluştur |
 | POST | `/api/v1/issuer/token` | - | - | Token endpoint (spec gereği public) |
 | POST | `/api/v1/issuer/credential` | - | - | Credential endpoint (spec gereği public) |
+| POST | `/api/v1/issuer/credentials/schema-issue` | Auth | 30/min | Schema-driven credential issuance (SD claim secimi, validity, format) |
 | POST | `/api/v1/issuer/credentials/batch` | Auth | 30/min | Batch issuance job oluştur → 202 + jobId |
 | GET | `/api/v1/issuer/credentials/batch/{jobId}` | Auth | - | Batch job status (polling) |
 | GET | `/api/v1/issuer/credentials/batch/{jobId}/results` | Auth | - | Batch job sonuçları |
@@ -468,6 +469,10 @@ Schema Management (/issuer/schemas)
   ├─▶ PUT    /api/v1/schemas/{id}                  → schema guncelle
   └─▶ DELETE /api/v1/schemas/{id}                  → schema deaktive et
 
+Advanced Issue (/issuer/issue-advanced)
+  ├─▶ GET  /api/v1/schemas                           → schema dropdown
+  └─▶ POST /api/v1/issuer/credentials/schema-issue   → credentialOfferUri + QR
+
 Batch Issue (/issuer/issue-batch)
   ├─▶ POST /api/v1/issuer/credentials/batch        → 202 + jobId
   ├─▶ GET  /api/v1/issuer/credentials/batch/{jobId}          (polling, 2sn)
@@ -553,6 +558,7 @@ OpenID4VC Flows (Wallet ↔ Issuer/Verifier)
 Issuer Frontend                 Backend                        Wallet
      │                            │                              │
      │ POST /issuer/credentials/* │                              │
+     │ (veya /schema-issue)      │                              │
      │──────────────────────────▶│                              │
      │  ◀── credentialOfferUri   │                              │
      │       + QR Code           │                              │
@@ -694,5 +700,6 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `backend/src/services/encryption.service.ts` | AES-256-GCM encryption — envelope key storage, hybrid DB+cache |
 | `backend/src/services/expirationNotifier.service.ts` | Credential expiration tracking + WebSocket notifications (PostgreSQL persistent) |
 | `backend/src/services/capabilityDiscovery.service.ts` | Agent capability discovery registry (PostgreSQL persistent) |
+| `frontend-issuer-verifier/src/pages/IssueAdvanced.tsx` | Schema-driven 3-step issuance wizard (SD claim selection, preview, QR) |
 | `frontend-issuer-verifier/src/pages/SchemaManagement.tsx` | Schema management UI (list/detail/create) |
 | `docker-compose.dev.yml` | Dev environment (4 services: backend, wallet, frontend, postgres) |

@@ -98,7 +98,7 @@ Single environment development setup - no staging/production yet.
 - [x] PostgreSQL — Fase 2: oidc configs + batch jobs → IStorageAdapter — 2026-03-11
 - [x] SD-JWT VC format migration (todo 009) — 2026-03-11
 - [x] Credential schema registry (todo 010) — 2026-03-11
-- [ ] Issuer SD-JWT credential form (todo 005)
+- [x] Issuer SD-JWT credential form (todo 005) — 2026-03-12
 - [ ] Client-side VP flow (todo 007)
 - [ ] React Native mobil wallet (todo 023)
 

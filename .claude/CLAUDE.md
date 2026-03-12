@@ -100,6 +100,7 @@ cd web-wallet && npm run dev
 - **[2026-03-12] Performance:** Background job'larda N+1 sorgudan kaçın — loop öncesi `list()` ile bulk load yap, loop içinde `get()` çağırma. `checkExpirations()` bu pattern ile düzeltildi.
 - **[2026-03-12] Architecture:** Constructor sync ise `initialize()` → async method'a taşı, boot sequence'de `await` ile çağır. Örnek: `encryptionService.initialize()`, `schemaRegistry.initialize()` — `index.ts`'de `initializeCore()` sonrası.
 - **[2026-03-12] Architecture:** Seed data (built-in schemas) DB'ye yazarken `exists()` check yap — kullanıcı tarafından modify edilmiş veriyi ezme. Yalnızca yoksa ekle.
+- **[2026-03-12] Architecture:** Schema-driven issuance'da bilinmeyen schema type için fallback issuance fonksiyonu kullanma — 400 hata dön. Yanlış claim yapısıyla kırık credential üretmekten kaçın. Bkz: `.claude/solutions/schema-driven-issuance-wizard.md`
 
 ## Pattern Library
 
@@ -115,3 +116,4 @@ cd web-wallet && npm run dev
 | Map→Adapter Migration | In-memory Map → IStorageAdapter with key-in-data pattern | `.claude/solutions/map-to-storage-adapter-migration.md` |
 | Orphan Service → Full Stack | Service exists → add route + zod + mount + frontend API in one pass | `.claude/solutions/orphan-service-to-api.md` |
 | Envelope Encryption Key Storage | KEK env var ile data key'leri wrap edip DB'ye yaz, boot'ta unwrap | `.claude/solutions/encryption-envelope-key-storage.md` |
+| Schema-Driven Issuance Wizard | 3-step wizard: schema→claims→SD options→preview→QR, type-to-function routing | `.claude/solutions/schema-driven-issuance-wizard.md` |

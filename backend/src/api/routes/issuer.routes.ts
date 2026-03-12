@@ -21,8 +21,10 @@ import {
   delegationCredentialSchema,
   capabilityCredentialSchema,
   batchIssuanceSchema,
+  schemaIssueRequestSchema,
 } from '../schemas/validation.schemas'
 import { batchIssuanceService, BatchCredentialRequest } from '../../services/batchIssuance.service'
+import { schemaRegistry } from '../../services/schemaRegistry.service'
 import { credentialIssuanceRateLimiter } from '../middleware/rateLimit.middleware'
 
 export const issuerRoutes = Router()
@@ -378,6 +380,68 @@ issuerRoutes.post(
     }
 
     res.json(result)
+  })
+)
+
+// ─── Schema-Based Issuance ──────────────────────────────────────────────
+
+const SCHEMA_TYPE_TO_CREDENTIAL: Record<string, string> = {
+  AIAgentIdentityCredential: 'agent-identity',
+  DelegationCredential: 'delegation',
+  CapabilityCredential: 'capability',
+}
+
+issuerRoutes.post(
+  '/credentials/schema-issue',
+  credentialIssuanceRateLimiter,
+  validateBody(schemaIssueRequestSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { holderDid, schemaId, claims, format } = req.body
+    const sdClaims = req.body.selectiveDisclosureClaims as string[] | undefined
+
+    // Validate schema exists
+    const schema = await schemaRegistry.getSchema(schemaId)
+    if (!schema) {
+      res.status(404).json({ error: `Schema ${schemaId} not found` })
+      return
+    }
+
+    // Validate claims against schema
+    const validation = await schemaRegistry.validateClaims(schemaId, claims)
+    if (!validation.valid) {
+      res.status(400).json({ error: 'Claim validation failed', details: validation.errors })
+      return
+    }
+
+    const credFormat = (format as 'jwt_vc_json' | 'vc+sd-jwt') || 'vc+sd-jwt'
+    const credType = SCHEMA_TYPE_TO_CREDENTIAL[schema.type]
+
+    let result: { credentialOfferId: string; credentialOfferUri: string }
+
+    switch (credType) {
+      case 'agent-identity':
+        result = await issueAgentIdentityCredential(holderDid, claims as Partial<AgentIdentityCredentialSubject>, { format: credFormat })
+        break
+      case 'delegation':
+        result = await issueDelegationCredential(holderDid, claims as Partial<DelegationCredentialSubject>, { format: credFormat })
+        break
+      case 'capability':
+        result = await issueCapabilityCredential(holderDid, claims as Partial<CapabilityCredentialSubject>, { format: credFormat })
+        break
+      default:
+        res.status(400).json({ error: `Unsupported schema type: ${schema.type}. Supported types: ${Object.keys(SCHEMA_TYPE_TO_CREDENTIAL).join(', ')}` })
+        return
+    }
+
+    logger.info(`Schema-based credential issued: schema=${schemaId}, format=${credFormat}${sdClaims ? `, sdClaims=${sdClaims.join(',')}` : ''}`)
+
+    res.json({
+      success: true,
+      credentialOfferId: result.credentialOfferId,
+      credentialOfferUri: result.credentialOfferUri,
+      format: credFormat,
+      schemaId,
+    })
   })
 )
 

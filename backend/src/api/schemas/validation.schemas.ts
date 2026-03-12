@@ -115,6 +115,19 @@ export const credentialSchemaUpdateSchema = credentialSchemaCreateSchema.partial
 export type CredentialSchemaCreateInput = z.infer<typeof credentialSchemaCreateSchema>
 export type CredentialSchemaUpdateInput = z.infer<typeof credentialSchemaUpdateSchema>
 
+// Schema-based issuance
+export const schemaIssueRequestSchema = z.object({
+  holderDid: didSchema,
+  schemaId: z.string().min(1).max(100),
+  claims: z.record(z.unknown()),
+  format: credentialFormatSchema.optional(),
+  selectiveDisclosureClaims: z.array(z.string()).optional(),
+  validityDays: z.number().positive().optional(),
+  revocable: z.boolean().optional(),
+})
+
+export type SchemaIssueRequestInput = z.infer<typeof schemaIssueRequestSchema>
+
 // Holder schemas
 export const credentialReceiveSchema = z.object({
   credentialOfferUri: z.string().url('Invalid credential offer URI'),

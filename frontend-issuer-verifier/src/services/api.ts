@@ -196,6 +196,23 @@ export const issuerApi = {
         error?: string;
       }>;
     }>(`/issuer/credentials/batch/${encodeURIComponent(jobId)}/results`),
+
+  issueBySchema: (data: {
+    holderDid: string;
+    schemaId: string;
+    claims: Record<string, unknown>;
+    format?: 'jwt_vc_json' | 'vc+sd-jwt';
+    selectiveDisclosureClaims?: string[];
+    validityDays?: number;
+    revocable?: boolean;
+  }) =>
+    request<{ credentialOfferId: string; credentialOfferUri: string }>(
+      '/issuer/credentials/schema-issue',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    ),
 };
 
 // Revocation API
