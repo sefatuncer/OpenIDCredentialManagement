@@ -172,6 +172,13 @@ class ExpirationNotifierService {
     const all = await getCredentialTrackingStorage().list()
     const notifStorage = getNotificationStorage()
 
+    // Bulk load all notification records to avoid N+1 queries
+    const allNotifications = await notifStorage.list()
+    const notifMap = new Map<string, number[]>()
+    for (const record of allNotifications) {
+      notifMap.set(record.credentialId, record.notifiedDays)
+    }
+
     for (const data of all) {
       const expiresAt = new Date(data.expiresAt)
       const daysUntilExpiry = Math.ceil(
@@ -186,34 +193,32 @@ class ExpirationNotifierService {
         daysUntilExpiry,
       }
 
+      const notified = notifMap.get(data.credentialId) || []
+      let notifUpdated = false
+
       // Check each warning day
       for (const warningDay of this.config.warningDays) {
         if (daysUntilExpiry <= warningDay && daysUntilExpiry > 0) {
-          const record = await notifStorage.get(data.credentialId)
-          const notified = record?.notifiedDays || []
           if (!notified.includes(warningDay)) {
             this.sendNotification(credential)
             notified.push(warningDay)
-            await notifStorage.save(data.credentialId, {
-              credentialId: data.credentialId,
-              notifiedDays: notified,
-            })
+            notifUpdated = true
           }
         }
       }
 
       // Check for expired credentials
-      if (daysUntilExpiry <= 0) {
-        const record = await notifStorage.get(data.credentialId)
-        const notified = record?.notifiedDays || []
-        if (!notified.includes(0)) {
-          this.sendExpiredNotification({ ...credential, daysUntilExpiry: 0 })
-          notified.push(0)
-          await notifStorage.save(data.credentialId, {
-            credentialId: data.credentialId,
-            notifiedDays: notified,
-          })
-        }
+      if (daysUntilExpiry <= 0 && !notified.includes(0)) {
+        this.sendExpiredNotification({ ...credential, daysUntilExpiry: 0 })
+        notified.push(0)
+        notifUpdated = true
+      }
+
+      if (notifUpdated) {
+        await notifStorage.save(data.credentialId, {
+          credentialId: data.credentialId,
+          notifiedDays: notified,
+        })
       }
     }
   }
@@ -258,16 +263,26 @@ class ExpirationNotifierService {
     expiringWithin7Days: number
     expired: number
   }> {
-    const expiring30 = await this.getExpiringCredentials(30)
-    const expiring7 = await this.getExpiringCredentials(7)
-    const expired = await this.getExpiredCredentials()
+    const now = new Date()
     const all = await getCredentialTrackingStorage().list()
+    let expiringWithin30 = 0
+    let expiringWithin7 = 0
+    let expired = 0
+
+    for (const data of all) {
+      const days = Math.ceil(
+        (new Date(data.expiresAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      )
+      if (days <= 0) expired++
+      else if (days <= 7) { expiringWithin7++; expiringWithin30++ }
+      else if (days <= 30) expiringWithin30++
+    }
 
     return {
       tracked: all.length,
-      expiringWithin30Days: expiring30.length,
-      expiringWithin7Days: expiring7.length,
-      expired: expired.length,
+      expiringWithin30Days: expiringWithin30,
+      expiringWithin7Days: expiringWithin7,
+      expired,
     }
   }
 }

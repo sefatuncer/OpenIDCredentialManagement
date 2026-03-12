@@ -32,7 +32,8 @@ export interface KeyInfo {
 
 interface StoredKeyData {
   keyId: string
-  keyBase64: string // Buffer serialized as base64
+  keyBase64: string // Envelope-encrypted key material (or plaintext in dev mode)
+  envelope?: { iv: string; authTag: string } // Present when envelope-encrypted
   info: {
     id: string
     createdAt: string // ISO string for JSONB
@@ -51,6 +52,31 @@ function getKeyStorage(): IStorageAdapter<StoredKeyData> {
   return keyStorage
 }
 
+/**
+ * Derive a Key Encryption Key (KEK) from env var for envelope encryption.
+ * Returns null in dev mode when no env key is set.
+ */
+function getKEK(): Buffer | null {
+  const keyHex = process.env.ENCRYPTION_KEY
+  const keyBase64 = process.env.ENCRYPTION_KEY_BASE64
+  if (keyHex) return Buffer.from(keyHex, 'hex')
+  if (keyBase64) return Buffer.from(keyBase64, 'base64')
+  return null
+}
+
+function envelopeWrap(plainKey: Buffer, kek: Buffer): { ciphertext: string; iv: string; authTag: string } {
+  const iv = crypto.randomBytes(IV_LENGTH)
+  const cipher = crypto.createCipheriv(ALGORITHM, kek, iv)
+  const encrypted = Buffer.concat([cipher.update(plainKey), cipher.final()])
+  return { ciphertext: encrypted.toString('base64'), iv: iv.toString('base64'), authTag: cipher.getAuthTag().toString('base64') }
+}
+
+function envelopeUnwrap(wrapped: { ciphertext: string; iv: string; authTag: string }, kek: Buffer): Buffer {
+  const decipher = crypto.createDecipheriv(ALGORITHM, kek, Buffer.from(wrapped.iv, 'base64'))
+  decipher.setAuthTag(Buffer.from(wrapped.authTag, 'base64'))
+  return Buffer.concat([decipher.update(Buffer.from(wrapped.ciphertext, 'base64')), decipher.final()])
+}
+
 class EncryptionService {
   private masterKey: Buffer | null = null
   private keyId: string = 'default'
@@ -60,11 +86,15 @@ class EncryptionService {
   async initialize(): Promise<void> {
     const storage = getKeyStorage()
 
+    const kek = getKEK()
+
     // Load existing keys from DB
     const storedKeys = await storage.list()
     if (storedKeys.length > 0) {
       for (const stored of storedKeys) {
-        const key = Buffer.from(stored.keyBase64, 'base64')
+        const key = stored.envelope && kek
+          ? envelopeUnwrap({ ciphertext: stored.keyBase64, ...stored.envelope }, kek)
+          : Buffer.from(stored.keyBase64, 'base64')
         const info: KeyInfo = {
           id: stored.info.id,
           createdAt: new Date(stored.info.createdAt),
@@ -82,13 +112,8 @@ class EncryptionService {
     }
 
     // No keys in DB — initialize from env or generate
-    const keyHex = process.env.ENCRYPTION_KEY
-    const keyBase64 = process.env.ENCRYPTION_KEY_BASE64
-
-    if (keyHex) {
-      this.masterKey = Buffer.from(keyHex, 'hex')
-    } else if (keyBase64) {
-      this.masterKey = Buffer.from(keyBase64, 'base64')
+    if (kek) {
+      this.masterKey = kek
     } else if (process.env.NODE_ENV === 'development') {
       this.masterKey = crypto.randomBytes(KEY_LENGTH)
       logger.warn('Using auto-generated encryption key - NOT FOR PRODUCTION')
@@ -103,18 +128,29 @@ class EncryptionService {
       }
       this.keysCache.set(this.keyId, { key: this.masterKey, info })
 
-      // Persist to DB
-      await storage.save(this.keyId, {
-        keyId: this.keyId,
-        keyBase64: this.masterKey.toString('base64'),
-        info: {
-          id: info.id,
-          createdAt: info.createdAt.toISOString(),
-          algorithm: info.algorithm,
-          status: info.status,
-        },
-      })
+      // Persist to DB with envelope encryption if KEK available
+      await this.persistKey(this.keyId, this.masterKey, info)
       logger.info('Encryption service initialized and key persisted')
+    }
+  }
+
+  private async persistKey(keyId: string, key: Buffer, info: KeyInfo): Promise<void> {
+    const kek = getKEK()
+    const storage = getKeyStorage()
+    if (kek) {
+      const wrapped = envelopeWrap(key, kek)
+      await storage.save(keyId, {
+        keyId,
+        keyBase64: wrapped.ciphertext,
+        envelope: { iv: wrapped.iv, authTag: wrapped.authTag },
+        info: { id: info.id, createdAt: info.createdAt.toISOString(), algorithm: info.algorithm, status: info.status },
+      })
+    } else {
+      await storage.save(keyId, {
+        keyId,
+        keyBase64: key.toString('base64'),
+        info: { id: info.id, createdAt: info.createdAt.toISOString(), algorithm: info.algorithm, status: info.status },
+      })
     }
   }
 
@@ -264,34 +300,15 @@ class EncryptionService {
     this.keysCache.set(keyId, { key, info })
 
     // Mark old active keys as rotated
-    const storage = getKeyStorage()
     for (const [id, data] of this.keysCache) {
       if (id !== keyId && data.info.status === 'active') {
         data.info.status = 'rotated'
-        await storage.save(id, {
-          keyId: id,
-          keyBase64: data.key.toString('base64'),
-          info: {
-            id: data.info.id,
-            createdAt: data.info.createdAt.toISOString(),
-            algorithm: data.info.algorithm,
-            status: 'rotated',
-          },
-        })
+        await this.persistKey(id, data.key, data.info)
       }
     }
 
     // Persist new key
-    await storage.save(keyId, {
-      keyId,
-      keyBase64: key.toString('base64'),
-      info: {
-        id: info.id,
-        createdAt: now.toISOString(),
-        algorithm: ALGORITHM,
-        status: 'active',
-      },
-    })
+    await this.persistKey(keyId, key, info)
 
     this.keyId = keyId
     this.masterKey = key
