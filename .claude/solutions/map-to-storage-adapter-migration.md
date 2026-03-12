@@ -69,6 +69,12 @@ await adapter.delete(result.data[0].offerId)
 | `holder.agent.ts` | `holder_credentials` |
 | `issuer.agent.ts` | `issuer_credential_offers`, `issuer_issued_credentials` |
 | `agentCredentialRequest.service.ts` | `partner_keys`, `org_agent_counts` |
+| `oidc.service.ts` | `oidc_provider_configs` |
+| `batchIssuance.service.ts` | `batch_jobs` |
+| `schemaRegistry.service.ts` | `credential_schemas` |
+| `expirationNotifier.service.ts` | `expiration_credentials`, `expiration_notifications` |
+| `encryption.service.ts` | `encryption_keys` |
+| `capabilityDiscovery.service.ts` | `agent_profiles` |
 
 ### Auto-Created Tables
 PostgresStorageAdapter `storage_<collection_name>` tablosu oluşturur:

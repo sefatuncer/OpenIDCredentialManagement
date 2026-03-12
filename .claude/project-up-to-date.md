@@ -614,12 +614,15 @@ Verifier Frontend               Backend                        Wallet
 - Credo aktifken: `/oid4vp/{verifierId}/authorization-requests/{id}` endpoint'leri otomatik
 - Jose fallback: Inline params (`presentation_definition` URI'da embedded)
 
-**PostgreSQL Persistence — Fase 1 (todo 002):**
-- Holder credentials, issuer offers/issued, partner keys → `IStorageAdapter` (PostgreSQL)
-- 7 JSONB collection (Fase 1+2): `storage_holder_credentials`, `storage_issuer_credential_offers`, `storage_issuer_issued_credentials`, `storage_partner_keys`, `storage_org_agent_counts`, `storage_oidc_provider_configs`, `storage_batch_jobs`
+**PostgreSQL Persistence (todo 002 — Fase 1-3 tamamlandı):**
+- 13 JSONB collection: `storage_holder_credentials`, `storage_issuer_credential_offers`, `storage_issuer_issued_credentials`, `storage_partner_keys`, `storage_org_agent_counts`, `storage_oidc_provider_configs`, `storage_batch_jobs`, `storage_credential_schemas`, `storage_expiration_credentials`, `storage_expiration_notifications`, `storage_encryption_keys`, `storage_agent_profiles`
 - Auto-create tablolar (migration gereksiz), GIN index
-- `holder.agent.ts`, `issuer.agent.ts`, `agentCredentialRequest.service.ts` tamamen persistent
-- Fase 2: `oidc.service.ts` configs persistent (sessions/metadataCache transient kaldı), `batchIssuance.service.ts` jobs persistent (processJob chunk-level save)
+- Fase 1: holder credentials, issuer offers/issued, partner keys
+- Fase 2: OIDC configs, batch jobs (sessions/metadataCache transient kaldı)
+- Fase 3: schema registry (built-in schema seed), expiration notifier, encryption keys (envelope-encrypted with KEK), agent profiles
+- Encryption keys: envelope encryption (AES-256-GCM wrap with KEK from env var) — DB compromise'da key material korunur
+- Boot sırası: `initializeCore()` → `encryptionService.initialize()` → `schemaRegistry.initialize()` → agents
+- Fase 4 (transient, bırakılabilir): websocket clients, event history, feature flags, plugins, simulation
 
 ---
 
@@ -647,6 +650,7 @@ Verifier Frontend               Backend                        Wallet
 | DID key encoding | Multicodec 0xed01 + base58btc |
 | SD-JWT digests | SHA-256 |
 | Wallet encryption | AES-GCM (client-side) |
+| Encryption key-at-rest | AES-256-GCM envelope wrap (KEK from env var) |
 | Client secrets | bcrypt hash |
 
 ---
@@ -686,6 +690,9 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `backend/src/core/storage/index.ts` | Storage factory — `createStorageAdapter<T>()`, auto/postgres/memory/redis |
 | `backend/src/core/storage/PostgresStorageAdapter.ts` | JSONB-based persistent storage, auto-table creation |
 | `backend/src/api/routes/schema.routes.ts` | Schema registry CRUD endpoints (5 routes) |
-| `backend/src/services/schemaRegistry.service.ts` | Schema registry service — 3 built-in schemas, CRUD, validation |
+| `backend/src/services/schemaRegistry.service.ts` | Schema registry service — 3 built-in schemas, CRUD, validation (PostgreSQL persistent) |
+| `backend/src/services/encryption.service.ts` | AES-256-GCM encryption — envelope key storage, hybrid DB+cache |
+| `backend/src/services/expirationNotifier.service.ts` | Credential expiration tracking + WebSocket notifications (PostgreSQL persistent) |
+| `backend/src/services/capabilityDiscovery.service.ts` | Agent capability discovery registry (PostgreSQL persistent) |
 | `frontend-issuer-verifier/src/pages/SchemaManagement.tsx` | Schema management UI (list/detail/create) |
 | `docker-compose.dev.yml` | Dev environment (4 services: backend, wallet, frontend, postgres) |

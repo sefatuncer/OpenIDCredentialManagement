@@ -96,6 +96,10 @@ cd web-wallet && npm run dev
 - **[2026-03-11] TypeScript:** sync→async dönüşümü tüm caller zincirini etkiler. `tsc --noEmit` ile erken doğrula — compiler kaçırılan `await`'leri yakalar.
 - **[2026-03-11] Architecture:** Mevcut standalone servis varsa yeni yazmak yerine wire-up et. `setIssuer()` callback pattern'i ile servisi agent'a bağla, endpoint'lerden servise delege et. `issueCredentialDirect()` offer flow bypass eder.
 - **[2026-03-11] Architecture:** Orphan servis pattern — service katmanı tam olsa bile API route'ları yoksa ulaşılamaz. Yeni servis eklerken hep route + validation + server mount + frontend API birlikte ekle.
+- **[2026-03-12] Security:** DB'ye key material yazarken envelope encryption kullan (KEK env var'dan, data key wrap edilir). Plaintext key storage DB compromise'da tüm encrypted veriyi açık eder. Bkz: `.claude/solutions/encryption-envelope-key-storage.md`
+- **[2026-03-12] Performance:** Background job'larda N+1 sorgudan kaçın — loop öncesi `list()` ile bulk load yap, loop içinde `get()` çağırma. `checkExpirations()` bu pattern ile düzeltildi.
+- **[2026-03-12] Architecture:** Constructor sync ise `initialize()` → async method'a taşı, boot sequence'de `await` ile çağır. Örnek: `encryptionService.initialize()`, `schemaRegistry.initialize()` — `index.ts`'de `initializeCore()` sonrası.
+- **[2026-03-12] Architecture:** Seed data (built-in schemas) DB'ye yazarken `exists()` check yap — kullanıcı tarafından modify edilmiş veriyi ezme. Yalnızca yoksa ekle.
 
 ## Pattern Library
 
@@ -110,3 +114,4 @@ cd web-wallet && npm run dev
 | SD-JWT VC Format Migration | jwt_vc_json → vc+sd-jwt dual format with _sdjwt config ID convention | `.claude/solutions/sdjwt-vc-format-migration.md` |
 | Map→Adapter Migration | In-memory Map → IStorageAdapter with key-in-data pattern | `.claude/solutions/map-to-storage-adapter-migration.md` |
 | Orphan Service → Full Stack | Service exists → add route + zod + mount + frontend API in one pass | `.claude/solutions/orphan-service-to-api.md` |
+| Envelope Encryption Key Storage | KEK env var ile data key'leri wrap edip DB'ye yaz, boot'ta unwrap | `.claude/solutions/encryption-envelope-key-storage.md` |
