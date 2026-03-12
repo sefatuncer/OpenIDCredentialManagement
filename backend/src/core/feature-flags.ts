@@ -146,6 +146,14 @@ export const featureFlagDefinitions: Record<string, FeatureFlag> = {
     envVar: 'FEATURE_RATE_LIMITING',
   },
 
+  'security.policy-engine': {
+    name: 'security.policy-engine',
+    category: 'security',
+    description: 'Fine-grained policy authorization engine',
+    defaultValue: false,
+    envVar: 'FEATURE_POLICY_ENGINE',
+  },
+
   // Experimental features
   'experimental.federation': {
     name: 'experimental.federation',

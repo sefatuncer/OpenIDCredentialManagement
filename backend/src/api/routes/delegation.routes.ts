@@ -6,6 +6,7 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { validateBody } from '../middleware/validation.middleware'
+import { enforcePolicy } from '../middleware/policy.middleware'
 import { asyncHandler } from '../middleware/error.middleware'
 import * as delegationService from '../../services/delegation.service'
 import { subDelegationSchema } from '../schemas/validation.schemas'
@@ -88,6 +89,7 @@ const verifyDelegationSchema = z.object({
  */
 delegationRoutes.post(
   '/',
+  enforcePolicy('delegation:create', 'delegations'),
   validateBody(createDelegationSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { delegatorDid, ...input } = req.body
@@ -291,6 +293,7 @@ delegationRoutes.post(
  */
 delegationRoutes.post(
   '/:id/sub-delegate',
+  enforcePolicy('delegation:create', 'delegations'),
   validateBody(subDelegationSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params

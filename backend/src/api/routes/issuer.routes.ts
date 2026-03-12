@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express'
+import { enforcePolicy } from '../middleware/policy.middleware'
 import { v4 as uuidv4 } from 'uuid'
 import {
   issueAgentIdentityCredential,
@@ -89,6 +90,7 @@ issuerRoutes.get('/did', (req: Request, res: Response) => {
  */
 issuerRoutes.post(
   '/credentials/agent-identity',
+  enforcePolicy('credential:issue', 'credentials'),
   credentialIssuanceRateLimiter,
   validateBody(agentIdentityCredentialSchema),
   asyncHandler(async (req: Request, res: Response) => {
@@ -162,6 +164,7 @@ issuerRoutes.post(
  */
 issuerRoutes.post(
   '/credentials/delegation',
+  enforcePolicy('credential:issue', 'credentials'),
   credentialIssuanceRateLimiter,
   validateBody(delegationCredentialSchema),
   asyncHandler(async (req: Request, res: Response) => {
@@ -238,6 +241,7 @@ issuerRoutes.post(
  */
 issuerRoutes.post(
   '/credentials/capability',
+  enforcePolicy('credential:issue', 'credentials'),
   credentialIssuanceRateLimiter,
   validateBody(capabilityCredentialSchema),
   asyncHandler(async (req: Request, res: Response) => {

@@ -138,6 +138,14 @@ Single environment development setup - no staging/production yet.
 - [x] Event wiring: ConnectionStateChanged + BasicMessageStateChanged → WebSocket
 - [x] Health endpoint: DIDComm status in /health/detailed
 
+### Policy Authorization Engine (2026-03-12) ✅ TAMAMLANDI
+- [x] Feature flag: `security.policy-engine` (default: false, env: `FEATURE_POLICY_ENGINE`)
+- [x] policy.service.ts — evaluate, CRUD, built-in defaults, 30s cache
+- [x] policy.middleware.ts — `enforcePolicy(action, resource)` Express middleware
+- [x] policy.routes.ts — 5 CRUD endpoints (admin only), feature-flag gated
+- [x] Applied to: issuer (3), verifier (3), delegation (2), tenant (2) routes
+- [x] Audit logging: `authorization.policy` event type, `policy_allow`/`policy_deny` actions
+
 ## WP1: Hızlı Analiz ve Mimari Tasarım (Ay 1-3)
 
 - [ ] Cloud HSM ön değerlendirme (todo 025)
@@ -174,7 +182,7 @@ Single environment development setup - no staging/production yet.
 ### Faz B — Platform Olgunlaştırma (Ay 10-12)
 - [x] OAuth 2.0 bridge adapter (todo 012) — 2026-03-12
 - [x] Gerçek zamanlı revocation — webhook (todo 015) — 2026-03-12
-- [ ] OPA/Cerbos fine-grained authorization (todo 024)
+- [x] Policy authorization engine (todo 024) — 2026-03-12
 
 ## WP4: Test Altyapısı (Ay 4-6, 9-12 — Paralel)
 
@@ -203,6 +211,6 @@ Single environment development setup - no staging/production yet.
 
 | Durum | Sayı |
 |-------|------|
-| Tamamlandı (done) | 17 |
-| Beklemede (pending) | 18 |
+| Tamamlandı (done) | 18 |
+| Beklemede (pending) | 17 |
 | **Toplam** | **35** |

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express'
+import { enforcePolicy } from '../middleware/policy.middleware'
 import {
   createVerificationRequest,
   verifyPresentation,
@@ -64,6 +65,7 @@ verifierRoutes.get('/did', (req: Request, res: Response) => {
  */
 verifierRoutes.post(
   '/verify/agent-identity',
+  enforcePolicy('verification:create', 'verifications'),
   verificationRateLimiter,
   asyncHandler(async (req: Request, res: Response) => {
     const result = await createVerificationRequest(agentIdentityPresentationDefinition)
@@ -99,6 +101,7 @@ verifierRoutes.post(
  */
 verifierRoutes.post(
   '/verify/delegation',
+  enforcePolicy('verification:create', 'verifications'),
   verificationRateLimiter,
   asyncHandler(async (req: Request, res: Response) => {
     const result = await createVerificationRequest(delegationPresentationDefinition)
@@ -134,6 +137,7 @@ verifierRoutes.post(
  */
 verifierRoutes.post(
   '/verify/combined',
+  enforcePolicy('verification:create', 'verifications'),
   verificationRateLimiter,
   asyncHandler(async (req: Request, res: Response) => {
     const result = await createVerificationRequest(combinedPresentationDefinition)

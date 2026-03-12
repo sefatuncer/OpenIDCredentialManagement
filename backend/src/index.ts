@@ -82,6 +82,12 @@ async function main() {
     await encryptionService.initialize()
     await schemaRegistry.initialize()
 
+    // Initialize policy authorization engine (optional)
+    if (isFeatureEnabled('security.policy-engine')) {
+      const { initializePolicies } = await import('./services/policy.service')
+      await initializePolicies()
+    }
+
     // Initialize Hyperledger Fabric anchor service (optional)
     if (isFeatureEnabled('module.hlf-anchoring')) {
       const fabricAnchor = await import('./services/fabricAnchor.service')

@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express'
 import { requirePermission, AuthenticatedRequest } from '../middleware/auth.middleware'
+import { enforcePolicy } from '../middleware/policy.middleware'
 import { validateBody } from '../middleware/validation.middleware'
 import { asyncHandler } from '../middleware/error.middleware'
 import { tenantCreateSchema, tenantUpdateSchema } from '../schemas/validation.schemas'
@@ -80,6 +81,7 @@ tenantRoutes.get(
 // Create tenant (admin only)
 tenantRoutes.post(
   '/',
+  enforcePolicy('tenant:manage', 'tenants'),
   requirePermission('tenants:write'),
   validateBody(tenantCreateSchema),
   asyncHandler(async (req: Request, res: Response) => {
@@ -127,6 +129,7 @@ tenantRoutes.post(
 // Delete tenant (admin only)
 tenantRoutes.delete(
   '/:id',
+  enforcePolicy('tenant:manage', 'tenants'),
   requirePermission('tenants:write'),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params

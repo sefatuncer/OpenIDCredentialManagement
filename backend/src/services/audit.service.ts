@@ -40,6 +40,7 @@ export type AuditEventType =
   | 'system.startup'
   | 'system.shutdown'
   | 'system.config_change'
+  | 'authorization.policy'
 
 export type AuditAction =
   | 'create'
@@ -53,6 +54,8 @@ export type AuditAction =
   | 'logout'
   | 'export'
   | 'import'
+  | 'policy_allow'
+  | 'policy_deny'
 
 export interface AuditLogEntry {
   id: string

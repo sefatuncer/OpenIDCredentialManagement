@@ -1,7 +1,7 @@
 ---
 id: "024"
 title: "OPA/Cerbos Fine-Grained Authorization"
-status: pending
+status: done
 priority: medium
 category: security
 wp: WP3

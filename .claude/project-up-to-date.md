@@ -595,6 +595,18 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 
 **Feature Flag:** `module.hlf-anchoring` — devre dışıyken tüm endpoint'ler 404 döner (middleware gate).
 
+### Policy Authorization (`policy.routes.ts`) — Feature-flag: `security.policy-engine`
+
+| Method | Path | Auth | Açıklama |
+|--------|------|------|----------|
+| GET | `/api/v1/policies` | Auth | List all authorization policies |
+| GET | `/api/v1/policies/:id` | Auth | Get policy detail |
+| POST | `/api/v1/policies` | Auth+Admin | Create custom policy (body: name, effect, actions, resources, principals) |
+| PUT | `/api/v1/policies/:id` | Auth+Admin | Update custom policy (built-in immutable) |
+| DELETE | `/api/v1/policies/:id` | Auth+Admin | Delete custom policy (built-in immutable) |
+
+**Middleware:** `enforcePolicy(action, resource)` applied to: issuer POST (3), verifier POST (3), delegation POST (2), tenant POST/DELETE (2).
+
 **Anchor Records:** `fabric_anchor_records` tablosu — record_type (`revocation`, `delegation_created`, `delegation_revoked`), reference_id, data_hash (SHA-256), fabric_tx_id, status (`pending`/`confirmed`/`failed`), retry_count (max 3).
 
 **Background:** Retry job (60s interval) — pending/failed records'ı HLF'ye yeniden gönderir.
@@ -1012,6 +1024,9 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `backend/src/services/fabricAnchor.service.ts` | HLF hash anchoring — anchor, verify, retry, status (384L) |
 | `backend/src/services/didcomm.service.ts` | DIDComm API wrappers — invitations, connections, messages (214L) |
 | `backend/src/api/routes/didcomm.routes.ts` | DIDComm REST endpoints — 6 routes, feature-flag gated (113L) |
+| `backend/src/services/policy.service.ts` | Policy authorization engine — evaluate, CRUD, built-in defaults, cache (270L) |
+| `backend/src/api/middleware/policy.middleware.ts` | `enforcePolicy()` Express middleware — feature-flag pass-through (65L) |
+| `backend/src/api/routes/policy.routes.ts` | Policy CRUD endpoints — 5 routes, admin only, feature-flag gated (140L) |
 | `backend/src/api/routes/fabric.routes.ts` | Fabric anchor API (4 endpoints: status, list, get, verify) |
 | `backend/chaincode/credential-anchor/src/credential-anchor.ts` | HLF chaincode — writeAnchor, readAnchor, verifyAnchor |
 | `backend/docker/hlf/docker-compose.hlf.yml` | HLF network (orderer + 4 peers + CLI, separate from dev compose) |
