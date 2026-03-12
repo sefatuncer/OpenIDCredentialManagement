@@ -36,6 +36,11 @@ Revocation ve delegation chain hash'lerinin Hyperledger Fabric üzerinde immutab
 - Credential içeriği ASLA on-chain'de saklanmaz
 - Fabric Gateway API (v2.5+) kullanılacak
 - Connection profile: `connection-org1.json`, `connection-org2.json`
+- **Network:** 2 organizasyon, 4 peer node, Raft uzlaşı mekanizması (crash fault tolerant)
+- **Credo-HLF adapter modülü:** Entegrasyon noktaları WP1'de tasarlandı, WP3'te implemente edilecek
+- **Performans hedefleri:** HLF TPS 100-200, blockchain anchor süresi 15-30 sn
+- **Ar-Ge:** SSI + permissioned blockchain hibrit tasarım — minimal anchor yaklaşımı (sadece hash)
+- **Risk:** HLF öğrenme eğrisi — B planı: sadece RevocationAnchor ile başlama, DelegationChain sonra
 
 ## Kabul Kriterleri
 

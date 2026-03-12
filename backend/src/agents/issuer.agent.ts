@@ -24,6 +24,7 @@ import {
   getStorageType,
 } from '../core/storage'
 import { batchIssuanceService } from '../services/batchIssuance.service'
+import { setDelegationIssuer } from '../services/delegation.service'
 
 let issuerAgent: BaseAgentInstance | null = null
 
@@ -79,6 +80,16 @@ export async function initializeIssuerAgent(): Promise<BaseAgentInstance> {
     return issueCredentialDirect(req.subjectDid, req.credentialType, req.claims)
   })
   logger.info('Batch issuance service wired to issuer agent')
+
+  // Wire delegation service → VC issuance
+  setDelegationIssuer(async (holderDid, subject, options) => {
+    return issueDelegationCredential(
+      holderDid,
+      subject as Partial<DelegationCredentialSubject>,
+      options ? { format: options.format as 'jwt_vc_json' | 'vc+sd-jwt' } : undefined,
+    )
+  })
+  logger.info('Delegation service wired to issuer agent')
 
   return issuerAgent
 }

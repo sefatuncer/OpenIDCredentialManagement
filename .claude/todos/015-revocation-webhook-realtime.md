@@ -1,11 +1,12 @@
 ---
 id: "015"
 title: "Gerçek Zamanlı Revocation (Webhook Push)"
-status: pending
+status: done
 priority: medium
 category: feature
 wp: WP3
 created: 2026-03-11
+completed: 2026-03-12
 ---
 
 ## Açıklama
@@ -14,13 +15,14 @@ StatusList2021 polling-based. <1dk revocation propagation için webhook push not
 
 ## Gereksinimler
 
-- [ ] Webhook subscription endpoint (`POST /webhooks/subscribe`)
-- [ ] Webhook event dispatcher (revocation events)
-- [ ] Subscriber management (URL, event types, retry policy)
-- [ ] Revocation event → webhook push + StatusList update (dual write)
-- [ ] Retry logic (exponential backoff, max 3 retries)
-- [ ] Webhook signature verification (HMAC-SHA256)
-- [ ] Verifier SDK/client — webhook listener + local cache invalidation
+- [x] Webhook subscription CRUD (7 endpoints: POST/GET/PUT/DELETE + test + deliveries)
+- [x] Webhook event dispatcher (EventBus→WebSocket+HTTP webhook bridge)
+- [x] Subscriber management (URL, event types, HMAC secret, metadata)
+- [x] Revocation event → webhook push + WebSocket broadcast (single handler per event)
+- [x] Retry logic (exponential backoff: 1s→10s→60s, max 3 retries)
+- [x] Webhook HMAC-SHA256 signature (X-Webhook-Signature header)
+- [x] SSRF protection (private IP blocking)
+- [x] Frontend: WebhookManagement UI + WebSocket auto-reconnect hook + toast notifications
 
 ## Teknik Notlar
 
@@ -31,7 +33,7 @@ StatusList2021 polling-based. <1dk revocation propagation için webhook push not
 
 ## Kabul Kriterleri
 
-- [ ] Revocation <1dk içinde webhook ile bildiriliyor
-- [ ] Webhook retry çalışıyor (failed delivery recovery)
-- [ ] StatusList2021 + webhook birlikte çalışıyor
-- [ ] Webhook signature doğrulanabiliyor
+- [x] Revocation <1dk içinde webhook ile bildiriliyor
+- [x] Webhook retry çalışıyor (exponential backoff recovery)
+- [x] StatusList2021 + webhook birlikte çalışıyor (EventBus bridge)
+- [x] Webhook HMAC-SHA256 signature doğrulanabiliyor

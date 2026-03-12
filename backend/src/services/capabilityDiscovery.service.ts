@@ -182,6 +182,44 @@ class CapabilityDiscoveryService {
     }
   }
 
+  /**
+   * Auto-update agent profile when a Capability VC is issued.
+   * Called from index.ts wire-up after issueCapabilityCredential().
+   */
+  async addCapabilitiesToAgent(
+    did: string,
+    capabilities: Array<{ id: string; name: string; description?: string }>,
+  ): Promise<void> {
+    const agent = await getAgentStorage().get(did)
+    if (!agent) {
+      logger.warn('Cannot add capabilities — agent profile not found', { did })
+      return
+    }
+
+    for (const cap of capabilities) {
+      const exists = agent.capabilities.some((c) => c.id === cap.id)
+      if (!exists) {
+        agent.capabilities.push({ id: cap.id, name: cap.name, version: '1.0', description: cap.description || '' })
+      }
+    }
+
+    agent.lastSeen = new Date()
+    await getAgentStorage().save(did, agent)
+    logger.info('Agent capabilities updated via VC issuance', { did, added: capabilities.length })
+  }
+
+  /**
+   * Remove capabilities from agent profile (e.g. on VC revocation)
+   */
+  async removeCapabilitiesFromAgent(did: string, capabilityIds: string[]): Promise<void> {
+    const agent = await getAgentStorage().get(did)
+    if (!agent) return
+
+    agent.capabilities = agent.capabilities.filter((c) => !capabilityIds.includes(c.id))
+    await getAgentStorage().save(did, agent)
+    logger.info('Agent capabilities removed', { did, removed: capabilityIds })
+  }
+
   async getStaleAgents(maxAgeMinutes: number = 30): Promise<AgentProfile[]> {
     const threshold = new Date(Date.now() - maxAgeMinutes * 60 * 1000)
     const agents = await this.getAllAgents()

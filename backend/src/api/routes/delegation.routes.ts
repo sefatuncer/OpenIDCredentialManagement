@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { validateBody } from '../middleware/validation.middleware'
 import { asyncHandler } from '../middleware/error.middleware'
 import * as delegationService from '../../services/delegation.service'
+import { subDelegationSchema } from '../schemas/validation.schemas'
 import { logger } from '../../utils/logger'
 
 export const delegationRoutes = Router()
@@ -29,6 +30,7 @@ const createDelegationSchema = z.object({
 const revokeDelegationSchema = z.object({
   revokedBy: z.string().min(1),
   reason: z.string().optional(),
+  cascade: z.boolean().optional().default(false),
 })
 
 const verifyDelegationSchema = z.object({
@@ -211,10 +213,10 @@ delegationRoutes.post(
   validateBody(revokeDelegationSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
-    const { revokedBy, reason } = req.body
+    const { revokedBy, reason, cascade } = req.body
 
     try {
-      const revoked = await delegationService.revokeDelegation(id, revokedBy, reason)
+      const revoked = await delegationService.revokeDelegation(id, revokedBy, reason, cascade)
 
       if (!revoked) {
         res.status(400).json({
@@ -280,5 +282,59 @@ delegationRoutes.post(
     const result = await delegationService.verifyDelegation(id, action, resource)
 
     res.json(result)
-  })
+  }),
+)
+
+/**
+ * POST /delegations/:id/sub-delegate — Create a sub-delegation (chain A→B→C)
+ * Scope must be a subset of parent (attenuation rule).
+ */
+delegationRoutes.post(
+  '/:id/sub-delegate',
+  validateBody(subDelegationSchema),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const { delegatorDid, delegateeDid, ...rest } = req.body
+
+    try {
+      const delegation = await delegationService.createSubDelegation(id, delegatorDid, {
+        delegateeDid,
+        ...rest,
+      })
+      logger.info('Sub-delegation created via API', { parentId: id, childId: delegation.id })
+      res.status(201).json({ success: true, delegation })
+    } catch (error) {
+      if (error instanceof Error) {
+        const clientErrors = [
+          'Parent delegation not found',
+          'Only the delegatee of the parent can sub-delegate',
+          'Parent delegation has been revoked',
+          'Parent delegation has expired',
+        ]
+        if (clientErrors.some((m) => error.message.includes(m)) || error.message.includes('not in parent scope') || error.message.includes('Maximum delegation depth')) {
+          res.status(400).json({ error: 'sub_delegation_error', message: error.message })
+          return
+        }
+      }
+      throw error
+    }
+  }),
+)
+
+/**
+ * GET /delegations/:id/chain — Get the full delegation chain
+ */
+delegationRoutes.get(
+  '/:id/chain',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const chain = await delegationService.getDelegationChain(id)
+
+    if (chain.length === 0) {
+      res.status(404).json({ error: 'not_found', message: 'Delegation not found' })
+      return
+    }
+
+    res.json({ chain, depth: chain.length })
+  }),
 )

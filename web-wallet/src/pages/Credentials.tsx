@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import SDJWTCredentialCard, { SDJWTCredentialDetail } from '../components/SDJWTCredentialCard'
 import CreatePresentationModal from '../components/CreatePresentationModal'
+import AgentIdentityCard from '../components/AgentIdentityCard'
+import DelegationCard from '../components/DelegationCard'
+import CapabilityCard from '../components/CapabilityCard'
 import { isSDJWT, sdJWTToCredentialData } from '../services/sdjwt.service'
 import type { SDJWTCredentialData } from '../types/sdjwt.types'
 
@@ -299,7 +302,36 @@ export default function Credentials() {
               )
             }
 
-            // Render regular JWT credential card
+            // Render type-specific JWT credential card
+            if (credential.type === 'AIAgentIdentityCredential') {
+              return (
+                <AgentIdentityCard
+                  key={credential.id}
+                  credential={credential}
+                  onClick={() => setSelectedCredential(credential)}
+                />
+              )
+            }
+            if (credential.type === 'DelegationCredential') {
+              return (
+                <DelegationCard
+                  key={credential.id}
+                  credential={credential}
+                  onClick={() => setSelectedCredential(credential)}
+                />
+              )
+            }
+            if (credential.type === 'CapabilityCredential') {
+              return (
+                <CapabilityCard
+                  key={credential.id}
+                  credential={credential}
+                  onClick={() => setSelectedCredential(credential)}
+                />
+              )
+            }
+
+            // Fallback: generic card for unknown types
             return (
               <div
                 key={credential.id}
@@ -309,7 +341,7 @@ export default function Credentials() {
               >
                 <div className="credential-type">{credential.type}</div>
                 <div className="credential-subject">
-                  {(credential.subject as Record<string, unknown>).agentName as string || 'AI Agent'}
+                  {(credential.subject as Record<string, unknown>).agentName as string || 'Credential'}
                 </div>
                 <div className="credential-details">
                   <div className="credential-detail">
@@ -320,18 +352,6 @@ export default function Credentials() {
                     <label>Issued</label>
                     <span>{new Date(credential.issuanceDate).toLocaleDateString()}</span>
                   </div>
-                  {(credential.subject as Record<string, unknown>).agentVersion && (
-                    <div className="credential-detail">
-                      <label>Version</label>
-                      <span>{(credential.subject as Record<string, unknown>).agentVersion as string}</span>
-                    </div>
-                  )}
-                  {(credential.subject as Record<string, unknown>).developer && (
-                    <div className="credential-detail">
-                      <label>Developer</label>
-                      <span>{(credential.subject as Record<string, unknown>).developer as string}</span>
-                    </div>
-                  )}
                 </div>
               </div>
             )

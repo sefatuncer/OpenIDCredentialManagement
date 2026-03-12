@@ -25,6 +25,9 @@ export const agentIdentityCredentialSchema = z.object({
   ownerDid: didSchema,
   ownerName: z.string().optional(),
   trustLevel: trustLevelSchema.optional(),
+  securityDomain: z.string().optional(),
+  registrationTimestamp: isoDateSchema.optional(),
+  delegationChainPosition: z.number().int().min(0).optional(),
   validUntil: isoDateSchema.optional(),
   format: credentialFormatSchema.optional(),
 })
@@ -38,6 +41,16 @@ export const delegationCredentialSchema = z.object({
   scope: z.array(z.string()).min(1, 'At least one scope is required'),
   constraints: z.record(z.unknown()).optional(),
   purpose: z.string().optional(),
+  parentDelegationId: z.string().optional(),
+  attenuationLevel: z.number().int().min(0).optional(),
+  maxAmount: z.number().positive().optional(),
+  allowedServices: z.array(z.string()).optional(),
+  geographicRestrictions: z.array(z.string().length(2, 'ISO 3166-1 alpha-2 code')).optional(),
+  ttlPolicy: z.object({
+    minTTL: z.number().positive().optional(),
+    maxTTL: z.number().positive().optional(),
+    recommendedTTL: z.number().positive().optional(),
+  }).optional(),
   validFrom: isoDateSchema.optional(),
   validUntil: isoDateSchema.optional(),
   revocable: z.boolean().optional(),
@@ -51,9 +64,31 @@ export const capabilityCredentialSchema = z.object({
   actions: z.array(z.string()).min(1, 'At least one action is required'),
   conditions: z.record(z.unknown()).optional(),
   grantedBy: didSchema.optional(),
+  toolAllowList: z.array(z.string()).optional(),
+  maxUsageCount: z.number().int().positive().optional(),
+  usageResetPeriod: z.number().positive().optional(),
+  requiredContext: z.string().optional(),
   validUntil: isoDateSchema.optional(),
   format: credentialFormatSchema.optional(),
 })
+
+// Sub-delegation schema (chain delegation)
+export const subDelegationSchema = z.object({
+  delegatorDid: didSchema,
+  delegateeDid: didSchema,
+  scope: z.object({
+    actions: z.array(z.string()).min(1, 'At least one action required'),
+    resources: z.array(z.string()).min(1, 'At least one resource required'),
+    constraints: z.record(z.unknown()).optional(),
+  }),
+  duration: z.string().regex(/^P\d+[DWMY]$/, 'ISO 8601 duration (e.g. P30D)').optional().default('P30D'),
+  revocable: z.boolean().optional().default(true),
+  maxAmount: z.number().positive().optional(),
+  allowedServices: z.array(z.string()).optional(),
+  geographicRestrictions: z.array(z.string().length(2)).optional(),
+})
+
+export type SubDelegationInput = z.infer<typeof subDelegationSchema>
 
 // Batch issuance schema
 export const batchIssuanceSchema = z.object({
@@ -170,6 +205,8 @@ const WEBHOOK_EVENT_TYPES = [
   'credential.unrevoked',
   'credential.issued',
   'verification.completed',
+  'delegation.created',
+  'delegation.revoked',
 ] as const
 
 export const webhookCreateSchema = z.object({

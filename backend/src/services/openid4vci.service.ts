@@ -24,9 +24,9 @@ import {
  * Claims listed here will be hidden by default and only revealed when holder chooses to disclose.
  */
 const SD_CLAIMS_BY_TYPE: Record<string, string[]> = {
-  AIAgentIdentityCredential: ['agent_name', 'agent_version', 'capabilities', 'owner_name', 'trust_level'],
-  DelegationCredential: ['delegator_name', 'delegate_name', 'constraints', 'purpose'],
-  CapabilityCredential: ['conditions', 'granted_by'],
+  AIAgentIdentityCredential: ['agent_name', 'agent_version', 'capabilities', 'owner_name', 'trust_level', 'security_domain', 'registration_timestamp'],
+  DelegationCredential: ['delegator_name', 'delegate_name', 'constraints', 'purpose', 'max_amount', 'allowed_services', 'geographic_restrictions'],
+  CapabilityCredential: ['conditions', 'granted_by', 'tool_allow_list', 'max_usage_count', 'required_context'],
 }
 
 // EdDSA key pair for credential signing (Ed25519)

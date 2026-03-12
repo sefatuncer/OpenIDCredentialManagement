@@ -59,12 +59,12 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 
 | Tip | Açıklama | İçerik |
 |-----|----------|--------|
-| `AIAgentIdentityCredential` | AI agent kimlik belgesi | agentId, agentType, agentName, capabilities, trustLevel |
-| `AIAgentIdentityCredential_sdjwt` | AI agent kimlik (SD-JWT VC) | Aynı alanlar, SD: agent_name, capabilities, trust_level |
-| `DelegationCredential` | Yetki devri belgesi | delegatorDid, delegateDid, scope, constraints |
-| `DelegationCredential_sdjwt` | Yetki devri (SD-JWT VC) | Aynı alanlar, SD: delegator_name, delegate_name, constraints |
-| `CapabilityCredential` | Yetenek belgesi | capabilityType, resource, actions, conditions |
-| `CapabilityCredential_sdjwt` | Yetenek (SD-JWT VC) | Aynı alanlar, SD: conditions, granted_by |
+| `AIAgentIdentityCredential` | AI agent kimlik belgesi | agentId, agentType, agentName, capabilities, trustLevel, securityDomain, registrationTimestamp, delegationChainPosition |
+| `AIAgentIdentityCredential_sdjwt` | AI agent kimlik (SD-JWT VC) | Aynı alanlar, SD: agent_name, capabilities, trust_level, security_domain, registration_timestamp |
+| `DelegationCredential` | Yetki devri belgesi | delegatorDid, delegateDid, scope, constraints, parentDelegationId, attenuationLevel, maxAmount, allowedServices, geographicRestrictions, ttlPolicy |
+| `DelegationCredential_sdjwt` | Yetki devri (SD-JWT VC) | Aynı alanlar, SD: delegator_name, delegate_name, constraints, max_amount, allowed_services, geographic_restrictions |
+| `CapabilityCredential` | Yetenek belgesi | capabilityType, resource, actions, conditions, grantedBy, toolAllowList, maxUsageCount, usageResetPeriod, requiredContext |
+| `CapabilityCredential_sdjwt` | Yetenek (SD-JWT VC) | Aynı alanlar, SD: conditions, granted_by, tool_allow_list, max_usage_count, required_context |
 
 ---
 
@@ -361,8 +361,10 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 | POST | `/api/v1/delegations` | Auth | Delegation oluştur |
 | GET | `/api/v1/delegations/{id}` | Auth | Delegation detayı |
 | GET | `/api/v1/delegations/agent/{did}` | Auth | Agent'a ait delegation'lar |
-| POST | `/api/v1/delegations/{id}/revoke` | Auth | Delegation iptal et |
+| POST | `/api/v1/delegations/{id}/revoke` | Auth | Delegation iptal et (cascade destekli) |
 | POST | `/api/v1/delegations/{id}/verify` | Auth | Delegation'ı action/resource için doğrula |
+| POST | `/api/v1/delegations/{id}/sub-delegate` | Auth | Sub-delegation oluştur (scope attenuation) |
+| GET | `/api/v1/delegations/{id}/chain` | Auth | Full delegation chain (root → leaf) |
 
 **Delegation Create:**
 ```json
@@ -493,7 +495,7 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 | POST | `/api/v1/webhooks/{id}/test` | Auth | Strict | Test event gonder |
 | GET | `/api/v1/webhooks/{id}/deliveries` | Auth | - | Delivery history (son 50) |
 
-**Desteklenen event'ler:** `credential.revoked`, `credential.unrevoked`, `credential.issued`, `verification.completed`
+**Desteklenen event'ler:** `credential.revoked`, `credential.unrevoked`, `credential.issued`, `verification.completed`, `delegation.created`, `delegation.revoked`
 
 **Webhook Payload:**
 ```json
@@ -617,9 +619,11 @@ Credentials
 
 Delegations
   ├─▶ GET  /api/v1/delegations            → given + received
-  ├─▶ POST /api/v1/delegations            → yeni delegation
-  ├─▶ POST /api/v1/delegations/{id}/revoke
-  └─▶ POST /api/v1/delegations/{id}/verify
+  ├─▶ POST /api/v1/delegations            → yeni delegation (+ VC issuance)
+  ├─▶ POST /api/v1/delegations/{id}/revoke  (cascade destekli)
+  ├─▶ POST /api/v1/delegations/{id}/verify
+  ├─▶ POST /api/v1/delegations/{id}/sub-delegate  → scope attenuation
+  └─▶ GET  /api/v1/delegations/{id}/chain  → full chain visualization
 
 Trust Management
   ├─▶ POST   /api/v1/agent-trust           → güven kur
@@ -830,4 +834,9 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `frontend-issuer-verifier/src/pages/WebhookManagement.tsx` | Webhook subscription management UI (list/create/detail/deliveries) |
 | `frontend-issuer-verifier/src/hooks/useWebSocket.ts` | WebSocket client hook with auto-reconnect + stable ref pattern |
 | `frontend-issuer-verifier/src/components/NotificationToast.tsx` | Real-time credential event toast notifications |
+| `backend/src/services/delegation.service.ts` | Delegation grants, chain attenuation, cascade revoke, VC↔DB integration |
+| `web-wallet/src/components/AgentIdentityCard.tsx` | Agent ID credential card (trust level, capabilities, security domain) |
+| `web-wallet/src/components/DelegationCard.tsx` | Delegation credential card (scope, chain depth, expiry, maxAmount) |
+| `web-wallet/src/components/CapabilityCard.tsx` | Capability credential card (tool allow list, usage, context) |
+| `web-wallet/src/components/DelegationChainView.tsx` | Chain visualization modal (A→B→C with status colors) |
 | `docker-compose.dev.yml` | Dev environment (4 services: backend, wallet, frontend, postgres) |

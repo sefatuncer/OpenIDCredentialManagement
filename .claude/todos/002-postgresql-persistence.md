@@ -1,12 +1,13 @@
 ---
 id: "002"
 title: "PostgreSQL Persistence — Kalan Map-based Servisler"
-status: in-progress
+status: done
 priority: high
 category: infrastructure
 wp: WP2
 created: 2026-03-09
 updated: 2026-03-12
+completed: 2026-03-12
 ---
 
 ## Açıklama

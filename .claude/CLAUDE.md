@@ -111,6 +111,10 @@ cd web-wallet && npm run dev
 - **[2026-03-12] Security:** Kullanıcı tarafından sağlanan URL'lere outbound HTTP yapılıyorsa SSRF koruması (private IP blocking) ekle. Hostname-level check DNS rebinding'e karşı tam koruma sağlamaz ama temel saldırıları engeller. Bkz: `.claude/solutions/realtime-webhook-notification-pipeline.md`
 - **[2026-03-12] Architecture:** Servis dosyası ~300L'yi aşınca concern'e göre böl (CRUD vs engine). "Thin wrapper + re-export" pattern public API'yi değiştirmeden iç yapıyı temizler.
 - **[2026-03-12] TypeScript:** React hook'larında WebSocket/timer gibi side effect'ler `useRef` ile callback referansı tutmalı. `useCallback` dep'ine callback koyulursa her render'da reconnect olur.
+- **[2026-03-12] Architecture:** DB schema (migration) ile service kodu senkron tutulmalı. Yeni kolon referans eden UPDATE/INSERT yazmadan önce migration'da kolon tanımlı olmalı. `credential_id` kolonu eksik kalınca runtime crash oldu. Bkz: `.claude/solutions/delegation-chain-attenuation.md`
+- **[2026-03-12] Security:** Caller identity için client-provided header (ör. `X-Delegator-Did`) kullanma — spoofable. Authorization-critical kararlar için authenticated identity (JWT sub, API key→DID mapping) kullan.
+- **[2026-03-12] Architecture:** EventBus emit'leri ve webhook subscription types senkron tutulmalı. Yeni event emit ediyorsan `WEBHOOK_EVENT_TYPES` enum'una da ekle, yoksa subscriber'lar o event'i alamaz.
+- **[2026-03-12] Performance:** Ağaç yapılarında (delegation chain, trust graph) N+1 yerine PostgreSQL `WITH RECURSIVE` CTE kullan — tek sorguda ancestor+descendant traversal. `getDelegationChain()` 4+ SELECT → 1 CTE ile değiştirildi.
 
 ## Pattern Library
 
@@ -130,3 +134,4 @@ cd web-wallet && npm run dev
 | Client-Side VP Flow | Wallet-local Ed25519 key, DID:key, encrypted storage, direct_post, SD-JWT disclosure selection | `.claude/solutions/client-side-vp-flow.md` |
 | OAuth 2.0 Bridge RFC 8693 | VC → OAuth token exchange, scope mapping, pre-auth endpoint pattern | `.claude/solutions/oauth2-bridge-rfc8693.md` |
 | Realtime Webhook Pipeline | EventBus→WebSocket+HTTP webhook, HMAC delivery, SSRF protection, subscription cache | `.claude/solutions/realtime-webhook-notification-pipeline.md` |
+| Delegation Chain Attenuation | A→B→C sub-delegation, scope narrowing, cascade revoke, VC↔DB integration | `.claude/solutions/delegation-chain-attenuation.md` |

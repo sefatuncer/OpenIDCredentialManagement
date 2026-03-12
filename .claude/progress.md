@@ -62,12 +62,14 @@ Single environment development setup - no staging/production yet.
 - [x] holder.agent.ts inline URI params support
 - [x] Duplicate direct_post route removed
 
-### PostgreSQL Persistence (2026-03-11)
+### PostgreSQL Persistence (2026-03-11 → 2026-03-12) ✅ TAMAMLANDI
 - [x] docker-compose.dev.yml PostgreSQL service
 - [x] IStorageAdapter with PostgreSQL backend
 - [x] VP sessions persistent across restarts
 - [x] Fase 1: Holder credentials, issuer offers/issued, partner keys → PostgreSQL
-- [x] 5 Map → IStorageAdapter migration (holder_credentials, issuer_credential_offers, issuer_issued_credentials, partner_keys, org_agent_counts)
+- [x] Fase 2: oidc configs + batch jobs → IStorageAdapter
+- [x] Fase 3: schemaRegistry, expirationNotifier, encryption (envelope), capabilityDiscovery
+- [x] 13 collection toplam — Fase 4 transient state (skip OK)
 
 ### SD-JWT VC Format Migration (2026-03-11)
 - [x] `issueCredential()` SD-JWT VC format branch (`sdjwtService.createSDJWTVC()`)
@@ -79,9 +81,16 @@ Single environment development setup - no staging/production yet.
 - [x] Zod validation — `credentialFormatSchema` enum
 - [x] Backward compat — jwt_vc_json still supported
 
+### Real-time Revocation Webhooks (2026-03-12) ✅ TAMAMLANDI
+- [x] EventBus → WebSocket + HTTP webhook bridge (single handler per event)
+- [x] Webhook CRUD + HMAC-SHA256 delivery + retry (3x exponential backoff)
+- [x] SSRF protection + HTTPS enforcement (production)
+- [x] Frontend: WebhookManagement + WebSocket auto-reconnect + toast notifications
+
 ## WP1: Hızlı Analiz ve Mimari Tasarım (Ay 1-3)
 
 - [ ] Cloud HSM ön değerlendirme (todo 025)
+- [ ] walt.id framework evaluation — yedek plan (todo 031) ← YENİ
 
 ### Batch Credential Issuance (2026-03-11)
 - [x] `issueCredentialDirect()` — offer flow bypass, doğrudan JWT-VC
@@ -94,34 +103,25 @@ Single environment development setup - no staging/production yet.
 ## WP2: Temel Geliştirme — Alfa Prototip (Ay 4-6)
 
 - [x] Batch credential issuance (todo 001) — 2026-03-11
-- [ ] PostgreSQL — Fase 3-4 kalan Map-based servisler (todo 002)
-- [x] PostgreSQL — Fase 2: oidc configs + batch jobs → IStorageAdapter — 2026-03-11
+- [x] PostgreSQL persistence — tüm faseler tamamlandı (todo 002) — 2026-03-12
 - [x] SD-JWT VC format migration (todo 009) — 2026-03-11
 - [x] Credential schema registry (todo 010) — 2026-03-11
 - [x] Issuer SD-JWT credential form (todo 005) — 2026-03-12
 - [x] Client-side VP flow (todo 007) — 2026-03-12
+- [x] AI Agent credential schemas — 3-type (todo 029) — 2026-03-12
+- [x] P1 review fixes: credential_id migration + sub-delegation auth + webhook events (todo 034/035/036) — 2026-03-12
+- [ ] Keycloak OAuth2/OIDC SSO (todo 030) ← YENİ
 - [ ] React Native mobil wallet (todo 023)
-
-### Real-time Revocation Webhooks (2026-03-12)
-- [x] WebSocket service wired up (`wsService.initialize(server)` in index.ts)
-- [x] ExpirationNotifier started at boot
-- [x] EventBus → WebSocket bridge (credential.revoked/issued/unrevoked)
-- [x] EventBus → Webhook delivery bridge
-- [x] Webhook service: CRUD + HMAC-SHA256 delivery + retry (3x exponential backoff)
-- [x] SSRF protection (private IP blocking)
-- [x] 7 webhook API endpoints (CRUD + test + deliveries)
-- [x] Zod validation schemas for webhooks
-- [x] Frontend: WebhookManagement page (list, create, detail, delivery history)
-- [x] Frontend: WebSocket hook with auto-reconnect
-- [x] Frontend: Real-time toast notifications via WebSocket
-- [x] IssuerDashboard webhook nav card + Layout nav item
 
 ## WP3: İleri Geliştirme + Blockchain — Beta Prototip (Ay 7-12)
 
+### Faz A — Protokol ve Blockchain (Ay 7-9)
 - [ ] Hyperledger Fabric entegrasyonu (todo 011)
-- [x] OAuth 2.0 bridge adapter (todo 012) — 2026-03-12
 - [ ] DIDComm v1/v2 entegrasyonu (todo 013)
-- [ ] Multi-tenant credential izolasyonu (todo 014)
+- [ ] Multi-tenant credential izolasyonu (todo 014) — priority: HIGH
+
+### Faz B — Platform Olgunlaştırma (Ay 10-12)
+- [x] OAuth 2.0 bridge adapter (todo 012) — 2026-03-12
 - [x] Gerçek zamanlı revocation — webhook (todo 015) — 2026-03-12
 - [ ] OPA/Cerbos fine-grained authorization (todo 024)
 
@@ -136,6 +136,8 @@ Single environment development setup - no staging/production yet.
 
 - [ ] 10K+ ajan ölçekleme testleri (todo 018)
 - [ ] Penetration test + güvenlik denetimi (todo 019)
+- [ ] STRIDE threat modeling + OWASP Agentic AI Top 10 (todo 032) ← YENİ
+- [ ] Çerçeveler arası interoperability testi (todo 033) ← YENİ
 - [ ] Cloud HSM kapsamlı analiz (todo 025)
 
 ## WP6: Finalizasyon (Ay 17-18)
@@ -145,3 +147,11 @@ Single environment development setup - no staging/production yet.
 - [ ] Demo uygulamalar — 3 senaryo (todo 026)
 - [ ] Akademik yayınlar — 2+ hakemli (todo 027)
 - [ ] Patent başvuruları (todo 028)
+
+## Özet İstatistikler
+
+| Durum | Sayı |
+|-------|------|
+| Tamamlandı (done) | 11 |
+| Beklemede (pending) | 24 |
+| **Toplam** | **35** |

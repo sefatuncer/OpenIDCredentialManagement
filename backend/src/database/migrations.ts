@@ -340,6 +340,18 @@ const migrations: Array<{
     `,
     down: `DROP TABLE IF EXISTS client_credentials;`,
   },
+  {
+    version: 18,
+    name: 'add_delegation_credential_id_and_parent_index',
+    up: `
+      ALTER TABLE delegations ADD COLUMN IF NOT EXISTS credential_id VARCHAR(255);
+      CREATE INDEX IF NOT EXISTS idx_delegations_parent ON delegations(parent_delegation_id);
+    `,
+    down: `
+      DROP INDEX IF EXISTS idx_delegations_parent;
+      ALTER TABLE delegations DROP COLUMN IF EXISTS credential_id;
+    `,
+  },
 ]
 
 /**

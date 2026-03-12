@@ -176,3 +176,19 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
+
+// --- Delegation API ---
+export const delegationApi = {
+  async getChain(delegationId: string) {
+    return apiService.get<{ chain: Array<Record<string, unknown>>; depth: number }>(
+      `/delegations/${delegationId}/chain`,
+    )
+  },
+
+  async verify(delegationId: string, action: string, resource?: string) {
+    return apiService.post<{ valid: boolean; inScope: boolean; errors?: string[] }>(
+      `/delegations/${delegationId}/verify`,
+      { action, resource },
+    )
+  },
+}
