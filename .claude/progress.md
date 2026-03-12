@@ -99,7 +99,7 @@ Single environment development setup - no staging/production yet.
 - [x] SD-JWT VC format migration (todo 009) — 2026-03-11
 - [x] Credential schema registry (todo 010) — 2026-03-11
 - [x] Issuer SD-JWT credential form (todo 005) — 2026-03-12
-- [ ] Client-side VP flow (todo 007)
+- [x] Client-side VP flow (todo 007) — 2026-03-12
 - [ ] React Native mobil wallet (todo 023)
 
 ## WP3: İleri Geliştirme + Blockchain — Beta Prototip (Ay 7-12)

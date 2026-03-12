@@ -136,6 +136,26 @@ export async function getHolderCredentials(): Promise<Credential[]> {
   return data.credentials || []
 }
 
+export interface HolderCredentialRaw {
+  id: string
+  type: string
+  format: string
+  jwt: string
+  combined?: string
+  isSDJWT: boolean
+  issuerDid: string
+  credentialSubject: Record<string, unknown>
+}
+
+export async function getHolderCredentialsRaw(): Promise<HolderCredentialRaw[]> {
+  const response = await authFetch(`${API_BASE}/holder/credentials`)
+  if (!response.ok) {
+    return []
+  }
+  const data = await response.json()
+  return data.credentials || []
+}
+
 export async function getIssuerMetadata(): Promise<Record<string, unknown>> {
   const response = await fetch('/.well-known/openid-credential-issuer')
   if (!response.ok) {

@@ -427,6 +427,7 @@ export async function getStoredCredentials(): Promise<Array<{
   id: string
   type: string
   format: string
+  jwt: string
   combined?: string
   isSDJWT: boolean
   issuerDid: string
@@ -438,6 +439,7 @@ export async function getStoredCredentials(): Promise<Array<{
     id: cred.id,
     type: cred.type,
     format: cred.format || 'jwt_vc_json',
+    jwt: cred.jwt,
     combined: cred.combined,
     isSDJWT: cred.format === 'vc+sd-jwt' || !!cred.combined,
     issuerDid: cred.issuerDid,

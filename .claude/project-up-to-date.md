@@ -533,11 +533,18 @@ Trust Management
   ├─▶ DELETE /api/v1/agent-trust/{did}/{trustedDid}
   └─▶ POST   /api/v1/agent-trust/verify
 
-Present Credential (/present)
+Present Credential (/present) — Dual Mode
   ├─▶ QR Scan: openid4vp://?client_id=...&request_uri=... formatı
   ├─▶ Alternatif: Manuel URI paste
-  ├─▶ POST /api/v1/holder/credentials/present  (verificationRequestUri gönder)
-  └─▶ Backend: request_uri fetch → credential match → VP oluştur → direct_post
+  ├─▶ Mode: Backend
+  │     └─▶ POST /api/v1/holder/credentials/present  (verificationRequestUri gönder)
+  │          → Backend: request_uri fetch → credential match → VP oluştur → direct_post
+  └─▶ Mode: Client-Side (varsayılan)
+        ├─▶ GET /api/v1/holder/credentials  (jwt + combined alanları ile)
+        ├─▶ fetch(request_uri) → presentation_definition
+        ├─▶ Wallet-local: credential matching, SD-JWT disclosure seçimi
+        ├─▶ Wallet-local: Ed25519 key pair → did:key → VP token (jose SignJWT)
+        └─▶ POST /direct_post  (vp_token + presentation_submission + state)
 
 OpenID4VC Flows (Wallet ↔ Issuer/Verifier)
   ├─▶ GET  /credential-offer/{offerId}     → offer detayı
@@ -546,7 +553,7 @@ OpenID4VC Flows (Wallet ↔ Issuer/Verifier)
   └─▶ POST /direct_post                     → VP token gönder
 ```
 
-**Not:** VP flow backend-driven'dır. Wallet sadece URI'yi backend'e gönderir, backend tüm VP mantığını (`verifier.agent.ts` üzerinden) yürütür. Client-side VP flow için bkz: todo 007.
+**Not:** VP flow artık dual-mode: Client-side (varsayılan) veya Backend. Client-side modda wallet kendi Ed25519 key pair'i ile VP token oluşturur ve `direct_post`'a doğrudan gönderir. SD-JWT credential'lar için selective disclosure UI mevcuttur.
 
 ---
 
@@ -578,7 +585,7 @@ Issuer Frontend                 Backend                        Wallet
      │                            │  (jwt~disclosure1~disc2~...)  │
 ```
 
-### Credential Verification Flow (OpenID4VP)
+### Credential Verification Flow (OpenID4VP) — Dual Mode
 
 ```
 Verifier Frontend               Backend                        Wallet
@@ -587,26 +594,36 @@ Verifier Frontend               Backend                        Wallet
      │──────────────────────────▶│                              │
      │  ◀── sessionId + QR       │                              │
      │     (openid4vp:// URI)     │                              │
-     │                            │                              │
      │                            │  Wallet scans QR or paste URI│
      │                            │                              │
-     │                            │  POST /holder/credentials/   │
-     │                            │       present                │
-     │                            │  (verificationRequestUri)    │
-     │                            │◀─────────────────────────────│
+     │  ┌─ Backend Mode ─────────────────────────────────────────┐
+     │  │                         │  POST /holder/credentials/   │
+     │  │                         │       present                │
+     │  │                         │◀─────────────────────────────│
+     │  │                         │  [Backend: fetch → match →   │
+     │  │                         │   create VP → direct_post]   │
+     │  └────────────────────────────────────────────────────────┘
+     │  ┌─ Client-Side Mode (varsayılan) ────────────────────────┐
+     │  │                         │  GET /holder/credentials     │
+     │  │                         │  (jwt + combined alanları)   │
+     │  │                         │─────────────────────────────▶│
+     │  │                         │                              │
+     │  │                         │  [Wallet locally:]           │
+     │  │                         │  1. fetch(request_uri)       │
+     │  │                         │  2. Match credentials        │
+     │  │                         │  3. SD-JWT disclosure select │
+     │  │                         │  4. Ed25519 key → did:key    │
+     │  │                         │  5. Create VP token (jose)   │
+     │  │                         │                              │
+     │  │                         │  POST /direct_post           │
+     │  │                         │  (vp_token + state)          │
+     │  │                         │◀─────────────────────────────│
+     │  └────────────────────────────────────────────────────────┘
      │                            │                              │
-     │                            │  [Backend internally:]       │
-     │                            │  1. Fetch request_uri        │
-     │                            │  2. Parse presentation_def   │
-     │                            │  3. Match holder credentials │
-     │                            │  4. Create VP token          │
-     │                            │  5. POST /direct_post        │
-     │                            │     (vp_token + state)       │
-     │                            │                              │
-     │                            │  ◀── verify signature ──▶    │
+     │                            │  ◀── verify VP signature ──▶ │
+     │                            │  ◀── resolve did:key ──▶     │
      │                            │  ◀── check nonce ──▶         │
      │                            │  ◀── check revocation ──▶    │
-     │                            │──── result ────────────────▶ │
      │                            │                              │
      │ GET /verify/{id}/result    │                              │
      │──────────────────────────▶│                              │
@@ -655,7 +672,8 @@ Verifier Frontend               Backend                        Wallet
 | JWT signing | EdDSA (Ed25519) via `jose` |
 | DID key encoding | Multicodec 0xed01 + base58btc |
 | SD-JWT digests | SHA-256 |
-| Wallet encryption | AES-GCM (client-side) |
+| Wallet credential encryption | AES-GCM-256 (client-side, localStorage) |
+| Wallet VP key encryption | AES-GCM-256 (client-side, sessionStorage) |
 | Encryption key-at-rest | AES-256-GCM envelope wrap (KEK from env var) |
 | Client secrets | bcrypt hash |
 
@@ -685,7 +703,10 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `web-wallet/src/services/api.service.ts` | Wallet API service |
 | `web-wallet/src/services/agent.service.ts` | Agent management service |
 | `web-wallet/src/services/sdjwt.service.ts` | Client-side SD-JWT parsing |
-| `web-wallet/src/pages/PresentCredential.tsx` | OpenID4VP presentation flow UI (QR scan + manual URI) |
+| `web-wallet/src/pages/PresentCredential.tsx` | OpenID4VP presentation flow UI — dual mode (client-side + backend) |
+| `web-wallet/src/services/wallet-key.service.ts` | Ed25519 key pair gen, DID:key derivation, AES-GCM encrypted storage, JWT signing |
+| `web-wallet/src/services/vp.service.ts` | Client-side VP: URI parsing, auth request fetch, credential matching, VP creation, direct_post |
+| `web-wallet/src/services/sdjwt-presentation.service.ts` | SD-JWT disclosure filtering for selective presentation |
 | `web-wallet/src/components/QRScanner.tsx` | html5-qrcode wrapper component |
 | `web-wallet/src/api.ts` | Wallet API calls (issue, verify, present) |
 | `backend/src/api/schemas/validation.schemas.ts` | Zod validation schemas (credential format, DID, trust level, batch issuance) |
