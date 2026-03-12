@@ -13,23 +13,47 @@ const AUTH_TOKEN_KEY = 'auth_token'
 
 let cachedToken: string | null = null
 
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return true
+    const payload = JSON.parse(atob(parts[1]))
+    return !payload.exp || (payload.exp - 60) < Math.floor(Date.now() / 1000)
+  } catch {
+    return true
+  }
+}
+
 function getClientCredentials(): { clientId: string; clientSecret: string } {
   const clientId = extra.clientId || 'web-wallet'
-  const clientSecret = extra.clientSecret || ''
+  const clientSecret = extra.clientSecret
+  if (!clientSecret) {
+    throw new Error('API client secret not configured. Set clientSecret in app.config.ts extra.')
+  }
   return { clientId, clientSecret }
 }
 
 async function getAuthToken(): Promise<string | null> {
-  if (cachedToken) return cachedToken
+  if (cachedToken && !isTokenExpired(cachedToken)) return cachedToken
+
+  // Cached token expired — clear it
+  if (cachedToken) {
+    cachedToken = null
+    await secureDelete(AUTH_TOKEN_KEY)
+  }
 
   const stored = await secureGet(AUTH_TOKEN_KEY)
-  if (stored) {
+  if (stored && !isTokenExpired(stored)) {
     cachedToken = stored
     return cachedToken
   }
 
-  const { clientId, clientSecret } = getClientCredentials()
-  if (!clientSecret) return null
+  let clientId: string, clientSecret: string
+  try {
+    ({ clientId, clientSecret } = getClientCredentials())
+  } catch {
+    return null
+  }
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/token`, {

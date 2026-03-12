@@ -1,7 +1,8 @@
 ---
 id: "037"
 title: "Mobile Wallet P1 Security Fixes"
-status: pending
+status: done
+completed: 2026-03-12
 priority: critical
 category: security
 wp: WP2

@@ -77,6 +77,7 @@ cd web-wallet && npm run dev
 - Branch: main
 - .env dosyaları gitignore'da
 - docs/ ve *.md (README hariç) gitignore'da
+- **Co-Authored-By satırı commit mesajlarına EKLENMEYECEK** — kullanıcı bunu istemiyor
 
 ## Lessons Learned
 

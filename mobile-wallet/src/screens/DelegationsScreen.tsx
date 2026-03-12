@@ -4,13 +4,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl,
-  TextInput, Alert, Modal,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert,
 } from 'react-native'
 
 import { colors, spacing, fontSize, borderRadius } from '../theme'
-import { getDelegations, createDelegation, revokeDelegation } from '../services/agent.service'
-import type { DelegationGrant, DelegationRequest } from '../types/agent.types'
+import { getDelegations, revokeDelegation } from '../services/agent.service'
+import type { DelegationGrant } from '../types/agent.types'
+import CreateDelegationModal from '../components/CreateDelegationModal'
 
 type Tab = 'received' | 'given'
 
@@ -20,12 +20,6 @@ export default function DelegationsScreen() {
   const [given, setGiven] = useState<DelegationGrant[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
-
-  // Create form state
-  const [delegateeDid, setDelegateeDid] = useState('')
-  const [actions, setActions] = useState('')
-  const [resources, setResources] = useState('')
-  const [duration, setDuration] = useState('P30D')
 
   const loadDelegations = useCallback(async () => {
     try {
@@ -63,34 +57,6 @@ export default function DelegationsScreen() {
         },
       },
     ])
-  }
-
-  const handleCreate = async () => {
-    if (!delegateeDid.trim()) {
-      Alert.alert('Error', 'Delegatee DID is required')
-      return
-    }
-
-    try {
-      const request: DelegationRequest = {
-        delegateeToDid: delegateeDid.trim(),
-        scope: {
-          actions: actions.split(',').map((a) => a.trim()).filter(Boolean),
-          resources: resources.split(',').map((r) => r.trim()).filter(Boolean),
-        },
-        duration,
-        revocable: true,
-      }
-      await createDelegation(request)
-      setShowCreate(false)
-      setDelegateeDid('')
-      setActions('')
-      setResources('')
-      await loadDelegations()
-      Alert.alert('Success', 'Delegation created')
-    } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to create delegation')
-    }
   }
 
   const data = tab === 'received' ? received : given
@@ -182,58 +148,11 @@ export default function DelegationsScreen() {
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
-      {/* Create Modal */}
-      <Modal visible={showCreate} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Create Delegation</Text>
-
-            <Text style={styles.inputLabel}>Delegatee DID</Text>
-            <TextInput
-              style={styles.input}
-              value={delegateeDid}
-              onChangeText={setDelegateeDid}
-              placeholder="did:key:z..."
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-            />
-
-            <Text style={styles.inputLabel}>Actions (comma-separated)</Text>
-            <TextInput
-              style={styles.input}
-              value={actions}
-              onChangeText={setActions}
-              placeholder="read, write, execute"
-              placeholderTextColor={colors.textMuted}
-            />
-
-            <Text style={styles.inputLabel}>Resources (comma-separated)</Text>
-            <TextInput
-              style={styles.input}
-              value={resources}
-              onChangeText={setResources}
-              placeholder="api://, file://"
-              placeholderTextColor={colors.textMuted}
-            />
-
-            <Text style={styles.inputLabel}>Duration (ISO 8601)</Text>
-            <TextInput
-              style={styles.input}
-              value={duration}
-              onChangeText={setDuration}
-              placeholder="P30D"
-              placeholderTextColor={colors.textMuted}
-            />
-
-            <TouchableOpacity style={styles.createButton} onPress={handleCreate}>
-              <Text style={styles.createButtonText}>Create</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setShowCreate(false)}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <CreateDelegationModal
+        visible={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={loadDelegations}
+      />
     </View>
   )
 }
@@ -282,25 +201,4 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 4,
   },
   fabText: { fontSize: 28, color: colors.white, lineHeight: 30 },
-  modalOverlay: {
-    flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: colors.surface, borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl, padding: spacing.lg, paddingBottom: spacing.xxl,
-  },
-  modalTitle: { fontSize: fontSize.xl, fontWeight: 'bold', color: colors.white, marginBottom: spacing.lg },
-  inputLabel: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.xs },
-  input: {
-    backgroundColor: colors.card, borderRadius: borderRadius.md,
-    padding: spacing.md, color: colors.text, fontSize: fontSize.md,
-    borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md,
-  },
-  createButton: {
-    backgroundColor: colors.primary, borderRadius: borderRadius.md,
-    padding: spacing.md, alignItems: 'center', marginTop: spacing.sm,
-  },
-  createButtonText: { fontSize: fontSize.lg, fontWeight: '600', color: colors.white },
-  cancelButton: { padding: spacing.md, alignItems: 'center', marginTop: spacing.xs },
-  cancelText: { fontSize: fontSize.md, color: colors.textSecondary },
 })

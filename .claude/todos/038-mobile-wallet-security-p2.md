@@ -1,7 +1,8 @@
 ---
 id: "038"
 title: "Mobile Wallet P2 Security & Architecture Fixes"
-status: pending
+status: done
+completed: 2026-03-12
 priority: high
 category: security
 wp: WP2

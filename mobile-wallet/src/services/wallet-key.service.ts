@@ -8,6 +8,7 @@ import * as jose from 'jose'
 import { secureGet, secureSet, secureDelete } from './secure-storage.service'
 
 const WALLET_KEY_STORAGE = 'wallet_keypair'
+const WALLET_ENC_KEY = 'wallet_enc_key'
 
 interface WalletKeyData {
   publicJwk: jose.JWK
@@ -17,6 +18,43 @@ interface WalletKeyData {
 }
 
 let cachedKeyData: WalletKeyData | null = null
+
+// --- AES-GCM-256 encryption for key-at-rest ---
+
+async function getEncryptionKey(): Promise<CryptoKey> {
+  const stored = await secureGet(WALLET_ENC_KEY)
+  if (stored) {
+    const jwk = JSON.parse(stored)
+    return crypto.subtle.importKey('jwk', jwk, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
+  }
+  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
+  const exported = await crypto.subtle.exportKey('jwk', key)
+  await secureSet(WALLET_ENC_KEY, JSON.stringify(exported))
+  return key
+}
+
+async function encryptData(data: string): Promise<string> {
+  const key = await getEncryptionKey()
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv }, key, new TextEncoder().encode(data)
+  )
+  const combined = new Uint8Array(iv.length + encrypted.byteLength)
+  combined.set(iv)
+  combined.set(new Uint8Array(encrypted), iv.length)
+  return jose.base64url.encode(combined)
+}
+
+async function decryptData(encoded: string): Promise<string> {
+  const key = await getEncryptionKey()
+  const combined = jose.base64url.decode(encoded)
+  const iv = combined.slice(0, 12)
+  const encrypted = combined.slice(12)
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv }, key, encrypted
+  )
+  return new TextDecoder().decode(decrypted)
+}
 
 // --- Base58btc encoding ---
 
@@ -88,20 +126,22 @@ async function generateWalletKeyPair(): Promise<WalletKeyData> {
 export async function getOrCreateWalletKey(): Promise<WalletKeyData> {
   if (cachedKeyData) return cachedKeyData
 
-  // Try loading from secure storage
+  // Try loading from encrypted secure storage
   const stored = await secureGet(WALLET_KEY_STORAGE)
   if (stored) {
     try {
-      cachedKeyData = JSON.parse(stored) as WalletKeyData
+      const decrypted = await decryptData(stored)
+      cachedKeyData = JSON.parse(decrypted) as WalletKeyData
       return cachedKeyData
     } catch {
-      // Corrupted — regenerate
+      // Corrupted or legacy plaintext — regenerate
     }
   }
 
-  // Generate new key pair and store securely
+  // Generate new key pair, encrypt, and store
   const keyData = await generateWalletKeyPair()
-  await secureSet(WALLET_KEY_STORAGE, JSON.stringify(keyData))
+  const encrypted = await encryptData(JSON.stringify(keyData))
+  await secureSet(WALLET_KEY_STORAGE, encrypted)
   cachedKeyData = keyData
 
   return keyData
