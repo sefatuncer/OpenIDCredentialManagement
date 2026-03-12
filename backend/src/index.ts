@@ -28,6 +28,8 @@ import {
 } from './core'
 import { initializeFeatures, getFeatureSummary } from './config/features.config'
 import { initializeCredoService, isUsingCredo, shutdownCredoService } from './services/credo.service'
+import { encryptionService } from './services/encryption.service'
+import { schemaRegistry } from './services/schemaRegistry.service'
 
 dotenv.config()
 
@@ -70,6 +72,10 @@ async function main() {
       storageType: getStorageType(),
       features: getEnabledFeatures().length,
     })
+
+    // Initialize services that depend on storage
+    await encryptionService.initialize()
+    await schemaRegistry.initialize()
 
     // Initialize all agents
     logger.info('Initializing agents...')

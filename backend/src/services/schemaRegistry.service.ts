@@ -2,9 +2,11 @@
  * Credential Schema Registry Service
  *
  * Manages credential schemas and definitions
+ * Storage: PostgreSQL via IStorageAdapter (credential_schemas collection)
  */
 
 import { logger } from '../utils/logger'
+import { createStorageAdapter, IStorageAdapter } from '../core/storage'
 
 export interface CredentialSchemaProperty {
   type: 'string' | 'number' | 'boolean' | 'array' | 'object'
@@ -142,30 +144,42 @@ const builtInSchemas: CredentialSchema[] = [
   },
 ]
 
+// Lazy storage initialization
+let schemaStorage: IStorageAdapter<CredentialSchema> | null = null
+
+function getSchemaStorage(): IStorageAdapter<CredentialSchema> {
+  if (!schemaStorage) {
+    schemaStorage = createStorageAdapter<CredentialSchema>('credential_schemas')
+  }
+  return schemaStorage
+}
+
 class SchemaRegistryService {
-  private schemas: Map<string, CredentialSchema> = new Map()
-
-  constructor() {
-    // Initialize with built-in schemas
+  async initialize(): Promise<void> {
+    const storage = getSchemaStorage()
     for (const schema of builtInSchemas) {
-      this.schemas.set(schema.id, schema)
+      const exists = await storage.exists(schema.id)
+      if (!exists) {
+        await storage.save(schema.id, schema)
+      }
     }
-    logger.info(`Schema registry initialized with ${this.schemas.size} schemas`)
+    const all = await storage.list()
+    logger.info(`Schema registry initialized with ${all.length} schemas`)
   }
 
-  // Get all schemas
-  getAllSchemas(): CredentialSchema[] {
-    return Array.from(this.schemas.values()).filter((s) => s.active)
+  async getAllSchemas(): Promise<CredentialSchema[]> {
+    const all = await getSchemaStorage().list()
+    return all.filter((s) => s.active)
   }
 
-  // Get schema by ID
-  getSchema(id: string): CredentialSchema | undefined {
-    return this.schemas.get(id)
+  async getSchema(id: string): Promise<CredentialSchema | null> {
+    return getSchemaStorage().get(id)
   }
 
-  // Register new schema
-  registerSchema(schema: Omit<CredentialSchema, 'createdAt' | 'updatedAt'>): CredentialSchema {
-    if (this.schemas.has(schema.id)) {
+  async registerSchema(schema: Omit<CredentialSchema, 'createdAt' | 'updatedAt'>): Promise<CredentialSchema> {
+    const storage = getSchemaStorage()
+    const exists = await storage.exists(schema.id)
+    if (exists) {
       throw new Error(`Schema ${schema.id} already exists`)
     }
 
@@ -176,14 +190,14 @@ class SchemaRegistryService {
       updatedAt: now,
     }
 
-    this.schemas.set(schema.id, fullSchema)
+    await storage.save(schema.id, fullSchema)
     logger.info(`Schema registered: ${schema.id}`)
     return fullSchema
   }
 
-  // Update schema
-  updateSchema(id: string, updates: Partial<CredentialSchema>): CredentialSchema {
-    const existing = this.schemas.get(id)
+  async updateSchema(id: string, updates: Partial<CredentialSchema>): Promise<CredentialSchema> {
+    const storage = getSchemaStorage()
+    const existing = await storage.get(id)
     if (!existing) {
       throw new Error(`Schema ${id} not found`)
     }
@@ -196,44 +210,42 @@ class SchemaRegistryService {
       updatedAt: new Date().toISOString(),
     }
 
-    this.schemas.set(id, updated)
+    await storage.save(id, updated)
     logger.info(`Schema updated: ${id}`)
     return updated
   }
 
-  // Deactivate schema (soft delete)
-  deactivateSchema(id: string): boolean {
-    const schema = this.schemas.get(id)
+  async deactivateSchema(id: string): Promise<boolean> {
+    const storage = getSchemaStorage()
+    const schema = await storage.get(id)
     if (!schema) {
       return false
     }
 
     schema.active = false
     schema.updatedAt = new Date().toISOString()
+    await storage.save(id, schema)
     logger.info(`Schema deactivated: ${id}`)
     return true
   }
 
-  // Validate claims against schema
-  validateClaims(schemaId: string, claims: Record<string, any>): {
+  async validateClaims(schemaId: string, claims: Record<string, any>): Promise<{
     valid: boolean
     errors: string[]
-  } {
-    const schema = this.schemas.get(schemaId)
+  }> {
+    const schema = await getSchemaStorage().get(schemaId)
     if (!schema) {
       return { valid: false, errors: [`Schema ${schemaId} not found`] }
     }
 
     const errors: string[] = []
 
-    // Check required fields
     for (const field of schema.required) {
       if (claims[field] === undefined || claims[field] === null) {
         errors.push(`Missing required field: ${field}`)
       }
     }
 
-    // Validate property types
     for (const [key, value] of Object.entries(claims)) {
       const propDef = schema.credentialSubject.properties[key]
       if (propDef) {
@@ -261,9 +273,8 @@ class SchemaRegistryService {
     return null
   }
 
-  // Get schema for OpenID4VCI
-  getCredentialConfiguration(schemaId: string): any {
-    const schema = this.schemas.get(schemaId)
+  async getCredentialConfiguration(schemaId: string): Promise<any> {
+    const schema = await getSchemaStorage().get(schemaId)
     if (!schema) return null
 
     return {
@@ -285,12 +296,28 @@ class SchemaRegistryService {
     }
   }
 
-  // Get all credential configurations for metadata
-  getAllCredentialConfigurations(): Record<string, any> {
+  async getAllCredentialConfigurations(): Promise<Record<string, any>> {
+    const schemas = await this.getAllSchemas()
     const configs: Record<string, any> = {}
 
-    for (const schema of this.getAllSchemas()) {
-      configs[schema.id] = this.getCredentialConfiguration(schema.id)
+    for (const schema of schemas) {
+      configs[schema.id] = {
+        format: 'jwt_vc_json',
+        scope: schema.id,
+        cryptographic_binding_methods_supported: ['did:key', 'did:web'],
+        credential_signing_alg_values_supported: ['ES256', 'EdDSA'],
+        credential_definition: {
+          type: ['VerifiableCredential', schema.type],
+          credentialSubject: schema.credentialSubject,
+        },
+        display: [
+          {
+            name: schema.name,
+            description: schema.description,
+            locale: 'en',
+          },
+        ],
+      }
     }
 
     return configs

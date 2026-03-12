@@ -2,10 +2,12 @@
  * Credential Expiration Notification Service
  *
  * Monitors credentials and sends notifications before expiration
+ * Storage: PostgreSQL via IStorageAdapter (expiration_credentials, expiration_notifications)
  */
 
 import { logger } from '../utils/logger'
 import { wsService } from './websocket.service'
+import { createStorageAdapter, IStorageAdapter } from '../core/storage'
 
 export interface ExpiringCredential {
   credentialId: string
@@ -21,7 +23,37 @@ export interface NotificationConfig {
   enabled: boolean
 }
 
+interface TrackedCredential {
+  credentialId: string
+  expiresAt: string // ISO string for JSONB serialization
+  holderDid: string
+  type: string
+}
+
+interface NotificationRecord {
+  credentialId: string
+  notifiedDays: number[]
+}
+
 type NotificationHandler = (credential: ExpiringCredential) => void | Promise<void>
+
+// Lazy storage initialization
+let credentialTrackingStorage: IStorageAdapter<TrackedCredential> | null = null
+let notificationStorage: IStorageAdapter<NotificationRecord> | null = null
+
+function getCredentialTrackingStorage(): IStorageAdapter<TrackedCredential> {
+  if (!credentialTrackingStorage) {
+    credentialTrackingStorage = createStorageAdapter<TrackedCredential>('expiration_credentials')
+  }
+  return credentialTrackingStorage
+}
+
+function getNotificationStorage(): IStorageAdapter<NotificationRecord> {
+  if (!notificationStorage) {
+    notificationStorage = createStorageAdapter<NotificationRecord>('expiration_notifications')
+  }
+  return notificationStorage
+}
 
 class ExpirationNotifierService {
   private config: NotificationConfig = {
@@ -30,8 +62,6 @@ class ExpirationNotifierService {
     enabled: true,
   }
 
-  private credentials: Map<string, { expiresAt: Date; holderDid: string; type: string }> = new Map()
-  private notifiedCredentials: Map<string, number[]> = new Map() // credentialId -> notified days
   private handlers: NotificationHandler[] = []
   private checkInterval: NodeJS.Timeout | null = null
 
@@ -44,11 +74,15 @@ class ExpirationNotifierService {
     logger.info('Starting expiration notification service')
 
     // Initial check
-    this.checkExpirations()
+    this.checkExpirations().catch((err) =>
+      logger.error('Expiration check failed', err)
+    )
 
     // Set up periodic checks
     this.checkInterval = setInterval(
-      () => this.checkExpirations(),
+      () => this.checkExpirations().catch((err) =>
+        logger.error('Expiration check failed', err)
+      ),
       this.config.checkIntervalMinutes * 60 * 1000
     )
   }
@@ -66,39 +100,42 @@ class ExpirationNotifierService {
     logger.info('Expiration notifier configured', this.config)
   }
 
-  // Register a credential for expiration tracking
-  trackCredential(credentialId: string, expiresAt: Date, holderDid: string, type: string): void {
-    this.credentials.set(credentialId, { expiresAt, holderDid, type })
+  async trackCredential(credentialId: string, expiresAt: Date, holderDid: string, type: string): Promise<void> {
+    await getCredentialTrackingStorage().save(credentialId, {
+      credentialId,
+      expiresAt: expiresAt.toISOString(),
+      holderDid,
+      type,
+    })
     logger.debug(`Tracking credential ${credentialId} expiring at ${expiresAt.toISOString()}`)
   }
 
-  // Unregister a credential
-  untrackCredential(credentialId: string): void {
-    this.credentials.delete(credentialId)
-    this.notifiedCredentials.delete(credentialId)
+  async untrackCredential(credentialId: string): Promise<void> {
+    await getCredentialTrackingStorage().delete(credentialId)
+    await getNotificationStorage().delete(credentialId)
   }
 
-  // Register notification handler
   onExpiring(handler: NotificationHandler): void {
     this.handlers.push(handler)
   }
 
-  // Get all expiring credentials
-  getExpiringCredentials(withinDays: number = 30): ExpiringCredential[] {
+  async getExpiringCredentials(withinDays: number = 30): Promise<ExpiringCredential[]> {
     const now = new Date()
+    const all = await getCredentialTrackingStorage().list()
     const expiringList: ExpiringCredential[] = []
 
-    for (const [credentialId, data] of this.credentials) {
+    for (const data of all) {
+      const expiresAt = new Date(data.expiresAt)
       const daysUntilExpiry = Math.ceil(
-        (data.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       )
 
       if (daysUntilExpiry <= withinDays && daysUntilExpiry > 0) {
         expiringList.push({
-          credentialId,
+          credentialId: data.credentialId,
           holderDid: data.holderDid,
           type: data.type,
-          expiresAt: data.expiresAt,
+          expiresAt,
           daysUntilExpiry,
         })
       }
@@ -107,18 +144,19 @@ class ExpirationNotifierService {
     return expiringList.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry)
   }
 
-  // Get expired credentials
-  getExpiredCredentials(): ExpiringCredential[] {
+  async getExpiredCredentials(): Promise<ExpiringCredential[]> {
     const now = new Date()
+    const all = await getCredentialTrackingStorage().list()
     const expiredList: ExpiringCredential[] = []
 
-    for (const [credentialId, data] of this.credentials) {
-      if (data.expiresAt <= now) {
+    for (const data of all) {
+      const expiresAt = new Date(data.expiresAt)
+      if (expiresAt <= now) {
         expiredList.push({
-          credentialId,
+          credentialId: data.credentialId,
           holderDid: data.holderDid,
           type: data.type,
-          expiresAt: data.expiresAt,
+          expiresAt,
           daysUntilExpiry: 0,
         })
       }
@@ -127,49 +165,54 @@ class ExpirationNotifierService {
     return expiredList
   }
 
-  private checkExpirations(): void {
+  private async checkExpirations(): Promise<void> {
     const now = new Date()
     logger.debug('Checking credential expirations')
 
-    for (const [credentialId, data] of this.credentials) {
+    const all = await getCredentialTrackingStorage().list()
+    const notifStorage = getNotificationStorage()
+
+    for (const data of all) {
+      const expiresAt = new Date(data.expiresAt)
       const daysUntilExpiry = Math.ceil(
-        (data.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       )
+
+      const credential: ExpiringCredential = {
+        credentialId: data.credentialId,
+        holderDid: data.holderDid,
+        type: data.type,
+        expiresAt,
+        daysUntilExpiry,
+      }
 
       // Check each warning day
       for (const warningDay of this.config.warningDays) {
         if (daysUntilExpiry <= warningDay && daysUntilExpiry > 0) {
-          // Check if already notified for this day threshold
-          const notified = this.notifiedCredentials.get(credentialId) || []
+          const record = await notifStorage.get(data.credentialId)
+          const notified = record?.notifiedDays || []
           if (!notified.includes(warningDay)) {
-            this.sendNotification({
-              credentialId,
-              holderDid: data.holderDid,
-              type: data.type,
-              expiresAt: data.expiresAt,
-              daysUntilExpiry,
-            })
-
+            this.sendNotification(credential)
             notified.push(warningDay)
-            this.notifiedCredentials.set(credentialId, notified)
+            await notifStorage.save(data.credentialId, {
+              credentialId: data.credentialId,
+              notifiedDays: notified,
+            })
           }
         }
       }
 
       // Check for expired credentials
       if (daysUntilExpiry <= 0) {
-        const notified = this.notifiedCredentials.get(credentialId) || []
+        const record = await notifStorage.get(data.credentialId)
+        const notified = record?.notifiedDays || []
         if (!notified.includes(0)) {
-          this.sendExpiredNotification({
-            credentialId,
-            holderDid: data.holderDid,
-            type: data.type,
-            expiresAt: data.expiresAt,
-            daysUntilExpiry: 0,
-          })
-
+          this.sendExpiredNotification({ ...credential, daysUntilExpiry: 0 })
           notified.push(0)
-          this.notifiedCredentials.set(credentialId, notified)
+          await notifStorage.save(data.credentialId, {
+            credentialId: data.credentialId,
+            notifiedDays: notified,
+          })
         }
       }
     }
@@ -180,7 +223,6 @@ class ExpirationNotifierService {
       `Credential ${credential.credentialId} expires in ${credential.daysUntilExpiry} days`
     )
 
-    // Call registered handlers
     for (const handler of this.handlers) {
       try {
         handler(credential)
@@ -189,7 +231,6 @@ class ExpirationNotifierService {
       }
     }
 
-    // Send WebSocket notification
     wsService.broadcast('credential:expiring' as any, {
       credentialId: credential.credentialId,
       holderDid: credential.holderDid,
@@ -211,19 +252,19 @@ class ExpirationNotifierService {
     })
   }
 
-  // Statistics
-  getStats(): {
+  async getStats(): Promise<{
     tracked: number
     expiringWithin30Days: number
     expiringWithin7Days: number
     expired: number
-  } {
-    const expiring30 = this.getExpiringCredentials(30)
-    const expiring7 = this.getExpiringCredentials(7)
-    const expired = this.getExpiredCredentials()
+  }> {
+    const expiring30 = await this.getExpiringCredentials(30)
+    const expiring7 = await this.getExpiringCredentials(7)
+    const expired = await this.getExpiredCredentials()
+    const all = await getCredentialTrackingStorage().list()
 
     return {
-      tracked: this.credentials.size,
+      tracked: all.length,
       expiringWithin30Days: expiring30.length,
       expiringWithin7Days: expiring7.length,
       expired: expired.length,

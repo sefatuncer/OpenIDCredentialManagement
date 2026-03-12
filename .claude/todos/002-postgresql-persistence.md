@@ -6,7 +6,7 @@ priority: high
 category: infrastructure
 wp: WP2
 created: 2026-03-09
-updated: 2026-03-11
+updated: 2026-03-12
 ---
 
 ## Açıklama
@@ -36,12 +36,12 @@ Kritik servisler zaten PostgreSQL'e geçirildi (IStorageAdapter pattern). Kalan 
 - [x] `oidc.service.ts` — configs Map → storage adapter (`oidc_provider_configs`). metadataCache (1h TTL cache) ve sessions (10min OAuth CSRF) transient → Map olarak kaldı.
 - [x] `batchIssuance.service.ts` — jobs Map → storage adapter (`batch_jobs`). processJob() explicit save per chunk (crash recovery).
 
-## Fase 3 — MEDIUM (defer edilebilir)
+## Fase 3 — MEDIUM ✅ TAMAMLANDI
 
-- [ ] `expirationNotifier.service.ts` — credentials + notifiedCredentials Map → storage adapter
-- [ ] `encryption.service.ts` — keys Map → storage adapter
-- [ ] `schemaRegistry.service.ts` — schemas Map → storage adapter
-- [ ] `capabilityDiscovery.service.ts` — agents Map → storage adapter
+- [x] `expirationNotifier.service.ts` — credentials + notifiedCredentials Map → storage adapter (`expiration_credentials`, `expiration_notifications`)
+- [x] `encryption.service.ts` — keys Map → storage adapter (`encryption_keys`) + memory cache hibrit
+- [x] `schemaRegistry.service.ts` — schemas Map → storage adapter (`credential_schemas`) + built-in schema seed
+- [x] `capabilityDiscovery.service.ts` — agents Map → storage adapter (`agent_profiles`)
 
 ## Fase 4 — LOW (bırakılabilir, transient state)
 

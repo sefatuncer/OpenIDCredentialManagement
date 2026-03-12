@@ -2,10 +2,12 @@
  * Encryption Service for Data at Rest
  *
  * Provides AES-256-GCM encryption for sensitive data
+ * Storage: PostgreSQL via IStorageAdapter (encryption_keys) — hybrid: DB persist + memory cache
  */
 
 import * as crypto from 'crypto'
 import { logger } from '../utils/logger'
+import { createStorageAdapter, IStorageAdapter } from '../core/storage'
 
 const ALGORITHM = 'aes-256-gcm'
 const KEY_LENGTH = 32 // 256 bits
@@ -28,16 +30,58 @@ export interface KeyInfo {
   status: 'active' | 'rotated' | 'expired'
 }
 
+interface StoredKeyData {
+  keyId: string
+  keyBase64: string // Buffer serialized as base64
+  info: {
+    id: string
+    createdAt: string // ISO string for JSONB
+    algorithm: string
+    status: 'active' | 'rotated' | 'expired'
+  }
+}
+
+// Lazy storage initialization
+let keyStorage: IStorageAdapter<StoredKeyData> | null = null
+
+function getKeyStorage(): IStorageAdapter<StoredKeyData> {
+  if (!keyStorage) {
+    keyStorage = createStorageAdapter<StoredKeyData>('encryption_keys')
+  }
+  return keyStorage
+}
+
 class EncryptionService {
   private masterKey: Buffer | null = null
   private keyId: string = 'default'
-  private keys: Map<string, { key: Buffer; info: KeyInfo }> = new Map()
+  // Memory cache for sync encrypt/decrypt operations
+  private keysCache: Map<string, { key: Buffer; info: KeyInfo }> = new Map()
 
-  constructor() {
-    this.initializeKey()
-  }
+  async initialize(): Promise<void> {
+    const storage = getKeyStorage()
 
-  private initializeKey(): void {
+    // Load existing keys from DB
+    const storedKeys = await storage.list()
+    if (storedKeys.length > 0) {
+      for (const stored of storedKeys) {
+        const key = Buffer.from(stored.keyBase64, 'base64')
+        const info: KeyInfo = {
+          id: stored.info.id,
+          createdAt: new Date(stored.info.createdAt),
+          algorithm: stored.info.algorithm,
+          status: stored.info.status,
+        }
+        this.keysCache.set(stored.keyId, { key, info })
+        if (info.status === 'active') {
+          this.masterKey = key
+          this.keyId = stored.keyId
+        }
+      }
+      logger.info(`Encryption service loaded ${storedKeys.length} key(s) from storage`)
+      return
+    }
+
+    // No keys in DB — initialize from env or generate
     const keyHex = process.env.ENCRYPTION_KEY
     const keyBase64 = process.env.ENCRYPTION_KEY_BASE64
 
@@ -46,31 +90,40 @@ class EncryptionService {
     } else if (keyBase64) {
       this.masterKey = Buffer.from(keyBase64, 'base64')
     } else if (process.env.NODE_ENV === 'development') {
-      // Generate a development key (NOT for production)
       this.masterKey = crypto.randomBytes(KEY_LENGTH)
       logger.warn('Using auto-generated encryption key - NOT FOR PRODUCTION')
     }
 
     if (this.masterKey) {
-      this.keys.set(this.keyId, {
-        key: this.masterKey,
+      const info: KeyInfo = {
+        id: this.keyId,
+        createdAt: new Date(),
+        algorithm: ALGORITHM,
+        status: 'active',
+      }
+      this.keysCache.set(this.keyId, { key: this.masterKey, info })
+
+      // Persist to DB
+      await storage.save(this.keyId, {
+        keyId: this.keyId,
+        keyBase64: this.masterKey.toString('base64'),
         info: {
-          id: this.keyId,
-          createdAt: new Date(),
-          algorithm: ALGORITHM,
-          status: 'active',
+          id: info.id,
+          createdAt: info.createdAt.toISOString(),
+          algorithm: info.algorithm,
+          status: info.status,
         },
       })
-      logger.info('Encryption service initialized')
+      logger.info('Encryption service initialized and key persisted')
     }
   }
 
   /**
-   * Encrypt data
+   * Encrypt data (sync — uses memory cache)
    */
   encrypt(plaintext: string | Buffer, keyId?: string): EncryptedData {
     const useKeyId = keyId || this.keyId
-    const keyData = this.keys.get(useKeyId)
+    const keyData = this.keysCache.get(useKeyId)
 
     if (!keyData) {
       throw new Error('Encryption key not configured')
@@ -92,11 +145,11 @@ class EncryptionService {
   }
 
   /**
-   * Decrypt data
+   * Decrypt data (sync — uses memory cache)
    */
   decrypt(encryptedData: EncryptedData): Buffer {
     const useKeyId = encryptedData.keyId || this.keyId
-    const keyData = this.keys.get(useKeyId)
+    const keyData = this.keysCache.get(useKeyId)
 
     if (!keyData) {
       throw new Error(`Encryption key not found: ${useKeyId}`)
@@ -191,40 +244,65 @@ class EncryptionService {
   }
 
   /**
-   * Add a new key for rotation
+   * Add a new key for rotation (async — persists to DB)
    */
-  addKey(keyId: string, keyHex: string): void {
+  async addKey(keyId: string, keyHex: string): Promise<void> {
     const key = Buffer.from(keyHex, 'hex')
     if (key.length !== KEY_LENGTH) {
       throw new Error(`Invalid key length: expected ${KEY_LENGTH} bytes`)
     }
 
-    this.keys.set(keyId, {
-      key,
+    const now = new Date()
+    const info: KeyInfo = {
+      id: keyId,
+      createdAt: now,
+      algorithm: ALGORITHM,
+      status: 'active',
+    }
+
+    // Update memory cache
+    this.keysCache.set(keyId, { key, info })
+
+    // Mark old active keys as rotated
+    const storage = getKeyStorage()
+    for (const [id, data] of this.keysCache) {
+      if (id !== keyId && data.info.status === 'active') {
+        data.info.status = 'rotated'
+        await storage.save(id, {
+          keyId: id,
+          keyBase64: data.key.toString('base64'),
+          info: {
+            id: data.info.id,
+            createdAt: data.info.createdAt.toISOString(),
+            algorithm: data.info.algorithm,
+            status: 'rotated',
+          },
+        })
+      }
+    }
+
+    // Persist new key
+    await storage.save(keyId, {
+      keyId,
+      keyBase64: key.toString('base64'),
       info: {
-        id: keyId,
-        createdAt: new Date(),
+        id: info.id,
+        createdAt: now.toISOString(),
         algorithm: ALGORITHM,
         status: 'active',
       },
     })
 
-    // Mark old active key as rotated
-    for (const [id, data] of this.keys) {
-      if (id !== keyId && data.info.status === 'active') {
-        data.info.status = 'rotated'
-      }
-    }
-
     this.keyId = keyId
+    this.masterKey = key
     logger.info(`New encryption key added: ${keyId}`)
   }
 
   /**
-   * Get active key info
+   * Get active key info (sync — uses memory cache)
    */
   getActiveKeyInfo(): KeyInfo | null {
-    const keyData = this.keys.get(this.keyId)
+    const keyData = this.keysCache.get(this.keyId)
     return keyData?.info || null
   }
 
@@ -232,7 +310,7 @@ class EncryptionService {
    * Get all key info
    */
   getAllKeysInfo(): KeyInfo[] {
-    return Array.from(this.keys.values()).map((k) => k.info)
+    return Array.from(this.keysCache.values()).map((k) => k.info)
   }
 
   /**
@@ -268,7 +346,7 @@ class EncryptionService {
 
 export const encryptionService = new EncryptionService()
 
-// Convenience functions
+// Convenience functions (sync — use memory cache)
 export const encrypt = (data: string) => encryptionService.encrypt(data)
 export const decrypt = (data: EncryptedData) => encryptionService.decryptToString(data)
 export const encryptObject = (obj: any) => encryptionService.encryptObject(obj)

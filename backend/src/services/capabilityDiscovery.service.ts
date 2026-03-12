@@ -2,9 +2,11 @@
  * Agent Capability Discovery Service
  *
  * Enables agents to discover each other's capabilities
+ * Storage: PostgreSQL via IStorageAdapter (agent_profiles collection)
  */
 
 import { logger } from '../utils/logger'
+import { createStorageAdapter, IStorageAdapter } from '../core/storage'
 
 export interface AgentCapability {
   id: string
@@ -89,108 +91,109 @@ export const WELL_KNOWN_CAPABILITIES: Record<string, AgentCapability> = {
   },
 }
 
+// Lazy storage initialization
+let agentStorage: IStorageAdapter<AgentProfile> | null = null
+
+function getAgentStorage(): IStorageAdapter<AgentProfile> {
+  if (!agentStorage) {
+    agentStorage = createStorageAdapter<AgentProfile>('agent_profiles')
+  }
+  return agentStorage
+}
+
 class CapabilityDiscoveryService {
-  private agents: Map<string, AgentProfile> = new Map()
   private localProfile: AgentProfile | null = null
 
-  // Set local agent profile
-  setLocalProfile(profile: AgentProfile): void {
+  async setLocalProfile(profile: AgentProfile): Promise<void> {
     this.localProfile = profile
-    this.agents.set(profile.did, profile)
+    await getAgentStorage().save(profile.did, profile)
     logger.info(`Local agent profile set: ${profile.did}`)
   }
 
-  // Get local agent profile
   getLocalProfile(): AgentProfile | null {
     return this.localProfile
   }
 
-  // Register a remote agent
-  registerAgent(profile: AgentProfile): void {
+  async registerAgent(profile: AgentProfile): Promise<void> {
     profile.lastSeen = new Date()
-    this.agents.set(profile.did, profile)
+    await getAgentStorage().save(profile.did, profile)
     logger.info(`Agent registered: ${profile.did} (${profile.name})`)
   }
 
-  // Unregister an agent
-  unregisterAgent(did: string): boolean {
-    const result = this.agents.delete(did)
+  async unregisterAgent(did: string): Promise<boolean> {
+    const result = await getAgentStorage().delete(did)
     if (result) {
       logger.info(`Agent unregistered: ${did}`)
     }
     return result
   }
 
-  // Get agent by DID
-  getAgent(did: string): AgentProfile | undefined {
-    return this.agents.get(did)
+  async getAgent(did: string): Promise<AgentProfile | null> {
+    return getAgentStorage().get(did)
   }
 
-  // Get all registered agents
-  getAllAgents(): AgentProfile[] {
-    return Array.from(this.agents.values())
+  async getAllAgents(): Promise<AgentProfile[]> {
+    return getAgentStorage().list()
   }
 
-  // Find agents by capability
-  findAgentsByCapability(capabilityId: string): AgentProfile[] {
-    return this.getAllAgents().filter((agent) =>
+  async findAgentsByCapability(capabilityId: string): Promise<AgentProfile[]> {
+    const agents = await this.getAllAgents()
+    return agents.filter((agent) =>
       agent.capabilities.some((cap) => cap.id === capabilityId)
     )
   }
 
-  // Find agents by type
-  findAgentsByType(type: AgentProfile['type']): AgentProfile[] {
-    return this.getAllAgents().filter((agent) => agent.type === type)
+  async findAgentsByType(type: AgentProfile['type']): Promise<AgentProfile[]> {
+    const agents = await this.getAllAgents()
+    return agents.filter((agent) => agent.type === type)
   }
 
-  // Find issuers for a credential type
-  findIssuersForCredentialType(credentialType: string): AgentProfile[] {
-    return this.getAllAgents().filter(
+  async findIssuersForCredentialType(credentialType: string): Promise<AgentProfile[]> {
+    const agents = await this.getAllAgents()
+    return agents.filter(
       (agent) =>
         agent.type === 'issuer' && agent.supportedCredentialTypes.includes(credentialType)
     )
   }
 
-  // Find verifiers supporting a protocol
-  findVerifiersByProtocol(protocol: string): AgentProfile[] {
-    return this.getAllAgents().filter(
+  async findVerifiersByProtocol(protocol: string): Promise<AgentProfile[]> {
+    const agents = await this.getAllAgents()
+    return agents.filter(
       (agent) => agent.type === 'verifier' && agent.supportedProtocols.includes(protocol)
     )
   }
 
-  // Check if an agent has a specific capability
-  hasCapability(did: string, capabilityId: string): boolean {
-    const agent = this.agents.get(did)
+  async hasCapability(did: string, capabilityId: string): Promise<boolean> {
+    const agent = await getAgentStorage().get(did)
     if (!agent) return false
     return agent.capabilities.some((cap) => cap.id === capabilityId)
   }
 
-  // Get agent's capabilities
-  getCapabilities(did: string): AgentCapability[] {
-    const agent = this.agents.get(did)
+  async getCapabilities(did: string): Promise<AgentCapability[]> {
+    const agent = await getAgentStorage().get(did)
     return agent?.capabilities || []
   }
 
-  // Update agent's last seen timestamp
-  updateLastSeen(did: string): void {
-    const agent = this.agents.get(did)
+  async updateLastSeen(did: string): Promise<void> {
+    const agent = await getAgentStorage().get(did)
     if (agent) {
       agent.lastSeen = new Date()
+      await getAgentStorage().save(did, agent)
     }
   }
 
-  // Get stale agents (not seen recently)
-  getStaleAgents(maxAgeMinutes: number = 30): AgentProfile[] {
+  async getStaleAgents(maxAgeMinutes: number = 30): Promise<AgentProfile[]> {
     const threshold = new Date(Date.now() - maxAgeMinutes * 60 * 1000)
-    return this.getAllAgents().filter((agent) => agent.lastSeen < threshold)
+    const agents = await this.getAllAgents()
+    return agents.filter((agent) => new Date(agent.lastSeen) < threshold)
   }
 
-  // Remove stale agents
-  pruneStaleAgents(maxAgeMinutes: number = 60): number {
-    const stale = this.getStaleAgents(maxAgeMinutes)
+  async pruneStaleAgents(maxAgeMinutes: number = 60): Promise<number> {
+    const stale = await this.getStaleAgents(maxAgeMinutes)
+    const storage = getAgentStorage()
     for (const agent of stale) {
       if (agent.did !== this.localProfile?.did) {
-        this.agents.delete(agent.did)
+        await storage.delete(agent.did)
       }
     }
     if (stale.length > 0) {
@@ -199,7 +202,6 @@ class CapabilityDiscoveryService {
     return stale.length
   }
 
-  // Create well-known endpoint response
   getWellKnownDiscovery(): {
     agent: AgentProfile | null
     capabilities: AgentCapability[]
@@ -214,16 +216,16 @@ class CapabilityDiscoveryService {
     }
   }
 
-  // Statistics
-  getStats(): {
+  async getStats(): Promise<{
     totalAgents: number
     byType: Record<string, number>
     byCapability: Record<string, number>
-  } {
+  }> {
+    const agents = await this.getAllAgents()
     const byType: Record<string, number> = {}
     const byCapability: Record<string, number> = {}
 
-    for (const agent of this.getAllAgents()) {
+    for (const agent of agents) {
       byType[agent.type] = (byType[agent.type] || 0) + 1
 
       for (const cap of agent.capabilities) {
@@ -232,7 +234,7 @@ class CapabilityDiscoveryService {
     }
 
     return {
-      totalAgents: this.agents.size,
+      totalAgents: agents.length,
       byType,
       byCapability,
     }

@@ -17,7 +17,7 @@ export const schemaRoutes = Router()
 schemaRoutes.get(
   '/',
   asyncHandler(async (_req: Request, res: Response) => {
-    const schemas = schemaRegistry.getAllSchemas()
+    const schemas = await schemaRegistry.getAllSchemas()
     res.json({ schemas })
   })
 )
@@ -29,7 +29,7 @@ schemaRoutes.get(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
     const schemaId = req.params.id.slice(0, 100)
-    const schema = schemaRegistry.getSchema(schemaId)
+    const schema = await schemaRegistry.getSchema(schemaId)
 
     if (!schema) {
       res.status(404).json({ error: `Schema '${schemaId}' not found` })
@@ -49,7 +49,7 @@ schemaRoutes.post(
   validateBody(credentialSchemaCreateSchema),
   asyncHandler(async (req: Request, res: Response) => {
     try {
-      const schema = schemaRegistry.registerSchema({
+      const schema = await schemaRegistry.registerSchema({
         ...req.body,
         properties: req.body.properties || {},
       })
@@ -76,7 +76,7 @@ schemaRoutes.put(
   validateBody(credentialSchemaUpdateSchema),
   asyncHandler(async (req: Request, res: Response) => {
     try {
-      const schema = schemaRegistry.updateSchema(req.params.id, req.body)
+      const schema = await schemaRegistry.updateSchema(req.params.id, req.body)
       logger.info(`Schema updated via API: ${req.params.id}`)
       res.json({ schema })
     } catch (error) {
@@ -97,7 +97,7 @@ schemaRoutes.delete(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
     const deleteId = req.params.id.slice(0, 100)
-    const success = schemaRegistry.deactivateSchema(deleteId)
+    const success = await schemaRegistry.deactivateSchema(deleteId)
 
     if (!success) {
       res.status(404).json({ error: `Schema '${deleteId}' not found` })
