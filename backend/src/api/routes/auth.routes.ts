@@ -6,6 +6,7 @@ import { asyncHandler } from '../middleware/error.middleware'
 import { authRateLimiter } from '../middleware/rateLimit.middleware'
 import { logger } from '../../utils/logger'
 import * as clientCredentialsRepo from '../../database/repositories/clientCredentials.repository'
+import { keycloakAuthRoutes } from './keycloak-auth.routes'
 
 export const authRoutes = Router()
 
@@ -210,3 +211,6 @@ authRoutes.post(
     }
   })
 )
+
+// Mount Keycloak SSO routes under /keycloak/*
+authRoutes.use('/keycloak', keycloakAuthRoutes)

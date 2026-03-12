@@ -1,7 +1,7 @@
 ---
 id: "030"
 title: "Keycloak OAuth2/OIDC SSO + VC-Based Machine Authentication"
-status: pending
+status: done
 priority: medium
 category: security
 wp: WP2-WP3

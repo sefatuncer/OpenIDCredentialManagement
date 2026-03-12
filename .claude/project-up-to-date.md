@@ -17,7 +17,7 @@
         │                            │ ssi-postgres (dev)           │ → Access Token
         └────────────────────────────┴──────────────────────────────┘
 
-Docker Compose Dev: 4 servis (backend, web-wallet, issuer-verifier, postgres)
+Docker Compose Dev: 5 servis (backend, web-wallet, issuer-verifier, postgres, keycloak:8080)
 
 Real-time Pipeline:
   EventBus (credential.revoked/issued/unrevoked)
@@ -47,11 +47,12 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 
 | Bileşen | Yöntem | Detay |
 |---------|--------|-------|
-| Frontend Issuer/Verifier | Bearer Token | API Key → sessionStorage |
+| Frontend Issuer/Verifier | Keycloak SSO / Bearer Token | SSO (PKCE) veya API Key → sessionStorage |
 | Web Wallet | Client Credentials | clientId + clientSecret → access token |
 | OpenID4VCI spec endpoints | Token/No Auth | Spec gereği bazı endpoint'ler public |
 | OpenID4VP direct_post | No Auth | Wallet'tan gelen VP submission |
 | OAuth Bridge | VC JWT (self-auth) | VC credential'i kendisi authentication gorevi gorur |
+| Backend middleware | 3-strategy chain | Keycloak JWT → local JWT → API key (`authenticateAny()`) |
 
 ---
 
@@ -90,6 +91,8 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 |--------|------|------|------------|----------|
 | POST | `/api/v1/auth/token` | - | 10/15min | Client credentials → JWT access token |
 | POST | `/api/v1/auth/introspect` | - | - | JWT token doğrulama/introspect |
+| GET | `/api/v1/auth/keycloak/config` | - | - | Keycloak OIDC config (realmUrl, clientId) |
+| POST | `/api/v1/auth/keycloak/callback` | - | 10/15min | Authorization code + PKCE verifier → local JWT |
 
 **Token Request:**
 ```json
@@ -536,7 +539,9 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 
 ```
 Login
-  └─▶ GET  /api/v1/issuer/did  VEYA  GET /api/v1/verifier/did  (credential doğrulama)
+  ├─▶ GET  /api/v1/auth/keycloak/config  (SSO availability check)
+  ├─▶ [SSO] Redirect → Keycloak → POST /api/v1/auth/keycloak/callback (code+verifier)
+  └─▶ [API Key] GET /api/v1/issuer/did  VEYA  GET /api/v1/verifier/did
 
 Issuer Dashboard
   ├─▶ POST /api/v1/issuer/credentials/agent-identity  → credentialOfferUri + QR
@@ -839,4 +844,8 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `web-wallet/src/components/DelegationCard.tsx` | Delegation credential card (scope, chain depth, expiry, maxAmount) |
 | `web-wallet/src/components/CapabilityCard.tsx` | Capability credential card (tool allow list, usage, context) |
 | `web-wallet/src/components/DelegationChainView.tsx` | Chain visualization modal (A→B→C with status colors) |
-| `docker-compose.dev.yml` | Dev environment (4 services: backend, wallet, frontend, postgres) |
+| `backend/src/services/keycloak.service.ts` | Keycloak OIDC — JWKS validation, token verify, role mapping, code exchange |
+| `backend/src/api/routes/keycloak-auth.routes.ts` | Keycloak auth endpoints (/config, /callback) |
+| `frontend-issuer-verifier/src/services/keycloak.ts` | Frontend PKCE flow — native crypto, state/verifier management |
+| `backend/docker/keycloak/ssi-realm.json` | Keycloak realm import (3 clients, 4 roles, 2 test users) |
+| `docker-compose.dev.yml` | Dev environment (5 services: backend, wallet, frontend, postgres, keycloak) |

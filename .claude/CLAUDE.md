@@ -115,6 +115,10 @@ cd web-wallet && npm run dev
 - **[2026-03-12] Security:** Caller identity için client-provided header (ör. `X-Delegator-Did`) kullanma — spoofable. Authorization-critical kararlar için authenticated identity (JWT sub, API key→DID mapping) kullan.
 - **[2026-03-12] Architecture:** EventBus emit'leri ve webhook subscription types senkron tutulmalı. Yeni event emit ediyorsan `WEBHOOK_EVENT_TYPES` enum'una da ekle, yoksa subscriber'lar o event'i alamaz.
 - **[2026-03-12] Performance:** Ağaç yapılarında (delegation chain, trust graph) N+1 yerine PostgreSQL `WITH RECURSIVE` CTE kullan — tek sorguda ancestor+descendant traversal. `getDelegationChain()` 4+ SELECT → 1 CTE ile değiştirildi.
+- **[2026-03-12] Security:** OIDC authorization code, talep eden `client_id`'ye bağlıdır. Frontend `ssi-frontend` ile auth request yapıyorsa, token exchange de `ssi-frontend` kullanmalı — backend confidential client ile exchange edemez. Bkz: `.claude/solutions/keycloak-sso-pkce-integration.md`
+- **[2026-03-12] Security:** PKCE `code_verifier` üretildiği yerden (frontend) exchange yapılacak yere (backend) iletilmeli. Eksik `code_verifier` Keycloak token exchange'i reddeder.
+- **[2026-03-12] Architecture:** Yeni IdP (Keycloak vb.) eklerken her zaman env var ile optional yap. Mevcut auth (API key + JWT) bozulmadan graceful degradation sağla. `isKeycloakConfigured()` gate pattern.
+- **[2026-03-12] Architecture:** PKCE için `keycloak-js` gibi ek bağımlılık gerekmez — native `crypto.subtle.digest('SHA-256')` + `crypto.getRandomValues()` yeterli. Bundle size'ı ~50KB azaltır.
 
 ## Pattern Library
 
@@ -135,3 +139,4 @@ cd web-wallet && npm run dev
 | OAuth 2.0 Bridge RFC 8693 | VC → OAuth token exchange, scope mapping, pre-auth endpoint pattern | `.claude/solutions/oauth2-bridge-rfc8693.md` |
 | Realtime Webhook Pipeline | EventBus→WebSocket+HTTP webhook, HMAC delivery, SSRF protection, subscription cache | `.claude/solutions/realtime-webhook-notification-pipeline.md` |
 | Delegation Chain Attenuation | A→B→C sub-delegation, scope narrowing, cascade revoke, VC↔DB integration | `.claude/solutions/delegation-chain-attenuation.md` |
+| Keycloak SSO PKCE Integration | 3-strategy auth chain, PKCE flow, dual client (public+confidential), graceful degradation | `.claude/solutions/keycloak-sso-pkce-integration.md` |

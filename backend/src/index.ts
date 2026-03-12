@@ -33,6 +33,7 @@ import { schemaRegistry } from './services/schemaRegistry.service'
 import { wsService } from './services/websocket.service'
 import { expirationNotifier } from './services/expirationNotifier.service'
 import { deliverEvent as deliverWebhookEvent, pruneDeliveries } from './services/webhook.service'
+import { initKeycloak } from './services/keycloak.service'
 
 dotenv.config()
 
@@ -79,6 +80,21 @@ async function main() {
     // Initialize services that depend on storage
     await encryptionService.initialize()
     await schemaRegistry.initialize()
+
+    // Initialize Keycloak SSO (optional — graceful if not configured)
+    const keycloakRealmUrl = process.env.KEYCLOAK_REALM_URL
+    const keycloakClientId = process.env.KEYCLOAK_CLIENT_ID
+    if (keycloakRealmUrl && keycloakClientId) {
+      initKeycloak({
+        realmUrl: keycloakRealmUrl,
+        clientId: keycloakClientId,
+        clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
+        frontendClientId: process.env.KEYCLOAK_FRONTEND_CLIENT_ID || 'ssi-frontend',
+      })
+      logger.info('Keycloak SSO enabled', { realmUrl: keycloakRealmUrl })
+    } else {
+      logger.info('Keycloak SSO not configured — API key + local JWT auth only')
+    }
 
     // Initialize all agents
     logger.info('Initializing agents...')

@@ -1,0 +1,121 @@
+{
+  "realm": "ssi",
+  "enabled": true,
+  "displayName": "SSI Credential Management",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "issuer",
+        "description": "Credential issuer role"
+      },
+      {
+        "name": "verifier",
+        "description": "Credential verifier role"
+      },
+      {
+        "name": "holder",
+        "description": "Credential holder role"
+      },
+      {
+        "name": "admin",
+        "description": "System administrator"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "ssi-backend",
+      "name": "SSI Backend Service",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "ssi-backend-secret-change-in-production",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "ssi-frontend",
+      "name": "SSI Issuer/Verifier Dashboard",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5174/*",
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5174",
+        "http://localhost:3000"
+      ],
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "ssi-wallet",
+      "name": "SSI Web Wallet",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173"
+      ],
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "issuer-admin",
+      "email": "issuer@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Issuer",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "issuer-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["issuer", "default-roles-ssi"]
+    },
+    {
+      "username": "verifier-admin",
+      "email": "verifier@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Verifier",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "verifier-pass-123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["verifier", "default-roles-ssi"]
+    }
+  ]
+}

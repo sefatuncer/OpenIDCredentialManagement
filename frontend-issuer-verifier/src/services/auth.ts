@@ -1,5 +1,6 @@
 import { storage, UserRole } from './storage';
 import { env } from '../config/env';
+import { isKeycloakAuth, keycloakLogout, setKeycloakAuth } from './keycloak';
 
 export interface AuthState {
   isAuthenticated: boolean;
@@ -46,7 +47,12 @@ export const auth = {
 
   logout(): void {
     this.stopSessionCheck();
+    const wasKeycloak = isKeycloakAuth();
+    setKeycloakAuth(false);
     storage.clearAll();
+    if (wasKeycloak) {
+      keycloakLogout();
+    }
   },
 
   switchRole(role: UserRole): void {

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from '../../utils/logger'
+import { isKeycloakConfigured, isKeycloakToken, validateKeycloakToken } from '../../services/keycloak.service'
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -10,6 +11,7 @@ export interface AuthenticatedRequest extends Request {
     permissions?: string[]
   }
   apiKeyId?: string
+  authMethod?: 'keycloak' | 'jwt' | 'apikey'
 }
 
 export interface AuthConfig {
@@ -132,12 +134,37 @@ export function authenticateApiKey(config: AuthConfig = defaultConfig) {
 }
 
 export function authenticateAny(config: AuthConfig = defaultConfig) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const requestId = (req as any).requestId || uuidv4()
     const authHeader = req.headers.authorization
     const apiKey = req.headers['x-api-key'] as string
 
-    // Try JWT first
+    // Try Keycloak JWT first (if configured and token issuer matches)
+    if (authHeader && authHeader.startsWith('Bearer ') && isKeycloakConfigured()) {
+      const token = authHeader.substring(7)
+      if (isKeycloakToken(token)) {
+        try {
+          const kcUser = await validateKeycloakToken(token)
+          if (kcUser) {
+            ;(req as AuthenticatedRequest).user = {
+              sub: kcUser.sub,
+              role: kcUser.roles.find((r) => ['issuer', 'verifier', 'holder', 'admin'].includes(r)),
+              permissions: kcUser.permissions,
+            }
+            ;(req as AuthenticatedRequest).authMethod = 'keycloak'
+            next()
+            return
+          }
+        } catch (error) {
+          logger.debug('Keycloak token validation failed, falling back', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            requestId,
+          })
+        }
+      }
+    }
+
+    // Try local JWT
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7)
       try {
@@ -147,10 +174,10 @@ export function authenticateAny(config: AuthConfig = defaultConfig) {
           permissions?: string[]
         }
         ;(req as AuthenticatedRequest).user = decoded
+        ;(req as AuthenticatedRequest).authMethod = 'jwt'
         next()
         return
       } catch (error) {
-        // Log the JWT verification failure and fall through to API key check
         logger.debug('JWT verification failed, falling back to API key authentication', {
           error: error instanceof Error ? error.message : 'Unknown error',
           requestId
@@ -167,6 +194,7 @@ export function authenticateAny(config: AuthConfig = defaultConfig) {
           sub: keyInfo.id,
           permissions: keyInfo.permissions,
         }
+        ;(req as AuthenticatedRequest).authMethod = 'apikey'
         next()
         return
       }

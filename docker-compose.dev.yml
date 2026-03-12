@@ -38,6 +38,10 @@ services:
       - CREDO_WALLET_ID=ai-agent-wallet-dev
       - ISSUER_BASE_URL=http://backend:3000
       - VERIFIER_BASE_URL=http://backend:3000
+      - KEYCLOAK_REALM_URL=http://keycloak:8080/realms/ssi
+      - KEYCLOAK_CLIENT_ID=ssi-backend
+      - KEYCLOAK_CLIENT_SECRET=ssi-backend-secret-change-in-production
+      - KEYCLOAK_FRONTEND_CLIENT_ID=ssi-frontend
     volumes:
       - ./backend/data:/app/data
     depends_on:
@@ -60,6 +64,35 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: ssi-keycloak
+    command: start-dev --import-realm
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/ssi_dev
+      - KC_DB_USERNAME=ssi_dev
+      - KC_DB_PASSWORD=ssi_dev_pass
+      - KC_DB_SCHEMA=keycloak
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_HEALTH_ENABLED=true
+      - KC_HTTP_PORT=8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/docker/keycloak/ssi-realm.json:/opt/keycloak/data/import/ssi-realm.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\n\r\n' >&3 && cat <&3 | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
 
   issuer-verifier-dashboard:

@@ -233,6 +233,16 @@ export const webhookUpdateSchema = z.object({
 export type WebhookCreateInput = z.infer<typeof webhookCreateSchema>
 export type WebhookUpdateInput = z.infer<typeof webhookUpdateSchema>
 
+// Keycloak SSO schemas
+export const keycloakCallbackSchema = z.object({
+  code: z.string().min(1, 'Authorization code is required'),
+  redirectUri: z.string().url('Valid redirect URI required'),
+  codeVerifier: z.string().min(43, 'PKCE code verifier required').max(128),
+  state: z.string().optional(),
+})
+
+export type KeycloakCallbackInput = z.infer<typeof keycloakCallbackSchema>
+
 // Type exports
 export type AgentIdentityCredentialInput = z.infer<typeof agentIdentityCredentialSchema>
 export type DelegationCredentialInput = z.infer<typeof delegationCredentialSchema>
