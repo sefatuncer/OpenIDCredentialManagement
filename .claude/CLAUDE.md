@@ -121,6 +121,10 @@ cd web-wallet && npm run dev
 - **[2026-03-12] Architecture:** PKCE için `keycloak-js` gibi ek bağımlılık gerekmez — native `crypto.subtle.digest('SHA-256')` + `crypto.getRandomValues()` yeterli. Bundle size'ı ~50KB azaltır.
 - **[2026-03-12] Architecture:** Multi-tenant middleware varsayılan olarak `optionalTenant()` (non-breaking) olmalı, `requireTenant()` değil. Mevcut single-tenant deploylar bozulmadan çalışmaya devam etmeli. Feature-flag gating (`module.multi-tenant`) ile kontrol et. Bkz: `.claude/solutions/multi-tenant-credential-isolation.md`
 - **[2026-03-12] Security:** Frontend API client'ları her zaman shared `request()` helper'ı kullanmalı. Standalone fetch wrapper'lar token refresh ve 401 redirect'i bypass eder.
+- **[2026-03-12] Architecture:** Web wallet → RN migration'da ~60% code reuse mümkün. Platform adaptasyon noktaları: storage (sessionStorage→expo-secure-store), env vars (import.meta.env→Constants.expoConfig.extra), URL encoding (URLSearchParams→manual). Pure JS crypto (jose) tercih et. Bkz: `.claude/solutions/react-native-mobile-wallet-cross-platform.md`
+- **[2026-03-12] TypeScript:** `Record<string, unknown>` + JSX'te `{value && <Text>}` pattern'i RN'de type error verir. Ternary kullan: `{value ? <Text>... : null}`.
+- **[2026-03-12] Architecture:** Mobile app'te WebSocket lifecycle AppState'e bağlanmalı — background'a geçince disconnect, foreground'a dönünce reconnect. `useRef` ile stabil callback tut.
+- **[2026-03-12] Security:** Push notification backend endpoint yoksa silent fail et (log + return false). Mobile app başlatılmadan push çalışmaz — crash yerine graceful degrade.
 
 ## Pattern Library
 
@@ -143,3 +147,4 @@ cd web-wallet && npm run dev
 | Realtime Webhook Pipeline | EventBus→WebSocket+HTTP webhook, HMAC delivery, SSRF protection, subscription cache | `.claude/solutions/realtime-webhook-notification-pipeline.md` |
 | Delegation Chain Attenuation | A→B→C sub-delegation, scope narrowing, cascade revoke, VC↔DB integration | `.claude/solutions/delegation-chain-attenuation.md` |
 | Keycloak SSO PKCE Integration | 3-strategy auth chain, PKCE flow, dual client (public+confidential), graceful degradation | `.claude/solutions/keycloak-sso-pkce-integration.md` |
+| React Native Mobile Wallet | Expo cross-platform SSI wallet, 60% web-wallet reuse, jose pure JS crypto, biometric+QR+push | `.claude/solutions/react-native-mobile-wallet-cross-platform.md` |

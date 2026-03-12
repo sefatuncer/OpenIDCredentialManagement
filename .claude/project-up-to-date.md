@@ -19,6 +19,14 @@
 
 Docker Compose Dev: 5 servis (backend, web-wallet, issuer-verifier, postgres, keycloak:8080)
 
+Mobile Wallet (React Native / Expo):
+  ├── Screens: Home, Credentials, Scan, PresentCredential, Delegations, Agent, Trust, Settings
+  ├── Native: Biometric (FaceID/TouchID), QR Scan (expo-camera), Push (Expo Push API)
+  ├── Crypto: jose (pure JS — Ed25519, DID:key, VP token signing)
+  ├── Storage: expo-secure-store (Keychain/Keystore)
+  ├── Deep Links: openid4vp://, openid-credential-offer://, ssi-wallet://
+  └── WebSocket: Auto-reconnect + AppState lifecycle (bg disconnect, fg reconnect)
+
 Real-time Pipeline:
   EventBus (credential.revoked/issued/unrevoked)
     ├── WebSocket broadcast → frontend toast notifications
@@ -242,6 +250,7 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 | POST | `/api/v1/holder/credentials/present` | Auth | VP oluştur ve sun |
 | GET | `/api/v1/holder/credentials` | Auth | Saklanan credential'ları listele |
 | DELETE | `/api/v1/holder/credentials/{credentialId}` | Auth | Credential sil |
+| POST | `/api/v1/holder/push-token` | Auth | Push notification token kaydet (token, platform: ios/android/web) |
 
 ---
 
@@ -691,6 +700,57 @@ OpenID4VC Flows (Wallet ↔ Issuer/Verifier)
 ```
 
 **Not:** VP flow artık dual-mode: Client-side (varsayılan) veya Backend. Client-side modda wallet kendi Ed25519 key pair'i ile VP token oluşturur ve `direct_post`'a doğrudan gönderir. SD-JWT credential'lar için selective disclosure UI mevcuttur.
+
+### Mobile Wallet (React Native / Expo)
+
+```
+Authentication
+  └─▶ POST /api/v1/auth/token  (client credentials → access token, expo-secure-store cache)
+
+Biometric Gate (App Root)
+  └─▶ expo-local-authentication (FaceID / TouchID / Passcode fallback)
+
+Home Dashboard
+  ├─▶ POST /api/v1/agents/register           → Agent DID (ilk kurulum)
+  ├─▶ GET  /api/v1/wallet/{did}              → Wallet state
+  └─▶ ws://localhost:3000/ws                 → Real-time events (auto-reconnect + AppState lifecycle)
+
+Credentials (expo-secure-store encrypted)
+  ├─▶ GET  /api/v1/holder/credentials        → Credential list (jwt + combined + isSDJWT)
+  ├─▶ Local: SD-JWT client-side parsing (base64url decode)
+  └─▶ Type-based card routing: AgentIdentityCard, DelegationCard, CapabilityCard, SDJWTCredentialCard
+
+QR Scan (expo-camera)
+  ├─▶ openid4vp://  → PresentCredentialScreen (VP flow)
+  └─▶ openid-credential-offer://  → Credential receive flow
+
+VP Presentation (Client-Side — jose pure JS)
+  ├─▶ fetch(request_uri) → presentation_definition
+  ├─▶ Wallet-local: credential matching, SD-JWT disclosure toggle
+  ├─▶ Wallet-local: Ed25519 key → did:key → VP token (jose SignJWT)
+  └─▶ POST /direct_post  (application/x-www-form-urlencoded)
+
+Delegations
+  ├─▶ GET  /api/v1/delegations                → received + given
+  ├─▶ POST /api/v1/delegations                → create (modal)
+  └─▶ POST /api/v1/delegations/{id}/revoke    → revoke
+
+Agent Management
+  ├─▶ POST /api/v1/agents/register            → register (name, type, capabilities)
+  └─▶ GET  /api/v1/wallet/{did}               → profile + activity log
+
+Trust Management
+  ├─▶ POST   /api/v1/agent-trust              → establish trust
+  ├─▶ GET    /api/v1/agent-trust/{did}        → relationships
+  └─▶ DELETE /api/v1/agent-trust/{did}/{trustedDid}  → revoke
+
+Push Notifications (expo-notifications)
+  ├─▶ POST /api/v1/holder/push-token          → register Expo push token
+  └─▶ Backend: EventBus credential.revoked → Expo Push API broadcast
+```
+
+**Deep Link URI Schemes:** `openid4vp://`, `openid-credential-offer://`, `ssi-wallet://`
+**Code Reuse:** ~60% from web-wallet (types=100%, vp/sdjwt=100%, wallet-key/api=90%, UI=0%)
 
 ---
 

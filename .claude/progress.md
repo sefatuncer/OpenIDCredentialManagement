@@ -174,6 +174,6 @@ Single environment development setup - no staging/production yet.
 
 | Durum | Sayı |
 |-------|------|
-| Tamamlandı (done) | 14 |
-| Beklemede (pending) | 21 |
+| Tamamlandı (done) | 15 |
+| Beklemede (pending) | 20 |
 | **Toplam** | **35** |
