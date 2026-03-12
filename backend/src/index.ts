@@ -30,6 +30,9 @@ import { initializeFeatures, getFeatureSummary } from './config/features.config'
 import { initializeCredoService, isUsingCredo, shutdownCredoService } from './services/credo.service'
 import { encryptionService } from './services/encryption.service'
 import { schemaRegistry } from './services/schemaRegistry.service'
+import { wsService } from './services/websocket.service'
+import { expirationNotifier } from './services/expirationNotifier.service'
+import { deliverEvent as deliverWebhookEvent, pruneDeliveries } from './services/webhook.service'
 
 dotenv.config()
 
@@ -157,6 +160,42 @@ async function main() {
 
     const displayPort = protocol === 'https' ? httpsPort : port
 
+    // Initialize WebSocket service
+    wsService.initialize(server)
+
+    // Wire EventBus → WebSocket + Webhook delivery (single handler per event)
+    eventBus.on('credential.revoked', (e) => {
+      const d = e.data as Record<string, unknown>
+      wsService.emitCredentialRevoked(d.credentialId as string, d.reason as string)
+      deliverWebhookEvent('credential.revoked', e.data).catch((err) =>
+        logger.error('Webhook delivery failed', { event: 'credential.revoked', error: err }),
+      )
+    })
+    eventBus.on('credential.issued', (e) => {
+      const d = e.data as Record<string, unknown>
+      wsService.emitCredentialIssued(d.credentialId as string, d.type as string)
+      deliverWebhookEvent('credential.issued', e.data).catch((err) =>
+        logger.error('Webhook delivery failed', { event: 'credential.issued', error: err }),
+      )
+    })
+    eventBus.on('credential.unrevoked', (e) => {
+      const d = e.data as Record<string, unknown>
+      wsService.broadcast('credential:revoked', { credentialId: d.credentialId, unrevoked: true })
+      deliverWebhookEvent('credential.unrevoked', e.data).catch((err) =>
+        logger.error('Webhook delivery failed', { event: 'credential.unrevoked', error: err }),
+      )
+    })
+
+    // Start expiration notifier
+    expirationNotifier.start()
+
+    // Prune old webhook deliveries every hour
+    const deliveryPruneInterval = setInterval(() => {
+      pruneDeliveries().catch((err) =>
+        logger.error('Webhook delivery pruning failed', { error: err }),
+      )
+    }, 60 * 60 * 1000)
+
     // Emit system startup event
     eventBus.emit('system.startup', {
       protocol,
@@ -189,6 +228,10 @@ async function main() {
       eventBus.emit('system.shutdown', {
         timestamp: new Date(),
       })
+
+      wsService.close()
+      expirationNotifier.stop()
+      clearInterval(deliveryPruneInterval)
 
       server.close(() => {
         logger.info('Server closed')

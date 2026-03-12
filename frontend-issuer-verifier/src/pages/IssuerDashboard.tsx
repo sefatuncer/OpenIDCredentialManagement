@@ -165,6 +165,18 @@ export function IssuerDashboard() {
 
         <div className="card">
           <div className="card-header">
+            <h3 className="card-title">Webhooks</h3>
+          </div>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+            Configure HTTP webhook notifications for credential events.
+          </p>
+          <Link to="/issuer/webhooks" className="btn btn-secondary">
+            Manage Webhooks
+          </Link>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
             <h3 className="card-title">📋 Audit Logs</h3>
           </div>
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>

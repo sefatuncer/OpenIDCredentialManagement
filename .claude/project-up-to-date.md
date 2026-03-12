@@ -19,6 +19,11 @@
 
 Docker Compose Dev: 4 servis (backend, web-wallet, issuer-verifier, postgres)
 
+Real-time Pipeline:
+  EventBus (credential.revoked/issued/unrevoked)
+    ├── WebSocket broadcast → frontend toast notifications
+    └── HTTP webhook delivery → external systems (HMAC-SHA256 signed)
+
 Credo-TS Route Base Paths (Askar aktifken):
   /oid4vci/{issuerId}/...    → Credo issuer endpoints (token, credential, offers)
   /oid4vp/{verifierId}/...   → Credo verifier endpoints (authorization-requests)
@@ -476,6 +481,43 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 
 ---
 
+### Webhooks (Real-time Notifications)
+
+| Method | Path | Auth | Rate Limit | Aciklama |
+|--------|------|------|------------|----------|
+| GET | `/api/v1/webhooks` | Auth | - | Tum webhook subscription'lari listele |
+| GET | `/api/v1/webhooks/{id}` | Auth | - | Webhook detayi |
+| POST | `/api/v1/webhooks` | Auth | Strict | Yeni webhook subscription olustur (secret doner) |
+| PUT | `/api/v1/webhooks/{id}` | Auth | Strict | Webhook guncelle |
+| DELETE | `/api/v1/webhooks/{id}` | Auth | Strict | Webhook sil |
+| POST | `/api/v1/webhooks/{id}/test` | Auth | Strict | Test event gonder |
+| GET | `/api/v1/webhooks/{id}/deliveries` | Auth | - | Delivery history (son 50) |
+
+**Desteklenen event'ler:** `credential.revoked`, `credential.unrevoked`, `credential.issued`, `verification.completed`
+
+**Webhook Payload:**
+```json
+{
+  "event": "credential.revoked",
+  "data": { "credentialId": "...", "reason": "..." },
+  "timestamp": "2026-03-12T..."
+}
+```
+
+**Security:**
+- HMAC-SHA256 signature: `X-Webhook-Signature: sha256=<hex>`
+- HTTPS enforced in production
+- SSRF koruması (private IP engelleme)
+- Max 20 subscription limiti
+- Retry: 3 deneme, exponential backoff (1s → 10s → 60s)
+
+**WebSocket (Real-time):**
+- Endpoint: `ws://localhost:3000/ws`
+- Event'ler: `credential:issued`, `credential:revoked`, `credential:verified`, `credential:expiring`, `credential:expired`
+- EventBus → WebSocket bridge otomatik (index.ts'de wire-up)
+
+---
+
 ### Legacy Redirects
 
 | Eski Path | Yeni Path | Status |
@@ -532,6 +574,17 @@ Trust Management
   ├─▶ POST   /api/v1/trust/entities
   ├─▶ DELETE  /api/v1/trust/entities/{did}
   └─▶ GET    /api/v1/trust/policies
+
+Webhook Management (/issuer/webhooks)
+  ├─▶ GET    /api/v1/webhooks                     → subscription listesi
+  ├─▶ POST   /api/v1/webhooks                     → yeni subscription (secret doner)
+  ├─▶ PUT    /api/v1/webhooks/{id}                → guncelle (active toggle)
+  ├─▶ DELETE /api/v1/webhooks/{id}                → sil
+  ├─▶ POST   /api/v1/webhooks/{id}/test           → test event gonder
+  └─▶ GET    /api/v1/webhooks/{id}/deliveries     → delivery history
+
+Real-time Notifications (WebSocket)
+  └─▶ ws://localhost:3000/ws  → credential:issued, credential:revoked toasts
 
 OAuth Bridge (/issuer/oauth-bridge)
   ├─▶ POST /api/v1/oauth/token-exchange   → VC JWT → OAuth access token
@@ -700,6 +753,7 @@ Verifier Frontend               Backend                        Wallet
 | Verification | 50 req / min |
 | Trust/Revocation | Strict (daha düşük) |
 | OAuth Bridge (exchange/introspect) | 10 req / 15 min |
+| Webhook mutations (create/update/delete/test) | Strict |
 
 ### Middleware
 - **CORS:** Whitelist (localhost:3000, 5173, 5174)
@@ -717,6 +771,7 @@ Verifier Frontend               Backend                        Wallet
 | Wallet credential encryption | AES-GCM-256 (client-side, localStorage) |
 | Wallet VP key encryption | AES-GCM-256 (client-side, sessionStorage) |
 | Encryption key-at-rest | AES-256-GCM envelope wrap (KEK from env var) |
+| Webhook signing | HMAC-SHA256 (per-subscription secret) |
 | Client secrets | bcrypt hash |
 
 ---
@@ -768,4 +823,11 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `backend/src/services/oauth-bridge.service.ts` | OAuth 2.0 Bridge — VC verification, scope mapping, token exchange (RFC 8693) |
 | `backend/src/api/routes/oauth-bridge.routes.ts` | OAuth bridge endpoints (token-exchange, introspect, scope-mappings, well-known) |
 | `frontend-issuer-verifier/src/pages/OAuthBridge.tsx` | OAuth bridge admin UI (exchange, introspect, mappings tabs) |
+| `backend/src/services/webhook.service.ts` | Webhook subscription CRUD + re-export delivery functions |
+| `backend/src/services/webhookDelivery.service.ts` | HMAC-SHA256 delivery engine, retry, subscription cache, pruning |
+| `backend/src/api/routes/webhook.routes.ts` | Webhook CRUD + test + delivery history endpoints (7 routes) |
+| `backend/src/services/websocket.service.ts` | WebSocket real-time broadcasts (`/ws` endpoint) |
+| `frontend-issuer-verifier/src/pages/WebhookManagement.tsx` | Webhook subscription management UI (list/create/detail/deliveries) |
+| `frontend-issuer-verifier/src/hooks/useWebSocket.ts` | WebSocket client hook with auto-reconnect + stable ref pattern |
+| `frontend-issuer-verifier/src/components/NotificationToast.tsx` | Real-time credential event toast notifications |
 | `docker-compose.dev.yml` | Dev environment (4 services: backend, wallet, frontend, postgres) |

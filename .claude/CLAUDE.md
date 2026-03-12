@@ -106,6 +106,11 @@ cd web-wallet && npm run dev
 - **[2026-03-12] TypeScript:** jose browser bundle'da `KeyLike` type export edilmez. Browser context'te `CryptoKey` type assertion kullan.
 - **[2026-03-12] Security:** Global rate limiter'dan önce mount edilen route'lar rate limiting'i bypass eder. Pre-auth endpoint'lere her zaman per-route `authRateLimiter` ekle. Bkz: `.claude/solutions/oauth2-bridge-rfc8693.md`
 - **[2026-03-12] Architecture:** Aynı veri (ör. scope mapping, trust level) hem service hem route'ta tanımlanmamalı. Service'den export et, route sadece pass-through yapsın — veri tutarsızlığını önler.
+- **[2026-03-12] Architecture:** Mevcut servislerin `index.ts`'te initialize edilip edilmediğini kontrol et. `wsService.initialize(server)` ve `expirationNotifier.start()` gibi çağrılar eksik olabilir — orphan service pattern infrastructure seviyesinde de geçerli.
+- **[2026-03-12] Architecture:** Aynı EventBus event'i için birden fazla listener kaydetme — tek handler içinde fan-out yap. Duplicate listener'lar divergence riski ve double-processing yaratır.
+- **[2026-03-12] Security:** Kullanıcı tarafından sağlanan URL'lere outbound HTTP yapılıyorsa SSRF koruması (private IP blocking) ekle. Hostname-level check DNS rebinding'e karşı tam koruma sağlamaz ama temel saldırıları engeller. Bkz: `.claude/solutions/realtime-webhook-notification-pipeline.md`
+- **[2026-03-12] Architecture:** Servis dosyası ~300L'yi aşınca concern'e göre böl (CRUD vs engine). "Thin wrapper + re-export" pattern public API'yi değiştirmeden iç yapıyı temizler.
+- **[2026-03-12] TypeScript:** React hook'larında WebSocket/timer gibi side effect'ler `useRef` ile callback referansı tutmalı. `useCallback` dep'ine callback koyulursa her render'da reconnect olur.
 
 ## Pattern Library
 
@@ -124,3 +129,4 @@ cd web-wallet && npm run dev
 | Schema-Driven Issuance Wizard | 3-step wizard: schema→claims→SD options→preview→QR, type-to-function routing | `.claude/solutions/schema-driven-issuance-wizard.md` |
 | Client-Side VP Flow | Wallet-local Ed25519 key, DID:key, encrypted storage, direct_post, SD-JWT disclosure selection | `.claude/solutions/client-side-vp-flow.md` |
 | OAuth 2.0 Bridge RFC 8693 | VC → OAuth token exchange, scope mapping, pre-auth endpoint pattern | `.claude/solutions/oauth2-bridge-rfc8693.md` |
+| Realtime Webhook Pipeline | EventBus→WebSocket+HTTP webhook, HMAC delivery, SSRF protection, subscription cache | `.claude/solutions/realtime-webhook-notification-pipeline.md` |

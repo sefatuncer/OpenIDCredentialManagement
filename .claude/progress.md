@@ -102,13 +102,27 @@ Single environment development setup - no staging/production yet.
 - [x] Client-side VP flow (todo 007) — 2026-03-12
 - [ ] React Native mobil wallet (todo 023)
 
+### Real-time Revocation Webhooks (2026-03-12)
+- [x] WebSocket service wired up (`wsService.initialize(server)` in index.ts)
+- [x] ExpirationNotifier started at boot
+- [x] EventBus → WebSocket bridge (credential.revoked/issued/unrevoked)
+- [x] EventBus → Webhook delivery bridge
+- [x] Webhook service: CRUD + HMAC-SHA256 delivery + retry (3x exponential backoff)
+- [x] SSRF protection (private IP blocking)
+- [x] 7 webhook API endpoints (CRUD + test + deliveries)
+- [x] Zod validation schemas for webhooks
+- [x] Frontend: WebhookManagement page (list, create, detail, delivery history)
+- [x] Frontend: WebSocket hook with auto-reconnect
+- [x] Frontend: Real-time toast notifications via WebSocket
+- [x] IssuerDashboard webhook nav card + Layout nav item
+
 ## WP3: İleri Geliştirme + Blockchain — Beta Prototip (Ay 7-12)
 
 - [ ] Hyperledger Fabric entegrasyonu (todo 011)
 - [x] OAuth 2.0 bridge adapter (todo 012) — 2026-03-12
 - [ ] DIDComm v1/v2 entegrasyonu (todo 013)
 - [ ] Multi-tenant credential izolasyonu (todo 014)
-- [ ] Gerçek zamanlı revocation — webhook (todo 015)
+- [x] Gerçek zamanlı revocation — webhook (todo 015) — 2026-03-12
 - [ ] OPA/Cerbos fine-grained authorization (todo 024)
 
 ## WP4: Test Altyapısı (Ay 4-6, 9-12 — Paralel)

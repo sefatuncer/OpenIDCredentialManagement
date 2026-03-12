@@ -8,12 +8,14 @@ import { BatchIssue } from './pages/BatchIssue';
 import { IssueAdvanced } from './pages/IssueAdvanced';
 import { SchemaManagement } from './pages/SchemaManagement';
 import { OAuthBridge } from './pages/OAuthBridge';
+import { WebhookManagement } from './pages/WebhookManagement';
 import { VerifyRequest } from './pages/VerifyRequest';
 import { VerifyResults } from './pages/VerifyResults';
 import { TrustManagement } from './pages/TrustManagement';
 import { AuditLogs } from './pages/AuditLogs';
 import { ToastContainer } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { NotificationListener } from './components/NotificationToast';
 import { auth } from './services/auth';
 import './styles/main.css';
 
@@ -36,6 +38,7 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <ToastContainer />
+        <NotificationListener />
         <Routes>
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
@@ -94,6 +97,14 @@ function App() {
           element={
             <ProtectedRoute requiredRole="issuer">
               <AuditLogs role="issuer" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/issuer/webhooks"
+          element={
+            <ProtectedRoute requiredRole="issuer">
+              <WebhookManagement />
             </ProtectedRoute>
           }
         />

@@ -164,6 +164,38 @@ export const bridgeIntrospectSchema = z.object({
 export type TokenExchangeInput = z.infer<typeof tokenExchangeSchema>
 export type BridgeIntrospectInput = z.infer<typeof bridgeIntrospectSchema>
 
+// Webhook schemas
+const WEBHOOK_EVENT_TYPES = [
+  'credential.revoked',
+  'credential.unrevoked',
+  'credential.issued',
+  'verification.completed',
+] as const
+
+export const webhookCreateSchema = z.object({
+  url: z.string().url('Valid URL required').refine(
+    (u) => u.startsWith('https://') || process.env.NODE_ENV !== 'production',
+    'HTTPS required for webhook URLs in production',
+  ),
+  events: z.array(z.enum(WEBHOOK_EVENT_TYPES)).min(1, 'At least one event required'),
+  name: z.string().max(100).optional(),
+  description: z.string().max(500).optional(),
+})
+
+export const webhookUpdateSchema = z.object({
+  url: z.string().url('Valid URL required').refine(
+    (u) => u.startsWith('https://') || process.env.NODE_ENV !== 'production',
+    'HTTPS required for webhook URLs in production',
+  ).optional(),
+  events: z.array(z.enum(WEBHOOK_EVENT_TYPES)).min(1).optional(),
+  active: z.boolean().optional(),
+  name: z.string().max(100).optional(),
+  description: z.string().max(500).optional(),
+})
+
+export type WebhookCreateInput = z.infer<typeof webhookCreateSchema>
+export type WebhookUpdateInput = z.infer<typeof webhookUpdateSchema>
+
 // Type exports
 export type AgentIdentityCredentialInput = z.infer<typeof agentIdentityCredentialSchema>
 export type DelegationCredentialInput = z.infer<typeof delegationCredentialSchema>

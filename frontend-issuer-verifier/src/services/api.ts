@@ -494,6 +494,99 @@ export const oauthBridgeApi = {
     }>('/oauth/scope-mappings'),
 };
 
+// Webhook API
+export const webhookApi = {
+  list: () =>
+    request<{
+      webhooks: Array<{
+        id: string;
+        url: string;
+        secret: string;
+        events: string[];
+        active: boolean;
+        createdAt: string;
+        updatedAt: string;
+        metadata?: { name?: string; description?: string };
+      }>;
+    }>('/webhooks'),
+
+  get: (id: string) =>
+    request<{
+      webhook: {
+        id: string;
+        url: string;
+        secret: string;
+        events: string[];
+        active: boolean;
+        createdAt: string;
+        updatedAt: string;
+        metadata?: { name?: string; description?: string };
+      };
+    }>(`/webhooks/${encodeURIComponent(id)}`),
+
+  create: (data: {
+    url: string;
+    events: string[];
+    name?: string;
+    description?: string;
+  }) =>
+    request<{
+      webhook: {
+        id: string;
+        url: string;
+        secret: string;
+        events: string[];
+        active: boolean;
+        createdAt: string;
+        metadata?: { name?: string; description?: string };
+      };
+    }>('/webhooks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: {
+    url?: string;
+    events?: string[];
+    active?: boolean;
+    name?: string;
+    description?: string;
+  }) =>
+    request<{ webhook: unknown }>(`/webhooks/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/webhooks/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  test: (id: string) =>
+    request<{
+      success: boolean;
+      responseStatus?: number;
+      latencyMs: number;
+    }>(`/webhooks/${encodeURIComponent(id)}/test`, {
+      method: 'POST',
+    }),
+
+  deliveries: (id: string) =>
+    request<{
+      deliveries: Array<{
+        id: string;
+        webhookId: string;
+        event: string;
+        status: 'pending' | 'success' | 'failed';
+        attempts: number;
+        responseStatus?: number;
+        responseBody?: string;
+        createdAt: string;
+        lastAttemptAt?: string;
+      }>;
+    }>(`/webhooks/${encodeURIComponent(id)}/deliveries`),
+};
+
 // Health check
 export const healthApi = {
   check: () => request<{ status: string }>('/health', {}, { showErrorToast: false }),
@@ -508,5 +601,6 @@ export default {
   audit: auditApi,
   schema: schemaApi,
   oauthBridge: oauthBridgeApi,
+  webhook: webhookApi,
   health: healthApi,
 };
