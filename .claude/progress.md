@@ -109,6 +109,16 @@ Single environment development setup - no staging/production yet.
 - [x] WebSocket real-time events (useWebSocket hook)
 - [x] Backend: push-notification.service + POST /holder/push-token endpoint
 
+### Mobile Wallet Security Fixes (2026-03-12) ✅ TAMAMLANDI
+- [x] P1: clientSecret validation (empty default kaldırıldı)
+- [x] P1: SSRF koruması (private IP blocking + HTTPS enforcement)
+- [x] P1: Presentation definition runtime validation
+- [x] P2: AES-GCM-256 encrypted private key storage
+- [x] P2: Token TTL tracking + proactive refresh
+- [x] P2: CreateDelegationModal extraction (307→204 lines)
+- [x] P2: DID format validation
+- [x] P2: Credential matching field filter support (const/enum/pattern)
+
 ## WP1: Hızlı Analiz ve Mimari Tasarım (Ay 1-3)
 
 - [ ] Cloud HSM ön değerlendirme (todo 025)

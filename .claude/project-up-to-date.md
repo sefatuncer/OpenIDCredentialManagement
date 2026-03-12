@@ -874,9 +874,26 @@ Verifier Frontend               Backend                        Wallet
 | SD-JWT digests | SHA-256 |
 | Wallet credential encryption | AES-GCM-256 (client-side, localStorage) |
 | Wallet VP key encryption | AES-GCM-256 (client-side, sessionStorage) |
+| Mobile wallet key-at-rest | AES-GCM-256 (crypto.subtle → expo-secure-store) |
 | Encryption key-at-rest | AES-256-GCM envelope wrap (KEK from env var) |
 | Webhook signing | HMAC-SHA256 (per-subscription secret) |
 | Client secrets | bcrypt hash |
+
+### SSRF Koruması
+| Bileşen | Koruma |
+|---------|--------|
+| Backend webhook delivery | Private IP blocking (hostname regex) + HTTPS enforcement (prod) |
+| Mobile wallet VP fetch | `validateUrl()` — private IP blocking + HTTPS enforcement (prod) |
+| Mobile wallet VP submit | `validateUrl()` — aynı koruma |
+
+### Input Validation (Mobile Wallet)
+| Veri | Yöntem |
+|------|--------|
+| Presentation definition | `validatePresentationDefinition()` runtime type guard (id + input_descriptors) |
+| Delegation DID | `/^did:[a-z0-9]+:.+$/i` regex |
+| Client credentials | clientSecret yoksa throw (empty default yok) |
+| Auth token | JWT exp parse + 60s buffer TTL check |
+| Credential matching | field.filter.const / enum / pattern constraint check |
 
 ---
 

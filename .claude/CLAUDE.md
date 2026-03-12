@@ -126,6 +126,8 @@ cd web-wallet && npm run dev
 - **[2026-03-12] TypeScript:** `Record<string, unknown>` + JSX'te `{value && <Text>}` pattern'i RN'de type error verir. Ternary kullan: `{value ? <Text>... : null}`.
 - **[2026-03-12] Architecture:** Mobile app'te WebSocket lifecycle AppState'e bağlanmalı — background'a geçince disconnect, foreground'a dönünce reconnect. `useRef` ile stabil callback tut.
 - **[2026-03-12] Security:** Push notification backend endpoint yoksa silent fail et (log + return false). Mobile app başlatılmadan push çalışmaz — crash yerine graceful degrade.
+- **[2026-03-12] Security:** Outbound fetch yapan her client-side servis (VP fetch, webhook delivery) SSRF koruması gerektirir — aynı private IP pattern'i backend ve mobile'da tekrar kullan. `validateUrl()` helper'ı her yeni outbound fetch noktasına ekle.
+- **[2026-03-12] Security:** Presentation definition gibi dışarıdan gelen yapısal veride `JSON.parse()` sonrası mutlaka runtime type guard uygula. Type assertion (`as T`) güvenli değil — `validatePresentationDefinition()` gibi type predicate fonksiyonu yaz.
 
 ## Pattern Library
 
