@@ -10,6 +10,7 @@
 import { getCredoAgent, isCredoAgentReady } from '../agents/credo.agent'
 import { isFeatureEnabled } from '../core/feature-flags'
 import { logger } from '../utils/logger'
+import { isPrivateUrl } from '../utils/url-validation'
 
 // --- Types ---
 
@@ -77,6 +78,12 @@ export async function createDidCommInvitation(): Promise<DIDCommInvitation> {
 export async function receiveDidCommInvitation(
   invitationUrl: string,
 ): Promise<{ connectionId: string; state: string }> {
+  // SSRF check — skip if inline OOB data (?oob= parameter contains the invitation)
+  const hasInlineOob = invitationUrl.includes('?oob=') || invitationUrl.includes('&oob=')
+  if (!hasInlineOob && isPrivateUrl(invitationUrl)) {
+    throw new Error('Private/internal URLs are not allowed')
+  }
+
   const agent = requireAgent()
 
   try {

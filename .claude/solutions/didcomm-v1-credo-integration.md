@@ -47,7 +47,7 @@ agentModules.didComm = new DidCommModule({
   inboundTransports: [
     new DidCommHttpInboundTransport({ app: credoApp, path: '/didcomm', port })
   ],
-  outboundTransports: [new DidCommHttpOutboundTransport()],  // Required for sending!
+  outboundTransports: [new DidCommHttpOutboundTransport()],  // REQUIRED for sending!
 })
 ```
 

@@ -263,7 +263,7 @@ export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?
     if (isFeatureEnabled('module.didcomm')) {
       try {
         // @ts-ignore — optional peer dependency
-        const { DidCommModule } = await import('@credo-ts/didcomm')
+        const { DidCommModule, DidCommHttpOutboundTransport } = await import('@credo-ts/didcomm')
         // @ts-ignore — optional peer dependency
         const { DidCommHttpInboundTransport } = await import('@credo-ts/node')
         const didCommPort = parseInt(process.env.API_PORT || '3000')
@@ -272,7 +272,7 @@ export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?
           inboundTransports: [
             new DidCommHttpInboundTransport({ app: credoApp as any, path: '/didcomm', port: didCommPort }),
           ],
-          outboundTransports: [],
+          outboundTransports: [new DidCommHttpOutboundTransport()],
         })
         logger.info('DIDComm module added to Credo agent')
       } catch (err) {
