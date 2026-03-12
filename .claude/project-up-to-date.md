@@ -28,16 +28,24 @@ Mobile Wallet (React Native / Expo):
   └── WebSocket: Auto-reconnect + AppState lifecycle (bg disconnect, fg reconnect)
 
 Real-time Pipeline:
-  EventBus (credential.revoked/issued/unrevoked, delegation.created/revoked)
+  EventBus (credential.revoked/issued/unrevoked, delegation.created/revoked, didcomm.connection/message)
     ├── WebSocket broadcast → frontend toast notifications
     ├── HTTP webhook delivery → external systems (HMAC-SHA256 signed)
-    └── HLF hash anchoring → Fabric ledger (feature-flag: module.hlf-anchoring)
+    ├── HLF hash anchoring → Fabric ledger (feature-flag: module.hlf-anchoring)
+    └── DIDComm events → WebSocket (didcomm:connection, didcomm:message)
 
 Hyperledger Fabric (Opsiyonel — ayrı Docker Compose):
   docker/hlf/docker-compose.hlf.yml → orderer + 4 peer (2 org) + CLI
   Chaincode: credential-anchor (TypeScript, fabric-contract-api)
   On-chain: SHA-256 hash + timestamp + event type ONLY (credential content NEVER on-chain)
   Graceful degradation: HLF kapalıyken records PostgreSQL'de 'pending', retry job 60s
+
+DIDComm v1 (Opsiyonel — feature flag: module.didcomm):
+  Credo-TS @credo-ts/didcomm v0.6.3 — conditional dynamic import
+  Inbound: DidCommHttpInboundTransport (Express app, /didcomm path)
+  Outbound: DidCommHttpOutboundTransport (HTTP-based message delivery)
+  Sub-modules: connections, oob, basicMessages (auto-registered by DidCommModule)
+  Events: ConnectionStateChanged → WS didcomm:connection, BasicMessageStateChanged → WS didcomm:message
 
 Credo-TS Route Base Paths (Askar aktifken):
   /oid4vci/{issuerId}/...    → Credo issuer endpoints (token, credential, offers)
@@ -574,6 +582,17 @@ PostgreSQL: `postgres:15-alpine`, DB: ssi_dev, healthcheck ile backend bağıml�
 | GET | `/api/v1/fabric/anchors/:referenceId` | Auth | Anchor status for credential/delegation |
 | POST | `/api/v1/fabric/anchors/:referenceId/verify` | Auth | Verify on-chain hash matches local record |
 
+### DIDComm v1 (`didcomm.routes.ts`) — Feature-flag: `module.didcomm`
+
+| Method | Path | Auth | Açıklama |
+|--------|------|------|----------|
+| POST | `/api/v1/didcomm/invitations` | Auth | Create OOB invitation (returns invitationUrl + outOfBandId) |
+| POST | `/api/v1/didcomm/invitations/receive` | Auth | Receive/accept OOB invitation (body: `{invitationUrl}`) |
+| GET | `/api/v1/didcomm/connections` | Auth | List all DIDComm connections |
+| GET | `/api/v1/didcomm/connections/:id` | Auth | Connection detail (state, theirDid, theirLabel) |
+| POST | `/api/v1/didcomm/connections/:id/messages` | Auth | Send basic message (body: `{content}`) |
+| GET | `/api/v1/didcomm/connections/:id/messages` | Auth | Get message history for connection |
+
 **Feature Flag:** `module.hlf-anchoring` — devre dışıyken tüm endpoint'ler 404 döner (middleware gate).
 
 **Anchor Records:** `fabric_anchor_records` tablosu — record_type (`revocation`, `delegation_created`, `delegation_revoked`), reference_id, data_hash (SHA-256), fabric_tx_id, status (`pending`/`confirmed`/`failed`), retry_count (max 3).
@@ -990,7 +1009,9 @@ API dokümantasyonu: `GET /api/v1/docs`
 | `backend/src/api/routes/tenant.routes.ts` | Tenant CRUD endpoints (9 routes: list, stats, get, create, update, suspend, activate, delete, usage) |
 | `backend/src/services/multiTenant.service.ts` | Multi-tenant business logic — CRUD, suspend/activate, usage, stats (528L) |
 | `frontend-issuer-verifier/src/pages/TenantManagement.tsx` | Tenant management admin UI (list, create, suspend/activate, delete, stats cards) |
-| `backend/src/services/fabricAnchor.service.ts` | HLF hash anchoring — anchor, verify, retry, status (416L) |
+| `backend/src/services/fabricAnchor.service.ts` | HLF hash anchoring — anchor, verify, retry, status (384L) |
+| `backend/src/services/didcomm.service.ts` | DIDComm API wrappers — invitations, connections, messages (214L) |
+| `backend/src/api/routes/didcomm.routes.ts` | DIDComm REST endpoints — 6 routes, feature-flag gated (113L) |
 | `backend/src/api/routes/fabric.routes.ts` | Fabric anchor API (4 endpoints: status, list, get, verify) |
 | `backend/chaincode/credential-anchor/src/credential-anchor.ts` | HLF chaincode — writeAnchor, readAnchor, verifyAnchor |
 | `backend/docker/hlf/docker-compose.hlf.yml` | HLF network (orderer + 4 peers + CLI, separate from dev compose) |

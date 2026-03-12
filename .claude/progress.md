@@ -130,6 +130,14 @@ Single environment development setup - no staging/production yet.
 - [x] PostgreSQL migration v19: fabric_anchor_records table
 - [x] Channel setup script + crypto config
 
+### DIDComm v1 Integration (2026-03-12) ✅ TAMAMLANDI
+- [x] Feature flag: `module.didcomm` (default: false, env: `FEATURE_DIDCOMM`)
+- [x] Credo DidCommModule conditional loading (dynamic import + @ts-ignore)
+- [x] didcomm.service.ts — 6 API wrappers (invitation, connections, messages)
+- [x] didcomm.routes.ts — 6 REST endpoints, feature-flag gated
+- [x] Event wiring: ConnectionStateChanged + BasicMessageStateChanged → WebSocket
+- [x] Health endpoint: DIDComm status in /health/detailed
+
 ## WP1: Hızlı Analiz ve Mimari Tasarım (Ay 1-3)
 
 - [ ] Cloud HSM ön değerlendirme (todo 025)
@@ -160,7 +168,7 @@ Single environment development setup - no staging/production yet.
 
 ### Faz A — Protokol ve Blockchain (Ay 7-9)
 - [x] Hyperledger Fabric entegrasyonu (todo 011) — 2026-03-12
-- [ ] DIDComm v1/v2 entegrasyonu (todo 013)
+- [x] DIDComm v1 entegrasyonu (todo 013) — 2026-03-12
 - [x] Multi-tenant credential izolasyonu (todo 014) — 2026-03-12
 
 ### Faz B — Platform Olgunlaştırma (Ay 10-12)
@@ -195,6 +203,6 @@ Single environment development setup - no staging/production yet.
 
 | Durum | Sayı |
 |-------|------|
-| Tamamlandı (done) | 16 |
-| Beklemede (pending) | 19 |
+| Tamamlandı (done) | 17 |
+| Beklemede (pending) | 18 |
 | **Toplam** | **35** |

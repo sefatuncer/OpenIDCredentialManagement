@@ -282,6 +282,42 @@ async function main() {
       }, 60_000)
     }
 
+    // DIDComm event wiring — forward Credo DIDComm events to WebSocket
+    if (isFeatureEnabled('module.didcomm')) {
+      try {
+        const agent = (await import('./agents/credo.agent')).getCredoAgent()
+        if (agent?.modules?.didComm) {
+          agent.events.on('ConnectionStateChanged', (event: any) => {
+            const { connectionRecord } = event.payload
+            wsService.broadcast('didcomm:connection', {
+              connectionId: connectionRecord.id,
+              state: connectionRecord.state,
+              theirDid: connectionRecord.theirDid,
+            })
+            eventBus.emit('didcomm.connection.established', {
+              connectionId: connectionRecord.id,
+              state: connectionRecord.state,
+            })
+          })
+          agent.events.on('BasicMessageStateChanged', (event: any) => {
+            const { basicMessageRecord } = event.payload
+            wsService.broadcast('didcomm:message', {
+              connectionId: basicMessageRecord.connectionId,
+              content: basicMessageRecord.content,
+              role: basicMessageRecord.role,
+            })
+            eventBus.emit('didcomm.message.received', {
+              connectionId: basicMessageRecord.connectionId,
+              content: basicMessageRecord.content,
+            })
+          })
+          logger.info('DIDComm event listeners registered')
+        }
+      } catch (err) {
+        logger.warn('DIDComm event wiring skipped', { error: (err as Error).message })
+      }
+    }
+
     // Prune old webhook deliveries every hour
     const deliveryPruneInterval = setInterval(() => {
       pruneDeliveries().catch((err) =>

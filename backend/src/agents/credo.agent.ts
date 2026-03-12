@@ -25,6 +25,7 @@ import {
 import express from 'express'
 import { logger } from '../utils/logger'
 import { eventBus } from '../core/event-bus'
+import { isFeatureEnabled } from '../core/feature-flags'
 
 // Type imports
 import type { Express } from 'express'
@@ -230,37 +231,62 @@ export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?
       logger: new ConsoleLogger(credoLogLevel),
     }
 
+    // Build modules object — DIDComm conditionally added
+    const agentModules: Record<string, unknown> = {
+      // Askar wallet module - v0.6.x'de 'askar' ve 'store' gerekli
+      askar: new AskarModule({
+        askar: askarNodeJS as any,
+        store: {
+          id: config.walletId,
+          key: config.walletKey,
+        },
+      }),
+      // DID modülü
+      dids: new DidsModule(),
+      // W3C Credentials
+      w3cCredentials: new W3cCredentialsModule(),
+      // OpenID4VC modülü (issuer + verifier + holder)
+      // Issuer and verifier MUST use different base paths to avoid route conflicts
+      openId4Vc: new OpenId4VcModule({
+        app: credoApp as any,
+        issuer: {
+          baseUrl: `${config.issuerBaseUrl}/oid4vci`,
+          credentialRequestToCredentialMapper,
+        },
+        verifier: {
+          baseUrl: `${config.verifierBaseUrl}/oid4vp`,
+        },
+      }),
+    }
+
+    // Conditionally add DIDComm module
+    if (isFeatureEnabled('module.didcomm')) {
+      try {
+        // @ts-ignore — optional peer dependency
+        const { DidCommModule } = await import('@credo-ts/didcomm')
+        // @ts-ignore — optional peer dependency
+        const { DidCommHttpInboundTransport } = await import('@credo-ts/node')
+        const didCommPort = parseInt(process.env.API_PORT || '3000')
+        agentModules.didComm = new DidCommModule({
+          endpoints: [`${config.issuerBaseUrl}/didcomm`],
+          inboundTransports: [
+            new DidCommHttpInboundTransport({ app: credoApp as any, path: '/didcomm', port: didCommPort }),
+          ],
+          outboundTransports: [],
+        })
+        logger.info('DIDComm module added to Credo agent')
+      } catch (err) {
+        logger.warn('DIDComm module not available', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
     // Agent oluştur
     credoAgent = new Agent({
       config: agentConfig,
       dependencies: agentDependencies,
-      modules: {
-        // Askar wallet module - v0.6.x'de 'askar' ve 'store' gerekli
-        askar: new AskarModule({
-          askar: askarNodeJS as any,
-          store: {
-            id: config.walletId,
-            key: config.walletKey,
-          },
-        }),
-        // DID modülü
-        dids: new DidsModule(),
-        // W3C Credentials
-        w3cCredentials: new W3cCredentialsModule(),
-        // OpenID4VC modülü (issuer + verifier + holder)
-        // Issuer and verifier MUST use different base paths to avoid route conflicts
-        // (both register /:actorId/... routes on the same Express app)
-        openId4Vc: new OpenId4VcModule({
-          app: credoApp as any,
-          issuer: {
-            baseUrl: `${config.issuerBaseUrl}/oid4vci`,
-            credentialRequestToCredentialMapper,
-          },
-          verifier: {
-            baseUrl: `${config.verifierBaseUrl}/oid4vp`,
-          },
-        }),
-      },
+      modules: agentModules as any,
     })
 
     // Agent'ı başlat

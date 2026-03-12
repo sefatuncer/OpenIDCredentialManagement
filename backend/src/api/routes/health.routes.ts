@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { getStorageStatus, isCacheAvailable } from '../../core/storage'
-import { getEnabledFeatures, getAllFeatureFlags } from '../../core/feature-flags'
+import { getEnabledFeatures, getAllFeatureFlags, isFeatureEnabled } from '../../core/feature-flags'
+import { isDidCommEnabled } from '../../services/didcomm.service'
 import { pluginRegistry } from '../../core/plugin-registry'
 import { eventBus } from '../../core/event-bus'
 import { isDatabaseConnected } from '../../database/connection'
@@ -168,6 +169,11 @@ healthRoutes.get('/detailed', async (req: Request, res: Response) => {
           version: p.version,
           state: p.state,
         })),
+      },
+
+      didcomm: {
+        featureEnabled: isFeatureEnabled('module.didcomm'),
+        moduleLoaded: isDidCommEnabled(),
       },
 
       events: eventStats,

@@ -1,7 +1,7 @@
 ---
 id: "013"
 title: "DIDComm v1/v2 Entegrasyonu"
-status: pending
+status: done
 priority: medium
 category: feature
 wp: WP3

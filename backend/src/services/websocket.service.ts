@@ -23,6 +23,9 @@ export type EventType =
   | 'simulation:event'
   | 'simulation:network'
   | 'simulation:agent'
+  // DIDComm events
+  | 'didcomm:connection'
+  | 'didcomm:message'
 
 export interface WSMessage {
   type: EventType

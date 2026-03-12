@@ -106,6 +106,14 @@ export const featureFlagDefinitions: Record<string, FeatureFlag> = {
     envVar: 'FEATURE_HLF_ANCHORING',
   },
 
+  'module.didcomm': {
+    name: 'module.didcomm',
+    category: 'module',
+    description: 'DIDComm v1 agent-to-agent messaging via Credo-TS',
+    defaultValue: false,
+    envVar: 'FEATURE_DIDCOMM',
+  },
+
   // Storage features
   'storage.postgres': {
     name: 'storage.postgres',

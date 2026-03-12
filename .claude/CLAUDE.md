@@ -131,6 +131,8 @@ cd web-wallet && npm run dev
 - **[2026-03-12] Architecture:** Ağır opsiyonel modülleri (HLF SDK, ML kütüphaneleri vb.) dynamic import + feature-flag ile entegre et. Static import compile-time bağımlılık yaratır, `@ts-ignore` + dynamic import SDK yokken de çalışmayı sağlar. Bkz: `.claude/solutions/hyperledger-fabric-hash-anchoring.md`
 - **[2026-03-12] Architecture:** Blockchain/ledger entegrasyonlarında write-ahead pattern kullan: önce lokal DB'ye `pending` yaz, sonra on-chain confirm et. Ana akışı consensus gecikmesine (1-3s) bağlama. Retry job ile failed/pending record'ları işle.
 - **[2026-03-12] Architecture:** Ağır altyapı bileşenlerini (HLF network, Kafka cluster vb.) ana `docker-compose.dev.yml`'den ayır. Ayrı compose dosyası + ayrı network ile dev ortam maliyetini minimize et.
+- **[2026-03-12] Architecture:** Credo-TS'e opsiyonel modül eklerken inbound + outbound transport + endpoints üçlüsü tam olmalı. `outboundTransports: []` mesaj göndermeyi sessizce engeller. Bkz: `.claude/solutions/didcomm-v1-credo-integration.md`
+- **[2026-03-12] Architecture:** Büyük dosyaya (>300L) yeni concern eklemek yerine ayrı servis dosyası oluştur ve mevcut getter'ı import et. `didcomm.service.ts` → `getCredoAgent()` import pattern'i.
 
 ## Pattern Library
 
@@ -155,3 +157,4 @@ cd web-wallet && npm run dev
 | Keycloak SSO PKCE Integration | 3-strategy auth chain, PKCE flow, dual client (public+confidential), graceful degradation | `.claude/solutions/keycloak-sso-pkce-integration.md` |
 | React Native Mobile Wallet | Expo cross-platform SSI wallet, 60% web-wallet reuse, jose pure JS crypto, biometric+QR+push | `.claude/solutions/react-native-mobile-wallet-cross-platform.md` |
 | HLF Hash Anchoring | Feature-flag gated, write-ahead PostgreSQL, async HLF confirm, dynamic SDK import, retry job | `.claude/solutions/hyperledger-fabric-hash-anchoring.md` |
+| DIDComm v1 Credo Integration | Conditional DidCommModule, separate service wrapper, OOB invitations, event→WebSocket | `.claude/solutions/didcomm-v1-credo-integration.md` |
