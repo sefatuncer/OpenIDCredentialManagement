@@ -139,6 +139,8 @@ cd web-wallet && npm run dev
 - **[2026-03-13] Security:** STRIDE analizi feature bazlı değil, mimari katman bazlı (API Gateway → Auth → Issuance → Verification → Delegation → Storage → External) yapılmalı — cross-cutting threat'leri yakalamak için. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
 - **[2026-03-13] Security:** Node.js `new URL()` IPv6 normalization'ı: `[::ffff:127.0.0.1]` → `[::ffff:7f00:1]` (bracket korunur, IP hex'e dönüşür). SSRF check'lerde bracket-aware IPv6 parsing gerekli. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
 - **[2026-03-13] Testing:** Credo-TS ESM modülleri Jest ile uyumsuz. `moduleNameMapper` ile `__mocks__/@credo-ts/*.js` stub dosyalarına yönlendir. `transformIgnorePatterns` tek başına yetmez.
+- **[2026-03-13] CI/CD:** `workflow_run` trigger'ında commit SHA için `github.event.workflow_run.head_sha` kullan, `github.sha` değil. `github.sha` event dispatch anındaki default branch HEAD'i gösterir. Bkz: `.claude/solutions/cicd-pipeline-enhancement.md`
+- **[2026-03-13] CI/CD:** Güvenlik testlerini ayrı CI job olarak çalıştır (step değil) — CI dashboard'da bağımsız görünür, hata izolasyonu sağlar. Job-level `env:` ile ortam değişkenlerini DRY tut.
 
 ## Pattern Library
 
@@ -167,3 +169,4 @@ cd web-wallet && npm run dev
 | Policy Authorization Engine | Built-in RBAC + delegation scope engine, enforcePolicy middleware, 30s cache, wildcard bypass | `.claude/solutions/policy-authorization-engine.md` |
 | STRIDE Threat Model & Hardening | Layer-based STRIDE analysis, rate limiter key trust, pre-auth DoS protection, OWASP Agentic AI | `.claude/solutions/stride-threat-model-security-hardening.md` |
 | Automated Security Pentest Suite | 3-round pentest: auth bypass, injection, SSRF, tenant isolation, rate limits | `backend/tests/security/` |
+| CI/CD Pipeline Enhancement | Security test job, npm audit, Kustomize deploy, workflow_run SHA reference | `.claude/solutions/cicd-pipeline-enhancement.md` |

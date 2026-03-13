@@ -1,7 +1,7 @@
 ---
 id: "017"
 title: "CI/CD Pipeline"
-status: pending
+status: done
 priority: medium
 category: infrastructure
 wp: WP4
@@ -15,20 +15,22 @@ GitHub Actions ile CI/CD pipeline. Automated testing, Docker image build, Kubern
 ## Gereksinimler
 
 ### CI (Continuous Integration)
-- [ ] GitHub Actions workflow — PR ve push'ta tetiklenir
-- [ ] TypeScript compile check (`tsc --noEmit`) — backend, web-wallet, frontend
-- [ ] Unit test çalıştırma (mevcut test suite)
-- [ ] Lint check (ESLint — varsa)
-- [ ] Docker image build test
+- [x] GitHub Actions workflow — PR ve push'ta tetiklenir
+- [x] TypeScript compile check (`tsc --noEmit`) — backend, web-wallet, frontend
+- [x] Unit test çalıştırma (mevcut test suite)
+- [x] Lint check (ESLint — varsa)
+- [x] Docker image build test
+- [x] Security test suite (3-round penetration tests)
+- [x] Dependency audit (`npm audit --audit-level=high`)
 
 ### CD (Continuous Deployment)
-- [ ] Docker image build & push (GitHub Container Registry veya Docker Hub)
-- [ ] Kubernetes deployment automation (ArgoCD veya kubectl apply)
-- [ ] Staging environment auto-deploy (main branch push)
-- [ ] Production manual approval gate
+- [x] Docker image build & push (GitHub Container Registry veya Docker Hub)
+- [x] Kubernetes deployment automation (Kustomize + kubectl apply)
+- [x] Staging environment auto-deploy (main branch push)
+- [x] Production manual approval gate (workflow_dispatch + confirmation)
 
 ## Kabul Kriterleri
 
-- [ ] PR'larda otomatik CI çalışıyor
-- [ ] main push'ta Docker image build ediliyor
-- [ ] Staging'e otomatik deploy çalışıyor
+- [x] PR'larda otomatik CI çalışıyor
+- [x] main push'ta Docker image build ediliyor
+- [x] Staging'e otomatik deploy çalışıyor
