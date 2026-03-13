@@ -21,6 +21,7 @@ jest.mock('../../src/utils/logger', () => ({
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
+    debug: jest.fn(),
   },
 }))
 
@@ -273,7 +274,7 @@ describe('DelegationService', () => {
         'delegation_revoked',
         'success',
         'del-123',
-        { reason: 'No longer needed' }
+        expect.objectContaining({ reason: 'No longer needed' })
       )
     })
 

@@ -40,7 +40,7 @@ export function authenticatedRequest(app: Express) {
 /**
  * Create an API key authenticated request agent
  */
-export function apiKeyRequest(app: Express, apiKey: string = 'dev-api-key-12345') {
+export function apiKeyRequest(app: Express, apiKey: string = 'test-api-key-12345') {
   return {
     get: (url: string) => request(app).get(url).set('X-API-Key', apiKey),
     post: (url: string) => request(app).post(url).set('X-API-Key', apiKey),

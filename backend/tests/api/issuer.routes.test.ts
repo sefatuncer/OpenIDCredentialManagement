@@ -20,7 +20,7 @@ describe('Issuer Routes', () => {
     it('should accept API key authentication', async () => {
       const response = await request(app)
         .get('/api/v1/issuer/did')
-        .set('X-API-Key', 'dev-api-key-12345');
+        .set('X-API-Key', 'test-api-key-12345');
 
       // Note: May fail if agent not initialized, but should not be 401
       expect(response.status).not.toBe(401);
@@ -47,7 +47,7 @@ describe('Issuer Routes', () => {
     it('should validate request body', async () => {
       const response = await request(app)
         .post('/api/v1/issuer/credentials/agent-identity')
-        .set('X-API-Key', 'dev-api-key-12345')
+        .set('X-API-Key', 'test-api-key-12345')
         .send({
           // Missing required fields
           agentName: 'Test',
@@ -61,7 +61,7 @@ describe('Issuer Routes', () => {
     it('should validate DID format', async () => {
       const response = await request(app)
         .post('/api/v1/issuer/credentials/agent-identity')
-        .set('X-API-Key', 'dev-api-key-12345')
+        .set('X-API-Key', 'test-api-key-12345')
         .send({
           ...testData.agentIdentityCredential,
           holderDid: 'invalid-did-format',
@@ -78,7 +78,7 @@ describe('Issuer Routes', () => {
     it('should validate agent type enum', async () => {
       const response = await request(app)
         .post('/api/v1/issuer/credentials/agent-identity')
-        .set('X-API-Key', 'dev-api-key-12345')
+        .set('X-API-Key', 'test-api-key-12345')
         .send({
           ...testData.agentIdentityCredential,
           agentType: 'invalid-type',
@@ -92,7 +92,7 @@ describe('Issuer Routes', () => {
     it('should validate required fields', async () => {
       const response = await request(app)
         .post('/api/v1/issuer/credentials/delegation')
-        .set('X-API-Key', 'dev-api-key-12345')
+        .set('X-API-Key', 'test-api-key-12345')
         .send({
           holderDid: testData.validDid,
           // Missing other required fields
@@ -104,7 +104,7 @@ describe('Issuer Routes', () => {
     it('should require at least one scope', async () => {
       const response = await request(app)
         .post('/api/v1/issuer/credentials/delegation')
-        .set('X-API-Key', 'dev-api-key-12345')
+        .set('X-API-Key', 'test-api-key-12345')
         .send({
           ...testData.delegationCredential,
           scope: [],
@@ -118,7 +118,7 @@ describe('Issuer Routes', () => {
     it('should validate required fields', async () => {
       const response = await request(app)
         .post('/api/v1/issuer/credentials/capability')
-        .set('X-API-Key', 'dev-api-key-12345')
+        .set('X-API-Key', 'test-api-key-12345')
         .send({
           holderDid: testData.validDid,
           // Missing other required fields
@@ -130,7 +130,7 @@ describe('Issuer Routes', () => {
     it('should require at least one action', async () => {
       const response = await request(app)
         .post('/api/v1/issuer/credentials/capability')
-        .set('X-API-Key', 'dev-api-key-12345')
+        .set('X-API-Key', 'test-api-key-12345')
         .send({
           ...testData.capabilityCredential,
           actions: [],
@@ -144,7 +144,7 @@ describe('Issuer Routes', () => {
     it('should include rate limit headers', async () => {
       const response = await request(app)
         .post('/api/v1/issuer/credentials/agent-identity')
-        .set('X-API-Key', 'dev-api-key-12345')
+        .set('X-API-Key', 'test-api-key-12345')
         .send(testData.agentIdentityCredential);
 
       // Rate limit headers should be present

@@ -45,7 +45,7 @@ describe('BatchIssuanceService', () => {
       ]
 
       const jobId = await batchIssuanceService.createBatchJob(requests)
-      const status = batchIssuanceService.getJobStatus(jobId)
+      const status = await batchIssuanceService.getJobStatus(jobId)
 
       expect(status).not.toBeNull()
       expect(status?.totalRequests).toBe(1)
@@ -67,7 +67,7 @@ describe('BatchIssuanceService', () => {
       // Wait for processing to complete
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      const status = batchIssuanceService.getJobStatus(jobId)
+      const status = await batchIssuanceService.getJobStatus(jobId)
 
       expect(status?.processedCount).toBe(5)
       expect(status?.status).toBe('completed')
@@ -88,7 +88,7 @@ describe('BatchIssuanceService', () => {
       // Wait for processing
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      const results = batchIssuanceService.getJobResults(jobId)
+      const results = await batchIssuanceService.getJobResults(jobId)
 
       expect(results).toHaveLength(1)
       expect(results[0].id).toBe('req-1')
@@ -111,7 +111,7 @@ describe('BatchIssuanceService', () => {
       await batchIssuanceService.createBatchJob(requests)
       await batchIssuanceService.createBatchJob(requests)
 
-      const jobs = batchIssuanceService.listJobs()
+      const jobs = await batchIssuanceService.listJobs()
 
       expect(jobs.length).toBeGreaterThanOrEqual(2)
     })
@@ -131,7 +131,7 @@ describe('BatchIssuanceService', () => {
       // Wait for completion
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      const completedJobs = batchIssuanceService.listJobs('completed')
+      const completedJobs = await batchIssuanceService.listJobs('completed')
 
       expect(completedJobs.length).toBeGreaterThan(0)
       completedJobs.forEach((job) => {
@@ -139,8 +139,8 @@ describe('BatchIssuanceService', () => {
       })
     })
 
-    it('should return null for non-existent job', () => {
-      const status = batchIssuanceService.getJobStatus('non-existent-job')
+    it('should return null for non-existent job', async () => {
+      const status = await batchIssuanceService.getJobStatus('non-existent-job')
       expect(status).toBeNull()
     })
   })
@@ -158,11 +158,11 @@ describe('BatchIssuanceService', () => {
       const jobId = await batchIssuanceService.createBatchJob(requests)
 
       // Cancel immediately
-      const cancelled = batchIssuanceService.cancelJob(jobId)
+      const cancelled = await batchIssuanceService.cancelJob(jobId)
 
       expect(cancelled).toBe(true)
 
-      const status = batchIssuanceService.getJobStatus(jobId)
+      const status = await batchIssuanceService.getJobStatus(jobId)
       expect(status?.status).toBe('failed')
       expect(status?.error).toBe('Cancelled by user')
     })
@@ -182,7 +182,7 @@ describe('BatchIssuanceService', () => {
       // Wait for completion
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      const cancelled = batchIssuanceService.cancelJob(jobId)
+      const cancelled = await batchIssuanceService.cancelJob(jobId)
 
       expect(cancelled).toBe(false)
     })
@@ -204,7 +204,7 @@ describe('BatchIssuanceService', () => {
       // Wait for completion
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      const stats = batchIssuanceService.getStats()
+      const stats = await batchIssuanceService.getStats()
 
       expect(stats.totalJobs).toBeGreaterThan(0)
       expect(stats.totalCredentialsIssued).toBeGreaterThan(0)
@@ -234,7 +234,7 @@ describe('BatchIssuanceService', () => {
       // Wait for processing
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      const results = batchIssuanceService.getJobResults(jobId)
+      const results = await batchIssuanceService.getJobResults(jobId)
 
       expect(results[0].credentialId).toBe(customCredentialId)
 

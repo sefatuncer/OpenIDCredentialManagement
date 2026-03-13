@@ -107,7 +107,7 @@ export function createServer(): Express {
 
   const allowedOrigins = corsAllowedOrigins
     ? corsAllowedOrigins.split(',').map(origin => origin.trim())
-    : (process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'])
+    : (process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://62.244.233.69:3000', 'http://62.244.233.69:5173', 'http://62.244.233.69:5174'])
 
   app.use(cors({
     origin: (origin, callback) => {
