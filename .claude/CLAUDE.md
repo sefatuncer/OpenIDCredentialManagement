@@ -134,6 +134,9 @@ cd web-wallet && npm run dev
 - **[2026-03-12] Architecture:** Credo-TS'e opsiyonel modül eklerken inbound + outbound transport + endpoints üçlüsü tam olmalı. `outboundTransports: []` mesaj göndermeyi sessizce engeller. Bkz: `.claude/solutions/didcomm-v1-credo-integration.md`
 - **[2026-03-12] Architecture:** Büyük dosyaya (>300L) yeni concern eklemek yerine ayrı servis dosyası oluştur ve mevcut getter'ı import et. `didcomm.service.ts` → `getCredoAgent()` import pattern'i.
 - **[2026-03-12] Security:** Policy engine eklerken mevcut wildcard permission (`*`) bypass'ını korumayı unutma. Kaldırılırsa tüm API key kullanıcıları kilitlenir. En yüksek priority'de wildcard rule ekle. Bkz: `.claude/solutions/policy-authorization-engine.md`
+- **[2026-03-13] Security:** Rate limiter key generator'larda client-supplied header (X-Tenant-ID gibi) kullanma — authenticated olmadan rate limit key'e koyulan değer değiştirilerek limit bypass edilir. Yalnızca authenticated identity (API key, IP) kullan. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
+- **[2026-03-13] Security:** Global rate limiter'dan önce mount edilen pre-auth endpoint'lere (direct_post, /credentials/request gibi) mutlaka per-route rate limiter ekle. Yoksa unauthenticated DoS vektörü oluşur. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
+- **[2026-03-13] Security:** STRIDE analizi feature bazlı değil, mimari katman bazlı (API Gateway → Auth → Issuance → Verification → Delegation → Storage → External) yapılmalı — cross-cutting threat'leri yakalamak için. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
 
 ## Pattern Library
 
@@ -160,3 +163,4 @@ cd web-wallet && npm run dev
 | HLF Hash Anchoring | Feature-flag gated, write-ahead PostgreSQL, async HLF confirm, dynamic SDK import, retry job | `.claude/solutions/hyperledger-fabric-hash-anchoring.md` |
 | DIDComm v1 Credo Integration | Conditional DidCommModule, separate service wrapper, OOB invitations, event→WebSocket | `.claude/solutions/didcomm-v1-credo-integration.md` |
 | Policy Authorization Engine | Built-in RBAC + delegation scope engine, enforcePolicy middleware, 30s cache, wildcard bypass | `.claude/solutions/policy-authorization-engine.md` |
+| STRIDE Threat Model & Hardening | Layer-based STRIDE analysis, rate limiter key trust, pre-auth DoS protection, OWASP Agentic AI | `.claude/solutions/stride-threat-model-security-hardening.md` |

@@ -1,6 +1,7 @@
 import * as jose from 'jose'
 import { logger } from '../utils/logger'
 import { resolveDidKey as resolveDidKeyToPublicKey } from '../agents/base.agent'
+import { isPrivateUrl } from '../utils/url-validation'
 
 /**
  * Universal DID Resolver Service
@@ -271,12 +272,28 @@ async function resolveDidWeb(
     url = `https://${domain}/.well-known/did.json`
   }
 
+  // SSRF protection: block resolution of private/internal URLs
+  if (isPrivateUrl(url)) {
+    return {
+      didDocument: null,
+      didDocumentMetadata: {},
+      didResolutionMetadata: {
+        error: 'invalidDid',
+        message: 'DID:web resolution to private/internal URLs is not allowed',
+      },
+    }
+  }
+
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
     const response = await fetch(url, {
       headers: {
         Accept: 'application/did+ld+json, application/json',
       },
+      signal: controller.signal,
     })
+    clearTimeout(timeout)
 
     if (!response.ok) {
       return {

@@ -1,7 +1,7 @@
 ---
 id: "032"
 title: "STRIDE Threat Modeling + OWASP Agentic AI Top 10 Uyum"
-status: pending
+status: done
 priority: high
 category: security
 wp: WP5

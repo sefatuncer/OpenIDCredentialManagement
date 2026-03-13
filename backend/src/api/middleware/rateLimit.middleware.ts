@@ -62,3 +62,22 @@ export const authRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 auth attempts per 15 minutes
 })
+
+/**
+ * Per-caller rate limiter for batch issuance.
+ * Stricter than the global credential issuance limiter.
+ * Uses authenticated API key or IP — NOT client-supplied headers
+ * (X-Tenant-ID is unauthenticated at this middleware stage).
+ */
+export const batchIssuanceRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 batch jobs per minute per caller
+})
+
+/**
+ * Rate limiter for unauthenticated direct_post endpoint (OpenID4VP).
+ */
+export const directPostRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60, // 60 submissions per minute per IP
+})

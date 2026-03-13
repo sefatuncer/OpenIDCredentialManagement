@@ -37,7 +37,7 @@ import {
 } from './middleware/error.middleware'
 import { authenticateAny } from './middleware/auth.middleware'
 import { optionalTenant } from './middleware/tenant.middleware'
-import { defaultRateLimiter } from './middleware/rateLimit.middleware'
+import { defaultRateLimiter, directPostRateLimiter } from './middleware/rateLimit.middleware'
 import { requestLoggerMiddleware } from './middleware/requestLogger.middleware'
 import { setupSwagger } from './swagger'
 
@@ -72,6 +72,9 @@ function getErrorStatusCode(error: string): number {
 
 export function createServer(): Express {
   const app = express()
+
+  // Trust proxy for accurate IP detection behind reverse proxy (rate limiting, logging)
+  app.set('trust proxy', process.env.TRUST_PROXY || 1)
 
   // Basic security middleware
   app.use(helmet({
@@ -367,7 +370,7 @@ export function createServer(): Express {
   // OpenID4VP direct_post endpoint (no auth required - spec requirement)
   // This must be before authentication middleware
   // Wallets submit presentations here without authentication
-  app.post('/direct_post', bodyParser.urlencoded({ extended: true }), async (req: Request, res: Response, next: NextFunction) => {
+  app.post('/direct_post', directPostRateLimiter, bodyParser.urlencoded({ extended: true }), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { handleDirectPost } = await import('../services/openid4vp.service')
       const { vp_token, presentation_submission, state } = req.body

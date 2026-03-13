@@ -26,7 +26,7 @@ import {
 } from '../schemas/validation.schemas'
 import { batchIssuanceService, BatchCredentialRequest } from '../../services/batchIssuance.service'
 import { schemaRegistry } from '../../services/schemaRegistry.service'
-import { credentialIssuanceRateLimiter } from '../middleware/rateLimit.middleware'
+import { credentialIssuanceRateLimiter, batchIssuanceRateLimiter } from '../middleware/rateLimit.middleware'
 
 export const issuerRoutes = Router()
 
@@ -456,6 +456,7 @@ issuerRoutes.post(
  */
 issuerRoutes.post(
   '/credentials/batch',
+  batchIssuanceRateLimiter,
   credentialIssuanceRateLimiter,
   validateBody(batchIssuanceSchema),
   asyncHandler(async (req: Request, res: Response) => {
