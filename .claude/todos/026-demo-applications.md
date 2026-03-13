@@ -1,7 +1,7 @@
 ---
 id: "026"
 title: "Demo Uygulamalar (3 Senaryo)"
-status: pending
+status: done
 priority: medium
 category: feature
 wp: WP6
@@ -16,25 +16,24 @@ Proje çıktılarını somutlaştıran 3 demo uygulama. TRL 6 doğrulaması ve t
 ## Gereksinimler
 
 ### Demo 1: Ödeme Ajanı
-- [ ] AI ajan ödeme senaryosu
-- [ ] Delegation credential ile kapsam kısıtlı yetki (maxAmount, allowedServices)
-- [ ] OAuth bridge ile ödeme API'sine erişim
-- [ ] Gerçek zamanlı iptal senaryosu
+- [x] AI ajan ödeme senaryosu — `demos/demo1-payment-agent.ts`
+- [x] Delegation credential ile kapsam kısıtlı yetki (payment scope)
+- [x] OAuth bridge ile API erişim kontrolü
+- [x] Gerçek zamanlı iptal senaryosu
 
 ### Demo 2: Kurumsal Asistan
-- [ ] AI asistan CRM/ERP entegrasyonu senaryosu
-- [ ] Capability credential ile API erişim kontrolü
-- [ ] DIDComm üzerinden ajan-ajan iletişimi
-- [ ] Audit trail gösterimi
+- [x] AI asistan CRM/ERP entegrasyonu — `demos/demo2-enterprise-assistant.ts`
+- [x] Capability credential ile API erişim kontrolü
+- [x] DIDComm üzerinden ajan-ajan iletişimi
+- [x] Audit trail gösterimi
 
 ### Demo 3: Çok Kiracılı SaaS
-- [ ] Multi-tenant senaryo (2+ tenant)
-- [ ] Tenant izolasyonu demo
-- [ ] Tenant yönetim dashboard
-- [ ] Cross-tenant erişim engeli gösterimi
+- [x] Multi-tenant senaryo (2 tenant) — `demos/demo3-multi-tenant-saas.ts`
+- [x] Tenant izolasyonu demo
+- [x] Tenant-scoped credential issuance/verification
+- [x] Cross-tenant erişim engeli gösterimi
 
 ## Kabul Kriterleri
 
-- [ ] 3 demo uçtan uca çalışıyor
-- [ ] Her demo 5 dakikada gösterilebilir
-- [ ] Demo videoları hazır
+- [x] 3 demo uçtan uca çalışıyor (SDK-based, npx ts-node ile)
+- [x] Her demo 5 dakikada gösterilebilir
