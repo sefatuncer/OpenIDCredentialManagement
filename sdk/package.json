@@ -1,0 +1,36 @@
+{
+  "name": "@openid-credential/agent-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for AI Agent Identity — credential issuance, verification, delegation, DIDComm",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ssi",
+    "verifiable-credentials",
+    "openid4vci",
+    "openid4vp",
+    "did",
+    "agent-identity",
+    "sd-jwt"
+  ],
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.3.0"
+  }
+}

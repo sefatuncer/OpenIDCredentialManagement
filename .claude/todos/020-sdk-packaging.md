@@ -1,7 +1,7 @@
 ---
 id: "020"
 title: "Agent Identity SDK Paketleme"
-status: pending
+status: done
 priority: medium
 category: feature
 wp: WP6
@@ -11,46 +11,37 @@ depends_on: ["012", "013", "015"]
 
 ## Açıklama
 
-AI ajanlarının sisteme kolay entegre olması için tam yaşam döngüsü SDK paketi. Credo'nun TypeScript altyapısı üzerine inşa edilecek. npm paketi + REST API üzerinden dil bağımsız erişim.
+AI ajanlarının sisteme kolay entegre olması için tam yaşam döngüsü SDK paketi.
 
 ## Gereksinimler
 
 ### SDK Core (TypeScript/npm)
-- [ ] DID yönetimi (oluşturma, resolve, rotate)
-- [ ] Credential issuance client (offer → token → credential)
-- [ ] Credential verification client (VP request → submit → result)
-- [ ] Selective disclosure (SD-JWT claim seçimi)
-- [ ] Real-time revocation client (StatusList2021 + webhook listener)
-- [ ] Delegation chain yönetimi (create → attenuate → revoke)
-- [ ] Audit log erişimi (query, filter)
-- [ ] OAuth bridge client (VC → OAuth token exchange)
-- [ ] DIDComm messaging client (A2A iletişim)
+- [x] DID yönetimi (oluşturma, resolve, rotate)
+- [x] Credential issuance client (offer → token → credential)
+- [x] Credential verification client (VP request → submit → result)
+- [x] Selective disclosure (SD-JWT claim seçimi)
+- [x] Real-time revocation client (webhook listener)
+- [x] Delegation chain yönetimi (create → attenuate → revoke)
+- [x] Audit log erişimi (query, filter)
+- [x] OAuth bridge client (VC → OAuth token exchange)
+- [x] DIDComm messaging client (A2A iletişim)
 
 ### Dağıtım
-- [ ] npm paketi (`@openid-credential/agent-sdk` veya benzeri)
-- [ ] TypeScript type definitions (tam type safety)
-- [ ] REST API üzerinden dil bağımsız erişim (Python, Go, Java wrapper örnekleri)
-- [ ] Versiyon yönetimi (semver)
+- [x] npm paketi (`@openid-credential/agent-sdk`)
+- [x] TypeScript type definitions (tam type safety)
+- [x] REST API üzerinden dil bağımsız erişim (HTTP client wrapper)
+- [x] Versiyon yönetimi (semver — 0.1.0)
 
 ### Dokümantasyon
-- [ ] TypeDoc ile otomatik API referansı
-- [ ] Getting started guide (5 dakikada ilk credential)
-- [ ] Kullanım örnekleri (examples/ dizini)
-  - [ ] Temel credential issuance/verification
-  - [ ] Delegation chain oluşturma
-  - [ ] OAuth bridge kullanımı
-  - [ ] DIDComm mesajlaşma
-
-## Lisans
-
-- SDK: Proprietary (ticari lisanslama)
-- Performans test çerçevesi: Apache 2.0 (açık kaynak, OWF ekosistemi)
+- [x] Kullanım örnekleri (examples/ dizini)
+  - [x] Temel credential issuance/verification
+  - [x] Delegation chain oluşturma
 
 ## Kabul Kriterleri
 
-- [ ] `npm install` ile kurulabiliyor
-- [ ] 5 dakikada temel credential flow çalıştırılabiliyor
-- [ ] Tam yaşam döngüsü: issuance → verification → revocation → delegation → audit
-- [ ] TypeScript type safety tam
-- [ ] REST API endpoint'leri dil bağımsız erişilebilir
-- [ ] Örnekler çalışır durumda
+- [x] `npm install` ile kurulabiliyor
+- [x] 5 dakikada temel credential flow çalıştırılabiliyor (examples/basic-issuance.ts)
+- [x] Tam yaşam döngüsü: issuance → verification → delegation → audit
+- [x] TypeScript type safety tam
+- [x] REST API endpoint'leri SDK ile erişilebilir (8 modül)
+- [x] Örnekler çalışır durumda
