@@ -170,3 +170,4 @@ cd web-wallet && npm run dev
 | STRIDE Threat Model & Hardening | Layer-based STRIDE analysis, rate limiter key trust, pre-auth DoS protection, OWASP Agentic AI | `.claude/solutions/stride-threat-model-security-hardening.md` |
 | Automated Security Pentest Suite | 3-round pentest: auth bypass, injection, SSRF, tenant isolation, rate limits | `backend/tests/security/` |
 | CI/CD Pipeline Enhancement | Security test job, npm audit, Kustomize deploy, workflow_run SHA reference | `.claude/solutions/cicd-pipeline-enhancement.md` |
+| k6 Performance Test Framework | Issuance/verification/mixed k6 scenarios, profile selection, baseline runner | `.claude/solutions/k6-performance-test-framework.md` |

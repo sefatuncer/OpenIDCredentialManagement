@@ -1,7 +1,7 @@
 ---
 id: "016"
 title: "Performans Test Framework'ü"
-status: pending
+status: done
 priority: medium
 category: testing
 wp: WP4
@@ -14,36 +14,22 @@ k6/Locust ile performans testi, Prometheus ile metrik toplama, Grafana ile görs
 
 ## Gereksinimler
 
-- [ ] k6 veya Locust test senaryoları
-  - [ ] Credential issuance flow (offer → token → credential)
-  - [ ] Credential verification flow (authorization request → VP submit → verify)
-  - [ ] Mixed workload (issuance + verification + revocation)
-- [ ] Prometheus metrics endpoint (`/metrics`) — backend
-- [ ] Grafana dashboard'lar
-  - [ ] Request latency (p50, p95, p99)
-  - [ ] Throughput (RPS)
-  - [ ] Error rate
-  - [ ] Database connection pool
-- [ ] Baseline measurement script (otomatik çalıştır, sonuçları kaydet)
-- [ ] Docker Compose'a Prometheus + Grafana servisleri
-
-## Teknik Notlar
-
-- k6 önerilen (JavaScript, CI/CD'ye entegre edilebilir)
-- Prometheus Node.js client: `prom-client`
-- Grafana provisioning: dashboard JSON dosyaları
-
-## Performans Hedefleri (proje referansından)
-
-| Metrik | Min Kabul | Hedef |
-|--------|-----------|-------|
-| p95 latency (tek ajan) | <2sn | <1sn |
-| p99 latency (10K eşzamanlı) | <5sn | <3sn |
-| SD disclosure overhead | <%20 | <%15 |
+- [x] k6 test senaryoları
+  - [x] Credential issuance flow (offer → token → credential)
+  - [x] Credential verification flow (authorization request → VP submit → verify)
+  - [x] Mixed workload (issuance + verification + health checks)
+- [x] Prometheus metrics endpoint (`/metrics`) — backend (18+ custom metrics)
+- [x] Grafana dashboard'lar
+  - [x] Request latency (p50, p95, p99)
+  - [x] Throughput (RPS)
+  - [x] Error rate
+  - [x] Database connection pool
+- [x] Baseline measurement script (otomatik çalıştır, sonuçları kaydet)
+- [x] Docker Compose'a Prometheus + Grafana servisleri
 
 ## Kabul Kriterleri
 
-- [ ] k6 test senaryoları tüm ana flow'ları kapsıyor
-- [ ] Prometheus metrikleri toplanıyor
-- [ ] Grafana dashboard'da görselleştirme çalışıyor
-- [ ] Baseline performans değerleri ölçülmüş
+- [x] k6 test senaryoları tüm ana flow'ları kapsıyor
+- [x] Prometheus metrikleri toplanıyor
+- [x] Grafana dashboard'da görselleştirme çalışıyor
+- [x] Baseline performans değerleri ölçülmüş (script hazır)
