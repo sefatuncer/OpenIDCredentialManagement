@@ -11,6 +11,14 @@ module.exports = {
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },
+  moduleNameMapper: {
+    '^@credo-ts/core$': '<rootDir>/tests/__mocks__/@credo-ts/core.js',
+    '^@credo-ts/askar$': '<rootDir>/tests/__mocks__/@credo-ts/askar.js',
+    '^@credo-ts/openid4vc$': '<rootDir>/tests/__mocks__/@credo-ts/openid4vc.js',
+    '^@credo-ts/didcomm$': '<rootDir>/tests/__mocks__/@credo-ts/didcomm.js',
+    '^@credo-ts/node$': '<rootDir>/tests/__mocks__/@credo-ts/node.js',
+    '^@openwallet-foundation/askar-nodejs$': '<rootDir>/tests/__mocks__/@openwallet-foundation/askar-nodejs.js',
+  },
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   collectCoverageFrom: [
     'src/**/*.ts',

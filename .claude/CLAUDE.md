@@ -137,6 +137,8 @@ cd web-wallet && npm run dev
 - **[2026-03-13] Security:** Rate limiter key generator'larda client-supplied header (X-Tenant-ID gibi) kullanma — authenticated olmadan rate limit key'e koyulan değer değiştirilerek limit bypass edilir. Yalnızca authenticated identity (API key, IP) kullan. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
 - **[2026-03-13] Security:** Global rate limiter'dan önce mount edilen pre-auth endpoint'lere (direct_post, /credentials/request gibi) mutlaka per-route rate limiter ekle. Yoksa unauthenticated DoS vektörü oluşur. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
 - **[2026-03-13] Security:** STRIDE analizi feature bazlı değil, mimari katman bazlı (API Gateway → Auth → Issuance → Verification → Delegation → Storage → External) yapılmalı — cross-cutting threat'leri yakalamak için. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
+- **[2026-03-13] Security:** Node.js `new URL()` IPv6 normalization'ı: `[::ffff:127.0.0.1]` → `[::ffff:7f00:1]` (bracket korunur, IP hex'e dönüşür). SSRF check'lerde bracket-aware IPv6 parsing gerekli. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
+- **[2026-03-13] Testing:** Credo-TS ESM modülleri Jest ile uyumsuz. `moduleNameMapper` ile `__mocks__/@credo-ts/*.js` stub dosyalarına yönlendir. `transformIgnorePatterns` tek başına yetmez.
 
 ## Pattern Library
 
@@ -164,3 +166,4 @@ cd web-wallet && npm run dev
 | DIDComm v1 Credo Integration | Conditional DidCommModule, separate service wrapper, OOB invitations, event→WebSocket | `.claude/solutions/didcomm-v1-credo-integration.md` |
 | Policy Authorization Engine | Built-in RBAC + delegation scope engine, enforcePolicy middleware, 30s cache, wildcard bypass | `.claude/solutions/policy-authorization-engine.md` |
 | STRIDE Threat Model & Hardening | Layer-based STRIDE analysis, rate limiter key trust, pre-auth DoS protection, OWASP Agentic AI | `.claude/solutions/stride-threat-model-security-hardening.md` |
+| Automated Security Pentest Suite | 3-round pentest: auth bypass, injection, SSRF, tenant isolation, rate limits | `backend/tests/security/` |
