@@ -25,7 +25,26 @@ import {
 
 export const tenantRoutes = Router()
 
-// List all tenants (admin only)
+/**
+ * @swagger
+ * /api/v1/tenants:
+ *   get:
+ *     summary: List all tenants (admin only)
+ *     tags: [Tenants]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, suspended, pending]
+ *         description: Filter by tenant status
+ *     responses:
+ *       200:
+ *         description: List of tenants
+ */
 tenantRoutes.get(
   '/',
   requirePermission('tenants:read'),
@@ -41,7 +60,19 @@ tenantRoutes.get(
   }),
 )
 
-// Get tenant stats (admin only)
+/**
+ * @swagger
+ * /api/v1/tenants/stats:
+ *   get:
+ *     summary: Get aggregated tenant statistics (admin only)
+ *     tags: [Tenants]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: Tenant statistics
+ */
 tenantRoutes.get(
   '/stats',
   requirePermission('tenants:read'),
@@ -51,7 +82,30 @@ tenantRoutes.get(
   }),
 )
 
-// Get tenant by ID (admin or own tenant)
+/**
+ * @swagger
+ * /api/v1/tenants/{id}:
+ *   get:
+ *     summary: Get tenant by ID (admin or own tenant)
+ *     tags: [Tenants]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tenant ID
+ *     responses:
+ *       200:
+ *         description: Tenant detail
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Tenant not found
+ */
 tenantRoutes.get(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
@@ -78,7 +132,37 @@ tenantRoutes.get(
   }),
 )
 
-// Create tenant (admin only)
+/**
+ * @swagger
+ * /api/v1/tenants:
+ *   post:
+ *     summary: Create a new tenant (admin only)
+ *     tags: [Tenants]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - slug
+ *             properties:
+ *               name:
+ *                 type: string
+ *               slug:
+ *                 type: string
+ *               config:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Tenant created
+ *       400:
+ *         description: Validation error
+ */
 tenantRoutes.post(
   '/',
   enforcePolicy('tenant:manage', 'tenants'),
@@ -91,7 +175,39 @@ tenantRoutes.post(
   }),
 )
 
-// Update tenant (admin only)
+/**
+ * @swagger
+ * /api/v1/tenants/{id}:
+ *   put:
+ *     summary: Update tenant details (admin only)
+ *     tags: [Tenants]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tenant ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               config:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Tenant updated
+ *       400:
+ *         description: Validation error
+ */
 tenantRoutes.put(
   '/:id',
   requirePermission('tenants:write'),
@@ -103,7 +219,35 @@ tenantRoutes.put(
   }),
 )
 
-// Suspend tenant (admin only)
+/**
+ * @swagger
+ * /api/v1/tenants/{id}/suspend:
+ *   post:
+ *     summary: Suspend a tenant (admin only)
+ *     tags: [Tenants]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tenant ID
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Suspension reason
+ *     responses:
+ *       200:
+ *         description: Tenant suspended
+ */
 tenantRoutes.post(
   '/:id/suspend',
   requirePermission('tenants:write'),
@@ -115,7 +259,26 @@ tenantRoutes.post(
   }),
 )
 
-// Activate tenant (admin only)
+/**
+ * @swagger
+ * /api/v1/tenants/{id}/activate:
+ *   post:
+ *     summary: Activate a suspended tenant (admin only)
+ *     tags: [Tenants]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tenant ID
+ *     responses:
+ *       200:
+ *         description: Tenant activated
+ */
 tenantRoutes.post(
   '/:id/activate',
   requirePermission('tenants:write'),
@@ -126,7 +289,28 @@ tenantRoutes.post(
   }),
 )
 
-// Delete tenant (admin only)
+/**
+ * @swagger
+ * /api/v1/tenants/{id}:
+ *   delete:
+ *     summary: Delete a tenant (admin only)
+ *     tags: [Tenants]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tenant ID
+ *     responses:
+ *       200:
+ *         description: Tenant deleted
+ *       404:
+ *         description: Tenant not found
+ */
 tenantRoutes.delete(
   '/:id',
   enforcePolicy('tenant:manage', 'tenants'),
@@ -142,7 +326,30 @@ tenantRoutes.delete(
   }),
 )
 
-// Get tenant usage (admin or own tenant)
+/**
+ * @swagger
+ * /api/v1/tenants/{id}/usage:
+ *   get:
+ *     summary: Get tenant usage metrics (admin or own tenant)
+ *     tags: [Tenants]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tenant ID
+ *     responses:
+ *       200:
+ *         description: Tenant usage data
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Usage data not found
+ */
 tenantRoutes.get(
   '/:id/usage',
   asyncHandler(async (req: Request, res: Response) => {

@@ -16,7 +16,34 @@ const JWT_SECRET = process.env.JWT_SECRET || ''
 export const oauthBridgeRoutes = Router()
 
 /**
- * POST /token-exchange — RFC 8693 Token Exchange (VC → OAuth token)
+ * @swagger
+ * /api/v1/oauth/token-exchange:
+ *   post:
+ *     summary: Exchange a Verifiable Credential for an OAuth access token (RFC 8693)
+ *     tags: [OAuth Bridge]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - subject_token
+ *             properties:
+ *               subject_token:
+ *                 type: string
+ *                 description: JWT or SD-JWT Verifiable Credential
+ *               scope:
+ *                 type: string
+ *                 description: Requested OAuth scope
+ *     responses:
+ *       200:
+ *         description: OAuth token response
+ *       400:
+ *         description: Invalid grant or token exchange failed
  */
 oauthBridgeRoutes.post(
   '/token-exchange',
@@ -46,7 +73,29 @@ oauthBridgeRoutes.post(
 )
 
 /**
- * POST /introspect — Bridge token introspection
+ * @swagger
+ * /api/v1/oauth/introspect:
+ *   post:
+ *     summary: Introspect a bridge token to check validity and claims
+ *     tags: [OAuth Bridge]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: Bridge token to introspect
+ *     responses:
+ *       200:
+ *         description: Token introspection result (active true/false)
  */
 oauthBridgeRoutes.post(
   '/introspect',
@@ -82,7 +131,17 @@ oauthBridgeRoutes.post(
 )
 
 /**
- * GET /scope-mappings — List available scope mappings
+ * @swagger
+ * /api/v1/oauth/scope-mappings:
+ *   get:
+ *     summary: List available credential-to-OAuth scope mappings
+ *     tags: [OAuth Bridge]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: Map of credential types to OAuth scopes
  */
 oauthBridgeRoutes.get(
   '/scope-mappings',
@@ -92,7 +151,17 @@ oauthBridgeRoutes.get(
 )
 
 /**
- * GET /.well-known/oauth-bridge — Bridge metadata discovery
+ * @swagger
+ * /api/v1/oauth/.well-known/oauth-bridge:
+ *   get:
+ *     summary: OAuth bridge metadata discovery endpoint
+ *     tags: [OAuth Bridge]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: Bridge metadata (grant types, token types, endpoints)
  */
 oauthBridgeRoutes.get(
   '/.well-known/oauth-bridge',

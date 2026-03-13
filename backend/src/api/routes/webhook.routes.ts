@@ -23,7 +23,19 @@ import {
 
 export const webhookRoutes = Router()
 
-// GET /webhooks — list all subscriptions
+/**
+ * @swagger
+ * /api/v1/webhooks:
+ *   get:
+ *     summary: List all webhook subscriptions
+ *     tags: [Webhooks]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: List of webhook subscriptions (secrets masked)
+ */
 webhookRoutes.get(
   '/',
   asyncHandler(async (_req: Request, res: Response) => {
@@ -37,7 +49,28 @@ webhookRoutes.get(
   }),
 )
 
-// GET /webhooks/:id — subscription detail
+/**
+ * @swagger
+ * /api/v1/webhooks/{id}:
+ *   get:
+ *     summary: Get webhook subscription detail
+ *     tags: [Webhooks]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Webhook subscription ID
+ *     responses:
+ *       200:
+ *         description: Webhook detail (secret masked)
+ *       404:
+ *         description: Webhook not found
+ */
 webhookRoutes.get(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
@@ -52,7 +85,44 @@ webhookRoutes.get(
   }),
 )
 
-// POST /webhooks — create subscription
+/**
+ * @swagger
+ * /api/v1/webhooks:
+ *   post:
+ *     summary: Create a webhook subscription
+ *     tags: [Webhooks]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - url
+ *               - events
+ *             properties:
+ *               url:
+ *                 type: string
+ *                 format: uri
+ *                 description: Webhook delivery URL (HTTPS required in production)
+ *               events:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Event types to subscribe to
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Webhook created (full secret returned only on creation)
+ *       400:
+ *         description: Validation error or max subscriptions reached
+ */
 webhookRoutes.post(
   '/',
   strictRateLimiter,
@@ -84,7 +154,50 @@ webhookRoutes.post(
   }),
 )
 
-// PUT /webhooks/:id — update subscription
+/**
+ * @swagger
+ * /api/v1/webhooks/{id}:
+ *   put:
+ *     summary: Update a webhook subscription
+ *     tags: [Webhooks]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Webhook subscription ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               url:
+ *                 type: string
+ *                 format: uri
+ *               events:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               enabled:
+ *                 type: boolean
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Webhook updated (secret masked)
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Webhook not found
+ */
 webhookRoutes.put(
   '/:id',
   strictRateLimiter,
@@ -120,7 +233,28 @@ webhookRoutes.put(
   }),
 )
 
-// DELETE /webhooks/:id — delete subscription
+/**
+ * @swagger
+ * /api/v1/webhooks/{id}:
+ *   delete:
+ *     summary: Delete a webhook subscription
+ *     tags: [Webhooks]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Webhook subscription ID
+ *     responses:
+ *       200:
+ *         description: Webhook deleted
+ *       404:
+ *         description: Webhook not found
+ */
 webhookRoutes.delete(
   '/:id',
   strictRateLimiter,
@@ -133,7 +267,28 @@ webhookRoutes.delete(
   }),
 )
 
-// POST /webhooks/:id/test — send test event
+/**
+ * @swagger
+ * /api/v1/webhooks/{id}/test:
+ *   post:
+ *     summary: Send a test event to a webhook endpoint
+ *     tags: [Webhooks]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Webhook subscription ID
+ *     responses:
+ *       200:
+ *         description: Test delivery result (success, status, latency)
+ *       404:
+ *         description: Webhook not found
+ */
 webhookRoutes.post(
   '/:id/test',
   strictRateLimiter,
@@ -152,7 +307,28 @@ webhookRoutes.post(
   }),
 )
 
-// GET /webhooks/:id/deliveries — delivery history
+/**
+ * @swagger
+ * /api/v1/webhooks/{id}/deliveries:
+ *   get:
+ *     summary: Get delivery history for a webhook
+ *     tags: [Webhooks]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Webhook subscription ID
+ *     responses:
+ *       200:
+ *         description: List of delivery attempts
+ *       404:
+ *         description: Webhook not found
+ */
 webhookRoutes.get(
   '/:id/deliveries',
   asyncHandler(async (req: Request, res: Response) => {

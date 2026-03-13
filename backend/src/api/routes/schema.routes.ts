@@ -12,7 +12,17 @@ import { credentialIssuanceRateLimiter } from '../middleware/rateLimit.middlewar
 export const schemaRoutes = Router()
 
 /**
- * GET /schemas — List all active schemas
+ * @swagger
+ * /api/v1/schemas:
+ *   get:
+ *     summary: List all active credential schemas
+ *     tags: [Schemas]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: List of active schemas
  */
 schemaRoutes.get(
   '/',
@@ -23,7 +33,26 @@ schemaRoutes.get(
 )
 
 /**
- * GET /schemas/:id — Get schema by ID
+ * @swagger
+ * /api/v1/schemas/{id}:
+ *   get:
+ *     summary: Get a credential schema by ID
+ *     tags: [Schemas]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Schema ID
+ *     responses:
+ *       200:
+ *         description: Schema detail
+ *       404:
+ *         description: Schema not found
  */
 schemaRoutes.get(
   '/:id',
@@ -41,7 +70,40 @@ schemaRoutes.get(
 )
 
 /**
- * POST /schemas — Register a new schema
+ * @swagger
+ * /api/v1/schemas:
+ *   post:
+ *     summary: Register a new credential schema
+ *     tags: [Schemas]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - id
+ *               - name
+ *               - version
+ *             properties:
+ *               id:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               version:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               properties:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Schema registered
+ *       409:
+ *         description: Schema already exists
  */
 schemaRoutes.post(
   '/',
@@ -68,7 +130,41 @@ schemaRoutes.post(
 )
 
 /**
- * PUT /schemas/:id — Update an existing schema
+ * @swagger
+ * /api/v1/schemas/{id}:
+ *   put:
+ *     summary: Update an existing credential schema
+ *     tags: [Schemas]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Schema ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               version:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               properties:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Schema updated
+ *       404:
+ *         description: Schema not found
  */
 schemaRoutes.put(
   '/:id',
@@ -91,7 +187,26 @@ schemaRoutes.put(
 )
 
 /**
- * DELETE /schemas/:id — Deactivate schema (soft delete)
+ * @swagger
+ * /api/v1/schemas/{id}:
+ *   delete:
+ *     summary: Deactivate a credential schema (soft delete)
+ *     tags: [Schemas]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Schema ID
+ *     responses:
+ *       200:
+ *         description: Schema deactivated
+ *       404:
+ *         description: Schema not found
  */
 schemaRoutes.delete(
   '/:id',

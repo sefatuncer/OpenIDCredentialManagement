@@ -31,7 +31,19 @@ function requireHlf(_req: Request, res: Response, next: () => void): void {
 fabricRoutes.use(requireHlf)
 
 /**
- * GET /api/v1/fabric/status — HLF connection status
+ * @swagger
+ * /api/v1/fabric/status:
+ *   get:
+ *     summary: Get HLF connection status
+ *     tags: [Fabric]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: HLF anchoring status
+ *       404:
+ *         description: HLF anchoring not enabled
  */
 fabricRoutes.get(
   '/status',
@@ -44,7 +56,32 @@ fabricRoutes.get(
 )
 
 /**
- * GET /api/v1/fabric/anchors — List recent anchor records
+ * @swagger
+ * /api/v1/fabric/anchors:
+ *   get:
+ *     summary: List recent anchor records
+ *     tags: [Fabric]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: Max records to return (1-100)
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: Pagination offset
+ *     responses:
+ *       200:
+ *         description: List of anchor records
+ *       404:
+ *         description: HLF anchoring not enabled
  */
 fabricRoutes.get(
   '/anchors',
@@ -58,7 +95,26 @@ fabricRoutes.get(
 )
 
 /**
- * GET /api/v1/fabric/anchors/:referenceId — Get anchor status for a credential/delegation
+ * @swagger
+ * /api/v1/fabric/anchors/{referenceId}:
+ *   get:
+ *     summary: Get anchor status for a credential or delegation
+ *     tags: [Fabric]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: referenceId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Credential or delegation reference ID
+ *     responses:
+ *       200:
+ *         description: Anchor records for the reference
+ *       404:
+ *         description: No anchor records found
  */
 fabricRoutes.get(
   '/anchors/:referenceId',
@@ -73,7 +129,26 @@ fabricRoutes.get(
 )
 
 /**
- * POST /api/v1/fabric/anchors/:referenceId/verify — Verify on-chain hash
+ * @swagger
+ * /api/v1/fabric/anchors/{referenceId}/verify:
+ *   post:
+ *     summary: Verify on-chain hash for an anchor record
+ *     tags: [Fabric]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: referenceId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Reference ID to verify
+ *     responses:
+ *       200:
+ *         description: Verification result
+ *       404:
+ *         description: HLF anchoring not enabled
  */
 fabricRoutes.post(
   '/anchors/:referenceId/verify',

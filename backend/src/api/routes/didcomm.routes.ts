@@ -33,7 +33,28 @@ function requireDidComm(_req: Request, res: Response, next: () => void): void {
 didcommRoutes.use(requireDidComm)
 
 /**
- * POST /api/v1/didcomm/invitations — Create OOB invitation
+ * @swagger
+ * /api/v1/didcomm/invitations:
+ *   post:
+ *     summary: Create OOB invitation
+ *     tags: [DIDComm]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       201:
+ *         description: Out-of-band invitation created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 invitationUrl:
+ *                   type: string
+ *                 outOfBandId:
+ *                   type: string
+ *       404:
+ *         description: DIDComm not enabled
  */
 didcommRoutes.post(
   '/invitations',
@@ -44,7 +65,29 @@ didcommRoutes.post(
 )
 
 /**
- * POST /api/v1/didcomm/invitations/receive — Receive/accept invitation
+ * @swagger
+ * /api/v1/didcomm/invitations/receive:
+ *   post:
+ *     summary: Receive/accept an OOB invitation
+ *     tags: [DIDComm]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [invitationUrl]
+ *             properties:
+ *               invitationUrl:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Invitation accepted, connection initiated
+ *       400:
+ *         description: Invalid invitation URL
  */
 didcommRoutes.post(
   '/invitations/receive',
@@ -60,7 +103,17 @@ didcommRoutes.post(
 )
 
 /**
- * GET /api/v1/didcomm/connections — List connections
+ * @swagger
+ * /api/v1/didcomm/connections:
+ *   get:
+ *     summary: List DIDComm connections
+ *     tags: [DIDComm]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: List of connections
  */
 didcommRoutes.get(
   '/connections',
@@ -71,7 +124,25 @@ didcommRoutes.get(
 )
 
 /**
- * GET /api/v1/didcomm/connections/:id — Connection detail
+ * @swagger
+ * /api/v1/didcomm/connections/{id}:
+ *   get:
+ *     summary: Get connection detail
+ *     tags: [DIDComm]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Connection details
+ *       404:
+ *         description: Connection not found
  */
 didcommRoutes.get(
   '/connections/:id',
@@ -86,7 +157,35 @@ didcommRoutes.get(
 )
 
 /**
- * POST /api/v1/didcomm/connections/:id/messages — Send basic message
+ * @swagger
+ * /api/v1/didcomm/connections/{id}/messages:
+ *   post:
+ *     summary: Send a basic message
+ *     tags: [DIDComm]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [content]
+ *             properties:
+ *               content:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Message sent
+ *       400:
+ *         description: Missing content
  */
 didcommRoutes.post(
   '/connections/:id/messages',
@@ -102,7 +201,23 @@ didcommRoutes.post(
 )
 
 /**
- * GET /api/v1/didcomm/connections/:id/messages — Get message history
+ * @swagger
+ * /api/v1/didcomm/connections/{id}/messages:
+ *   get:
+ *     summary: Get message history for a connection
+ *     tags: [DIDComm]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Message history
  */
 didcommRoutes.get(
   '/connections/:id/messages',

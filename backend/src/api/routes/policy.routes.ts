@@ -33,7 +33,19 @@ function requirePolicyEngine(_req: Request, res: Response, next: () => void): vo
 policyRoutes.use(requirePolicyEngine)
 
 /**
- * GET /api/v1/policies — List all policies
+ * @swagger
+ * /api/v1/policies:
+ *   get:
+ *     summary: List all authorization policies
+ *     tags: [Policies]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: List of policies
+ *       404:
+ *         description: Policy engine not enabled
  */
 policyRoutes.get(
   '/',
@@ -44,7 +56,26 @@ policyRoutes.get(
 )
 
 /**
- * GET /api/v1/policies/:id — Get policy detail
+ * @swagger
+ * /api/v1/policies/{id}:
+ *   get:
+ *     summary: Get policy by ID
+ *     tags: [Policies]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Policy ID
+ *     responses:
+ *       200:
+ *         description: Policy detail
+ *       404:
+ *         description: Policy not found
  */
 policyRoutes.get(
   '/:id',
@@ -59,7 +90,61 @@ policyRoutes.get(
 )
 
 /**
- * POST /api/v1/policies — Create custom policy (admin only)
+ * @swagger
+ * /api/v1/policies:
+ *   post:
+ *     summary: Create a custom authorization policy (admin only)
+ *     tags: [Policies]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - effect
+ *               - actions
+ *               - resources
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               effect:
+ *                 type: string
+ *                 enum: [allow, deny]
+ *               principals:
+ *                 type: object
+ *                 properties:
+ *                   roles:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                   dids:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *               actions:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               resources:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               conditions:
+ *                 type: object
+ *               priority:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Policy created
+ *       400:
+ *         description: Validation error
  */
 policyRoutes.post(
   '/',
@@ -101,7 +186,52 @@ policyRoutes.post(
 )
 
 /**
- * PUT /api/v1/policies/:id — Update custom policy (admin only)
+ * @swagger
+ * /api/v1/policies/{id}:
+ *   put:
+ *     summary: Update a custom policy (admin only)
+ *     tags: [Policies]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Policy ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               effect:
+ *                 type: string
+ *                 enum: [allow, deny]
+ *               actions:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               resources:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               priority:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Policy updated
+ *       400:
+ *         description: Cannot modify built-in policy
+ *       404:
+ *         description: Policy not found
  */
 policyRoutes.put(
   '/:id',
@@ -125,7 +255,28 @@ policyRoutes.put(
 )
 
 /**
- * DELETE /api/v1/policies/:id — Delete custom policy (admin only)
+ * @swagger
+ * /api/v1/policies/{id}:
+ *   delete:
+ *     summary: Delete a custom policy (admin only)
+ *     tags: [Policies]
+ *     security:
+ *       - BearerAuth: []
+ *       - ApiKeyAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Policy ID
+ *     responses:
+ *       200:
+ *         description: Policy deleted
+ *       400:
+ *         description: Cannot delete built-in policy
+ *       404:
+ *         description: Policy not found
  */
 policyRoutes.delete(
   '/:id',
