@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express'
 import path from 'path'
 import cors from 'cors'
 import helmet from 'helmet'
+import compression from 'compression'
 import bodyParser from 'body-parser'
 import { logger } from '../utils/logger'
 import { issuerRoutes } from './routes/issuer.routes'
@@ -75,6 +76,16 @@ export function createServer(): Express {
 
   // Trust proxy for accurate IP detection behind reverse proxy (rate limiting, logging)
   app.set('trust proxy', process.env.TRUST_PROXY || 1)
+
+  // Response compression (gzip/deflate)
+  app.use(compression({
+    threshold: 1024, // Only compress responses > 1KB
+    filter: (req, res) => {
+      // Skip compression for SSE/WebSocket upgrade requests
+      if (req.headers['accept'] === 'text/event-stream') return false
+      return compression.filter(req, res)
+    },
+  }))
 
   // Basic security middleware
   app.use(helmet({

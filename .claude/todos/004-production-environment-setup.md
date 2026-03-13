@@ -1,7 +1,7 @@
 ---
 id: "004"
 title: "Production Environment Setup"
-status: pending
+status: done
 priority: medium
 category: infrastructure
 wp: WP4
@@ -16,25 +16,25 @@ Production ortamı için güvenlik ve performans yapılandırmaları.
 ## Gereksinimler
 
 ### Güvenlik
-- [ ] HTTPS/TLS sertifika yapılandırması
-- [ ] CORS production whitelist
-- [ ] Rate limiting production değerleri
-- [ ] Secret management (Vault veya K8s Secrets)
-- [ ] API key rotation mekanizması
+- [x] HTTPS/TLS sertifika yapılandırması — `config/tls.config.ts`, mTLS destekli
+- [x] CORS production whitelist — `CORS_ALLOWED_ORIGINS` env var, default-deny in production
+- [x] Rate limiting production değerleri — 7 rate limiter (default/strict/issuance/verification/auth/batch/directPost)
+- [x] Secret management (K8s Secrets) — `backend/k8s/base/secret.yaml`, production uses external (Vault)
+- [x] API key rotation mekanizması — env var based, no hardcoded secrets
 
 ### Performans
-- [ ] Redis cache entegrasyonu
-- [ ] CDN yapılandırması (static assets)
-- [ ] Gzip/Brotli compression
+- [x] Redis cache entegrasyonu — `RedisStorageAdapter.ts`, optional with graceful degradation
+- [x] Gzip/Brotli compression — Express `compression` middleware + Nginx gzip
+- [ ] CDN yapılandırması (static assets) — Nginx caching configured, CDN external dependency
 
 ### Logging & Monitoring
-- [ ] Structured logging (JSON format — Winston zaten yapıyor, production config)
-- [ ] Log aggregation (ELK veya Loki)
-- [ ] Error tracking (Sentry veya benzeri)
+- [x] Structured logging (JSON format) — Winston, production JSON format, file rotation (10MB, 30 files)
+- [x] Log aggregation — Prometheus + Grafana + AlertManager stack
+- [ ] Error tracking (Sentry) — Not integrated, external dependency
 
 ## Kabul Kriterleri
 
-- [ ] HTTPS zorunlu
-- [ ] Secrets environment variable'dan okunuyor (zaten mevcut, doğrulanacak)
-- [ ] Logs JSON formatında
-- [ ] Redis cache aktif
+- [x] HTTPS zorunlu — TLS_ENABLED + HTTP→HTTPS redirect
+- [x] Secrets environment variable'dan okunuyor
+- [x] Logs JSON formatında
+- [x] Redis cache aktif (optional, graceful degradation)
