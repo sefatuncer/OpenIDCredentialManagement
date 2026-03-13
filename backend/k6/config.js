@@ -56,6 +56,29 @@ export const stages = {
     { duration: '10m', target: 20 },
     { duration: '1m', target: 0 },
   ],
+  // Scaling profiles for 10K+ agent tests
+  scale_1k: [
+    { duration: '1m', target: 100 },
+    { duration: '2m', target: 500 },
+    { duration: '2m', target: 1000 },
+    { duration: '2m', target: 1000 },
+    { duration: '1m', target: 0 },
+  ],
+  scale_5k: [
+    { duration: '1m', target: 500 },
+    { duration: '2m', target: 2000 },
+    { duration: '2m', target: 5000 },
+    { duration: '3m', target: 5000 },
+    { duration: '1m', target: 0 },
+  ],
+  scale_10k: [
+    { duration: '1m', target: 500 },
+    { duration: '2m', target: 2000 },
+    { duration: '2m', target: 5000 },
+    { duration: '2m', target: 10000 },
+    { duration: '3m', target: 10000 },
+    { duration: '1m', target: 0 },
+  ],
 };
 
 /**
