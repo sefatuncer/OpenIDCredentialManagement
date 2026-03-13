@@ -164,19 +164,21 @@ export function createServer(): Express {
 
   // OpenID4VCI token and credential endpoints (no auth required - part of credential issuance flow)
   // These endpoints use pre-authorized codes or access tokens from the issuer
+  // Delegates to openid4vci.service (Credo-TS PRIMARY)
   app.post(`${API_BASE_PATH}/issuer/token`, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { exchangePreAuthorizedCode } = await import('../agents/issuer.agent')
+      const { exchangePreAuthorizedCode } = await import('../services/openid4vci.service')
       const preAuthorizedCode = req.body['pre-authorized_code']
+      const txCodeValue = req.body.tx_code || req.body.user_pin
 
       if (!preAuthorizedCode) {
         return res.status(400).json({ error: 'invalid_request', error_description: 'Missing pre-authorized_code' })
       }
 
-      const tokenResponse = await exchangePreAuthorizedCode(preAuthorizedCode)
+      const tokenResponse = await exchangePreAuthorizedCode(preAuthorizedCode, txCodeValue)
 
-      if (!tokenResponse) {
-        return res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid pre-authorized code' })
+      if ('error' in tokenResponse) {
+        return res.status(400).json(tokenResponse)
       }
 
       res.json(tokenResponse)
@@ -185,36 +187,27 @@ export function createServer(): Express {
     }
   })
 
-  app.post(`${API_BASE_PATH}/issuer/credential`, async (req: Request, res: Response) => {
-    const { claimCredential } = await import('../agents/issuer.agent')
-    const authHeader = req.headers.authorization
+  app.post(`${API_BASE_PATH}/issuer/credential`, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { issueCredential } = await import('../services/openid4vci.service')
+      const authHeader = req.headers.authorization
 
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'invalid_token', error_description: 'Missing access token' })
-    }
-
-    const accessToken = authHeader.substring(7)
-    const { proof } = req.body
-
-    // Extract holder DID from proof JWT
-    let holderDid = 'did:key:unknown'
-    if (proof?.jwt) {
-      try {
-        const parts = proof.jwt.split('.')
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
-        holderDid = payload.iss || holderDid
-      } catch {
-        // Ignore parse errors
+      if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'invalid_token', error_description: 'Missing access token' })
       }
+
+      const accessToken = authHeader.substring(7)
+      const result = await issueCredential(accessToken, req.body)
+
+      if ('error' in result) {
+        const statusCode = result.error === 'invalid_token' ? 401 : 400
+        return res.status(statusCode).json(result)
+      }
+
+      res.json(result)
+    } catch (error) {
+      next(error)
     }
-
-    const result = await claimCredential(accessToken, holderDid)
-
-    if (!result) {
-      return res.status(400).json({ error: 'invalid_request', error_description: 'Invalid access token or expired offer' })
-    }
-
-    res.json(result)
   })
 
   // Simulation routes (no auth required - for monitoring dashboard)

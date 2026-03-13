@@ -118,7 +118,16 @@ async function main() {
       logger.info('Keycloak SSO not configured — API key + local JWT auth only')
     }
 
-    // Initialize all agents
+    // Create Express app BEFORE Credo init (Credo needs the app for route registration)
+    const app = createServer()
+
+    // Initialize Credo service FIRST — Credo-TS PRIMARY, Askar ZORUNLU
+    // Credo must init before agents so signing keys use Credo's managed wallet
+    logger.info('Initializing Credo service (PRIMARY mode)...')
+    await initializeCredoService(app)
+    logger.info('Credo service active — Credo-TS PRIMARY for OpenID4VCI/VP')
+
+    // Initialize Jose-based agents AFTER Credo — agents use service signing keys
     logger.info('Initializing agents...')
 
     const [issuerAgent, verifierAgent, holderAgent] = await Promise.all([
@@ -128,14 +137,6 @@ async function main() {
     ])
 
     logger.info('All agents initialized successfully')
-
-    // Create Express app BEFORE Credo init (Credo needs the app for route registration)
-    const app = createServer()
-
-    // Initialize Credo service — Credo-TS PRIMARY, Askar ZORUNLU
-    logger.info('Initializing Credo service (PRIMARY mode)...')
-    await initializeCredoService(app)
-    logger.info('Credo service active — Credo-TS PRIMARY for OpenID4VCI/VP')
 
     // Finalize server: add error/404 handlers AFTER Credo route registration
     finalizeServer(app)

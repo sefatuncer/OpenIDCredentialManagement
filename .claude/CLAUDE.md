@@ -143,6 +143,8 @@ cd web-wallet && npm run dev
 - **[2026-03-13] Testing:** Jest→Vitest migration'da `require()` çağrıları `vi.resetModules()` ile uyumsuz. `await import()` ile değiştir, `beforeEach` async yap. `vi.hoisted()` ile mock variable'ları factory dışına taşı.
 - **[2026-03-13] Architecture:** Native binding zorunlu ise (Askar gibi) baştan mandatory yap. Optional fallback dual code path yaratır ve her yeni feature'da divergence riski doğurur.
 - **[2026-03-13] Security:** Credo wallet key production'da zorunlu (`CREDO_WALLET_KEY`). Dev'de fallback key uyarı ile kullanılır, production'da `throw` ile başlatma engellenir.
+- **[2026-03-13] Architecture:** Pre-auth endpoint'ler `server.ts`'te `app.post()` ile doğrudan mount edilir — route dosyalarından bağımsız. Migration sırasında `server.ts`'teki duplicate endpoint'ler de güncellenmelidir.
+- **[2026-03-13] Architecture:** Credential signing tek entry point'ten yapılmalı (`signCredentialDirect()`). Offer flow, batch issuance ve agent claim hepsi aynı fonksiyonu çağırmalı — birden fazla signing path field inconsistency yaratır.
 - **[2026-03-13] CI/CD:** `workflow_run` trigger'ında commit SHA için `github.event.workflow_run.head_sha` kullan, `github.sha` değil. `github.sha` event dispatch anındaki default branch HEAD'i gösterir. Bkz: `.claude/solutions/cicd-pipeline-enhancement.md`
 - **[2026-03-13] CI/CD:** Güvenlik testlerini ayrı CI job olarak çalıştır (step değil) — CI dashboard'da bağımsız görünür, hata izolasyonu sağlar. Job-level `env:` ile ortam değişkenlerini DRY tut.
 

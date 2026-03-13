@@ -896,7 +896,7 @@ Verifier Frontend               Backend                        Wallet
 - Fase 2: OIDC configs, batch jobs (sessions/metadataCache transient kaldı)
 - Fase 3: schema registry (built-in schema seed), expiration notifier, encryption keys (envelope-encrypted with KEK), agent profiles
 - Encryption keys: envelope encryption (AES-256-GCM wrap with KEK from env var) — DB compromise'da key material korunur
-- Boot sırası: `initializeCore()` → `encryptionService.initialize()` → `schemaRegistry.initialize()` → agents
+- Boot sırası: `initializeCore()` → `encryptionService.initialize()` → `schemaRegistry.initialize()` → Express app → Credo → agents
 - Fase 4 (transient, bırakılabilir): websocket clients, event history, feature flags, plugins, simulation
 
 ---

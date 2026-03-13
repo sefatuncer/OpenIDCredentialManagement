@@ -6,9 +6,11 @@ import {
   issueDelegationCredential,
   issueCapabilityCredential,
   getIssuerDid,
-  exchangePreAuthorizedCode,
-  claimCredential,
 } from '../../agents/issuer.agent'
+import {
+  exchangePreAuthorizedCode as serviceExchangeCode,
+  issueCredential as serviceIssueCredential,
+} from '../../services/openid4vci.service'
 import {
   AgentIdentityCredentialSubject,
   DelegationCredentialSubject,
@@ -308,16 +310,18 @@ issuerRoutes.post(
   '/token',
   asyncHandler(async (req: Request, res: Response) => {
     const preAuthorizedCode = req.body['pre-authorized_code']
+    const txCodeValue = req.body.tx_code || req.body.user_pin
 
     if (!preAuthorizedCode) {
       res.status(400).json({ error: 'invalid_request', error_description: 'Missing pre-authorized_code' })
       return
     }
 
-    const tokenResponse = await exchangePreAuthorizedCode(preAuthorizedCode)
+    // Delegate to openid4vci.service (unified token exchange)
+    const tokenResponse = await serviceExchangeCode(preAuthorizedCode, txCodeValue)
 
-    if (!tokenResponse) {
-      res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid pre-authorized code' })
+    if ('error' in tokenResponse) {
+      res.status(400).json(tokenResponse)
       return
     }
 
@@ -362,24 +366,13 @@ issuerRoutes.post(
     }
 
     const accessToken = authHeader.substring(7)
-    const { proof } = req.body
 
-    // Proof'tan holder DID'i çıkar (basitleştirilmiş)
-    let holderDid = 'did:key:unknown'
-    if (proof?.jwt) {
-      try {
-        const parts = proof.jwt.split('.')
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
-        holderDid = payload.iss || holderDid
-      } catch {
-        // Ignore parse errors
-      }
-    }
+    // Delegate to openid4vci.service (unified credential issuance)
+    const result = await serviceIssueCredential(accessToken, req.body)
 
-    const result = await claimCredential(accessToken, holderDid)
-
-    if (!result) {
-      res.status(400).json({ error: 'invalid_request', error_description: 'Invalid access token or expired offer' })
+    if ('error' in result) {
+      const statusCode = result.error === 'invalid_token' ? 401 : 400
+      res.status(statusCode).json(result)
       return
     }
 

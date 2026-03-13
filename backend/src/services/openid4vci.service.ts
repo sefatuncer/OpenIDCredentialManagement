@@ -782,77 +782,23 @@ export async function issueCredential(
     || (configId.endsWith('_sdjwt') ? 'vc+sd-jwt' : 'jwt_vc_json')
 
   try {
-    const issuerDid = getIssuerDid()
-    const expiresIn = 365 * 24 * 60 * 60 // 1 year
-
     // Build credential subject based on type
     const credentialSubject = buildCredentialSubject(credentialType, holderDid, offerData)
-    const credentialId = `urn:uuid:${uuidv4()}`
 
-    const { privateKey, keyId } = await getSigningKeyPair()
-    let credential: string
-
-    if (requestedFormat === 'vc+sd-jwt') {
-      // Issue as SD-JWT VC (eIDAS 2.0 / EUDI ARF compliant)
-      const sdClaims = SD_CLAIMS_BY_TYPE[credentialType] || []
-      const sdResult = await sdjwtService.createSDJWTVC(
-        issuerDid,
-        holderDid,
-        credentialType,
-        credentialSubject as SDJWTClaims,
-        sdClaims,
-        { expiresIn, credentialId, privateKey }
-      )
-      credential = sdResult.combined
-    } else {
-      // Issue as plain JWT-VC (backward compat)
-      const now = Math.floor(Date.now() / 1000)
-      const vcPayload = {
-        iss: issuerDid,
-        sub: holderDid,
-        iat: now,
-        exp: now + expiresIn,
-        nbf: now,
-        jti: credentialId,
-        vc: {
-          '@context': [
-            'https://www.w3.org/2018/credentials/v1',
-            'https://www.w3.org/2018/credentials/examples/v1'
-          ],
-          type: credentialTypes,
-          issuer: issuerDid,
-          issuanceDate: new Date().toISOString(),
-          expirationDate: new Date(Date.now() + expiresIn * 1000).toISOString(),
-          credentialSubject: {
-            id: holderDid,
-            ...credentialSubject,
-          },
-        },
-      }
-
-      credential = await new jose.SignJWT(vcPayload)
-        .setProtectedHeader({
-          alg: 'EdDSA',
-          typ: 'JWT',
-          kid: `${issuerDid}#${keyId}`,
-        })
-        .sign(privateKey)
-    }
+    // Delegate to shared signing function
+    const signResult = await signCredentialDirect(
+      holderDid,
+      credentialType,
+      credentialSubject,
+      { format: requestedFormat as 'jwt_vc_json' | 'vc+sd-jwt' }
+    )
 
     logger.info('Credential issued successfully', {
-      format: requestedFormat,
+      format: signResult.format,
       credentialType,
       holderDid,
-      jti: credentialId,
+      jti: signResult.credentialId,
       storage: getStorageType(),
-    })
-
-    eventBus.emit('credential.issued', {
-      credentialId,
-      credentialType,
-      issuerDid,
-      holderDid,
-      format: requestedFormat,
     })
 
     // Generate new nonce for potential follow-up requests
@@ -869,8 +815,8 @@ export async function issueCredential(
     await getNonceStorage().save(newNonce, newStoredNonce)
 
     return {
-      format: requestedFormat,
-      credential,
+      format: signResult.format,
+      credential: signResult.credential,
       c_nonce: newNonce,
       c_nonce_expires_in: newNonceExpiresIn,
     }
@@ -882,6 +828,89 @@ export async function issueCredential(
       error_description: 'Failed to issue credential',
     }
   }
+}
+
+/**
+ * Sign a credential directly — bypass offer/token flow.
+ * Used by batch issuance and issuer agent direct issuance.
+ * Credo-TS PRIMARY: uses the service signing key (same key as issueCredential).
+ */
+export async function signCredentialDirect(
+  holderDid: string,
+  credentialType: string,
+  claims: Record<string, unknown>,
+  options: { format?: 'jwt_vc_json' | 'vc+sd-jwt' } = {}
+): Promise<{ credentialId: string; credential: string; format: string }> {
+  const issuerDid = getIssuerDid()
+  const credentialId = `urn:uuid:${uuidv4()}`
+  const expiresIn = 365 * 24 * 60 * 60 // 1 year
+  const requestedFormat = options.format || 'jwt_vc_json'
+  const credentialTypes = ['VerifiableCredential', credentialType]
+
+  const { privateKey, keyId } = await getSigningKeyPair()
+  let credential: string
+
+  if (requestedFormat === 'vc+sd-jwt') {
+    const sdClaims = SD_CLAIMS_BY_TYPE[credentialType] || []
+    const sdResult = await sdjwtService.createSDJWTVC(
+      issuerDid,
+      holderDid,
+      credentialType,
+      claims as SDJWTClaims,
+      sdClaims,
+      { expiresIn, credentialId, privateKey }
+    )
+    credential = sdResult.combined
+  } else {
+    const now = Math.floor(Date.now() / 1000)
+    const vcPayload = {
+      iss: issuerDid,
+      sub: holderDid,
+      iat: now,
+      exp: now + expiresIn,
+      nbf: now,
+      jti: credentialId,
+      vc: {
+        '@context': [
+          'https://www.w3.org/2018/credentials/v1',
+          'https://www.w3.org/2018/credentials/examples/v1'
+        ],
+        type: credentialTypes,
+        issuer: issuerDid,
+        issuanceDate: new Date().toISOString(),
+        expirationDate: new Date(Date.now() + expiresIn * 1000).toISOString(),
+        credentialSubject: {
+          id: holderDid,
+          ...claims,
+        },
+      },
+    }
+
+    credential = await new jose.SignJWT(vcPayload)
+      .setProtectedHeader({
+        alg: 'EdDSA',
+        typ: 'JWT',
+        kid: `${issuerDid}#${keyId}`,
+      })
+      .sign(privateKey)
+  }
+
+  eventBus.emit('credential.issued', {
+    credentialId,
+    credentialType,
+    issuerDid,
+    holderDid,
+    format: requestedFormat,
+  })
+
+  logger.info('Direct credential signed', {
+    format: requestedFormat,
+    credentialType,
+    holderDid,
+    jti: credentialId,
+  })
+
+  return { credentialId, credential, format: requestedFormat }
 }
 
 /**

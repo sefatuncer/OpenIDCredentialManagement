@@ -1,14 +1,13 @@
 /**
- * Issuer Agent - JWT-VC credential issuance (PRIMARY)
+ * Issuer Agent - Credential offer management ve issuance orchestration
  *
- * Ana credential issuance implementation. Native modül gerektirmez.
- * OpenID4VCI standardını destekler.
+ * Credo-TS PRIMARY mimari: credential signing openid4vci.service üzerinden yapılır.
+ * Bu modül offer oluşturma, storage yönetimi ve batch issuance wire-up sağlar.
  */
 
 import { v4 as uuidv4 } from 'uuid'
 import {
   createBaseAgent,
-  createJwtVc,
   BaseAgentInstance,
 } from './base.agent'
 import { issuerConfig } from '../config/agent.config'
@@ -24,6 +23,7 @@ import {
   getStorageType,
 } from '../core/storage'
 import { batchIssuanceService } from '../services/batchIssuance.service'
+import { signCredentialDirect } from '../services/openid4vci.service'
 import { setDelegationIssuer } from '../services/delegation.service'
 
 let issuerAgent: BaseAgentInstance | null = null
@@ -275,33 +275,20 @@ export async function issueCapabilityCredential(
 }
 
 /**
- * Offer flow bypass — doğrudan JWT-VC oluştur ve issuedStorage'a kaydet.
+ * Offer flow bypass — doğrudan credential oluştur ve issuedStorage'a kaydet.
  * Batch issuance service callback'i olarak kullanılır.
+ * Credo-TS PRIMARY: delegates to openid4vci.service.signCredentialDirect()
  */
 export async function issueCredentialDirect(
   holderDid: string,
   credentialType: string,
   claims: Record<string, unknown>
 ): Promise<{ credentialId: string; credential: string }> {
-  const agent = getIssuerAgent()
-  const credentialId = uuidv4()
+  const result = await signCredentialDirect(holderDid, credentialType, claims)
 
-  const jwt = await createJwtVc(
-    agent.keyPair.privateKey,
-    agent.getDid(),
-    agent.getKid(),
-    {
-      credentialSubject: {
-        id: holderDid,
-        ...claims,
-      },
-      type: ['VerifiableCredential', credentialType],
-    }
-  )
-
-  await getIssuedStorage().save(credentialId, {
-    credentialId,
-    jwt,
+  await getIssuedStorage().save(result.credentialId, {
+    credentialId: result.credentialId,
+    jwt: result.credential,
     type: credentialType,
     holderDid,
     issuedAt: new Date(),
@@ -309,7 +296,7 @@ export async function issueCredentialDirect(
 
   logger.info(`Direct credential issued: ${credentialType} to ${holderDid}`)
 
-  return { credentialId, credential: jwt }
+  return { credentialId: result.credentialId, credential: result.credential }
 }
 
 /**
@@ -343,42 +330,31 @@ export async function exchangePreAuthorizedCode(preAuthorizedCode: string): Prom
 
 /**
  * Credential claim - access token ile credential al
+ * Credo-TS PRIMARY: delegates signing to openid4vci.service.signCredentialDirect()
  */
 export async function claimCredential(
   accessToken: string,
   holderDid: string
 ): Promise<{ credential: string; format: string } | null> {
   // Access token ile offer bul (query by accessToken field)
-  const result = await getOffersStorage().query({
+  const queryResult = await getOffersStorage().query({
     where: { accessToken },
     limit: 1,
   })
 
-  if (result.data.length === 0) {
+  if (queryResult.data.length === 0) {
     return null
   }
 
-  const offer = result.data[0]
-  const agent = getIssuerAgent()
+  const offer = queryResult.data[0]
 
-  // JWT-VC oluştur
-  const jwt = await createJwtVc(
-    agent.keyPair.privateKey,
-    agent.getDid(),
-    agent.getKid(),
-    {
-      credentialSubject: {
-        id: holderDid,
-        ...offer.subject,
-      },
-      type: ['VerifiableCredential', offer.type],
-    }
-  )
+  // Delegate signing to service (holderDid is set as credentialSubject.id by signCredentialDirect)
+  const result = await signCredentialDirect(holderDid, offer.type, offer.subject)
 
   // Issued credential'ı kaydet (offerId as key)
   await getIssuedStorage().save(offer.offerId, {
     credentialId: offer.offerId,
-    jwt,
+    jwt: result.credential,
     type: offer.type,
     holderDid,
     issuedAt: new Date(),
@@ -390,8 +366,8 @@ export async function claimCredential(
   logger.info(`Credential issued: ${offer.type} to ${holderDid}`)
 
   return {
-    credential: jwt,
-    format: 'jwt_vc_json',
+    credential: result.credential,
+    format: result.format,
   }
 }
 

@@ -1,11 +1,12 @@
 /**
- * Base Agent - Jose tabanlı DID ve Credential yönetimi (PRIMARY)
+ * Base Agent - Jose tabanlı DID ve key yönetimi (utility)
  *
- * Ana SSI implementation. Native modül gerektirmez, pure JavaScript.
- * OpenID4VCI ve OpenID4VP standartlarını destekler.
+ * Agent identity (DID, key pair) oluşturma ve JWT utility fonksiyonları.
+ * Credo-TS PRIMARY mimari altında credential signing openid4vci.service üzerinden yapılır.
+ * Bu modül sadece agent identity bootstrapping ve verification utility'leri sağlar.
  *
- * Credo (askar) kuruluysa opsiyonel olarak Credo da kullanılabilir.
- * @see credo.agent.ts - Credo tabanlı implementation (opsiyonel)
+ * @see credo.agent.ts - Credo-TS PRIMARY SSI engine
+ * @see openid4vci.service.ts - Credential signing (signCredentialDirect)
  */
 
 import * as jose from 'jose'

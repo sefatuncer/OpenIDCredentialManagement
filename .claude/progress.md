@@ -37,6 +37,10 @@ Single environment development setup - no staging/production yet.
 - [x] Jest → Vitest migration (49 test files, 1093/1093 tests passing)
 - [x] Production wallet key enforcement (CREDO_WALLET_KEY required)
 - [x] Client-side Jose exception: web-wallet + mobile-wallet (browser/Expo can't run Askar)
+- [x] `signCredentialDirect()` — unified signing entry point (issueCredential, batch, agent claim all use it)
+- [x] Boot order fixed: Express app → Credo → agents (agents no longer init before Credo)
+- [x] Route consolidation: issuer.routes.ts + server.ts pre-auth endpoints delegate to openid4vci.service
+- [x] issuer.agent.ts: `issueCredentialDirect()` + `claimCredential()` delegate to service instead of Jose
 
 ### Frontend
 - [x] Web Wallet (React + Vite)
