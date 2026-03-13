@@ -15,7 +15,6 @@ import { sdjwtService, type SDJWTClaims } from './sdjwt.service'
 import { saveTenantData, listTenantData } from './tenant-storage.service'
 // Credo Service import - Credo varsa onu kullan, yoksa Jose fallback
 import {
-  isUsingCredo,
   createCredentialOffer as credoCreateOffer,
   getIssuerDid as credoGetIssuerDid,
 } from './credo.service'
@@ -396,8 +395,7 @@ export function getAuthorizationServerMetadata() {
 }
 
 /**
- * Create a credential offer
- * Credo varsa Credo'yu, yoksa Jose-based implementation'ı kullanır
+ * Create a credential offer — Credo-TS PRIMARY
  */
 export async function createCredentialOffer(
   credentialTypes: string[],
@@ -412,95 +410,37 @@ export async function createCredentialOffer(
   credentialOffer: CredentialOffer
   credentialOfferUri: string
 }> {
-  // Credo kullanılabilirse öncelikli olarak onu kullan
-  if (isUsingCredo()) {
-    const txCode = options.txCode || (options.userPinRequired
-      ? { inputMode: 'numeric', length: 6 }
-      : undefined)
-    const credoResult = await credoCreateOffer(credentialTypes, {
-      preAuthorizedCodeFlowConfig: txCode ? { txCode } : undefined,
-    })
-
-    if (credoResult) {
-      logger.info('Created credential offer via Credo', {
-        credentialTypes,
-        mode: 'credo',
-      })
-
-      eventBus.emit('credential.offer.created', {
-        offerId: credoResult.issuanceSession?.id || uuidv4(),
-        credentialTypes,
-        expiresAt: new Date(Date.now() + (options.expiresInSeconds || 300) * 1000),
-        mode: 'credo',
-      })
-
-      return {
-        offerId: credoResult.issuanceSession?.id || uuidv4(),
-        credentialOffer: credoResult.credentialOffer,
-        credentialOfferUri: credoResult.credentialOfferUri,
-      }
-    }
-    // Credo başarısız olursa Jose fallback'e düş
-    logger.warn('Credo credential offer failed, falling back to Jose')
-  }
-
-  // Jose-based implementation (fallback)
-  const baseUrl = getIssuerBaseUrl()
-  const offerId = uuidv4()
-  const preAuthorizedCode = uuidv4()
-  const expiresIn = options.expiresInSeconds || 300 // 5 minutes default
-
-  // Resolve tx_code from options (support deprecated userPinRequired)
+  // Credo-TS PRIMARY — always use Credo
   const txCode = options.txCode || (options.userPinRequired
-    ? { input_mode: 'numeric', length: 6 }
+    ? { inputMode: 'numeric', length: 6 }
     : undefined)
+  const credoResult = await credoCreateOffer(credentialTypes, {
+    preAuthorizedCodeFlowConfig: txCode ? { txCode } : undefined,
+  })
 
-  const credentialOffer: CredentialOffer = {
-    credential_issuer: baseUrl,
-    credential_configuration_ids: credentialTypes,
-    credentials: credentialTypes, // deprecated, backward compat for old clients
-    grants: {
-      'urn:ietf:params:oauth:grant-type:pre-authorized_code': {
-        'pre-authorized_code': preAuthorizedCode,
-        ...(txCode ? { tx_code: txCode } : {}),
-      },
-    },
+  if (!credoResult) {
+    throw new Error('Credo credential offer creation failed')
   }
 
-  // Store the offer
-  const storedOffer: StoredCredentialOffer = {
-    offer: credentialOffer,
-    preAuthorizedCode,
-    createdAt: new Date(),
-    expiresAt: new Date(Date.now() + expiresIn * 1000),
-    claimed: false,
-  }
+  const offerId = credoResult.issuanceSession?.id || uuidv4()
 
-  await saveTenantData(getOffersStorage(), offerId, options.tenantId, storedOffer)
-
-  // Create offer URI (can be used as QR code or deep link)
-  const offerJson = encodeURIComponent(JSON.stringify(credentialOffer))
-  const credentialOfferUri = `openid-credential-offer://?credential_offer=${offerJson}`
-
-  logger.info('Created credential offer', {
+  logger.info('Created credential offer via Credo', {
     offerId,
     credentialTypes,
-    expiresAt: storedOffer.expiresAt.toISOString(),
-    storage: getStorageType(),
-    mode: 'jose',
+    mode: 'credo',
   })
 
   eventBus.emit('credential.offer.created', {
     offerId,
     credentialTypes,
-    expiresAt: storedOffer.expiresAt,
-    mode: 'jose',
+    expiresAt: new Date(Date.now() + (options.expiresInSeconds || 300) * 1000),
+    mode: 'credo',
   })
 
   return {
     offerId,
-    credentialOffer,
-    credentialOfferUri,
+    credentialOffer: credoResult.credentialOffer,
+    credentialOfferUri: credoResult.credentialOfferUri,
   }
 }
 

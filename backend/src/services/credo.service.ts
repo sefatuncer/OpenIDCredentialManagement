@@ -2,10 +2,7 @@
  * Credo Service - Credo Agent lifecycle ve API wrapper'ları
  * Singleton pattern ile tek bir agent instance yönetimi
  *
- * Bu service Credo-TS'i kullanır. Native askar modülü için
- * Visual Studio Build Tools gereklidir.
- *
- * Kurulum: scripts/setup-credo.ps1 scriptini admin olarak çalıştırın.
+ * Credo-TS PRIMARY mimari: Askar ZORUNLU, Jose fallback YOK.
  */
 
 import { Agent } from '@credo-ts/core'
@@ -29,27 +26,15 @@ import type { Express } from 'express'
 
 // Service state
 let serviceInitialized = false
-let usingCredo = false
 
 /**
- * Credo Service'i başlat
- * @returns true if using Credo, false if using Jose fallback
+ * Credo Service'i başlat — Askar ZORUNLU
+ * @throws Askar veya Credo init başarısız olursa hata fırlatır
  */
 export async function initializeCredoService(expressApp?: Express): Promise<boolean> {
   if (serviceInitialized) {
-    logger.info('Credo service already initialized', { usingCredo })
-    return usingCredo
-  }
-
-  // Askar kullanılabilirliğini kontrol et
-  const askarAvailable = await checkAskarAvailability()
-
-  if (!askarAvailable) {
-    // Jose mode - bu normal çalışma modu, Askar opsiyonel
-    logger.info('Using Jose-based SSI implementation (primary mode)')
-    serviceInitialized = true
-    usingCredo = false
-    return false
+    logger.info('Credo service already initialized')
+    return true
   }
 
   const config: CredoAgentConfig = {
@@ -62,30 +47,18 @@ export async function initializeCredoService(expressApp?: Express): Promise<bool
 
   // Wallet key kontrolü
   if (!config.walletKey) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('CREDO_WALLET_KEY or WALLET_KEY must be set in production')
+    }
     logger.warn('CREDO_WALLET_KEY or WALLET_KEY not set. Using development key.')
     config.walletKey = 'development-key-do-not-use-in-production'
   }
 
-  try {
-    const agent = await initializeCredoAgent(config, expressApp)
-
-    if (agent) {
-      serviceInitialized = true
-      usingCredo = true
-      logger.info('Credo service initialized with Credo agent')
-      return true
-    } else {
-      serviceInitialized = true
-      usingCredo = false
-      logger.info('Credo agent initialization failed. Using Jose-based implementation.')
-      return false
-    }
-  } catch (error) {
-    logger.error('Failed to initialize Credo service', { error: (error as Error).message })
-    serviceInitialized = true
-    usingCredo = false
-    return false
-  }
+  // Credo agent başlat — Askar zorunlu, hata fırlatır
+  const agent = await initializeCredoAgent(config, expressApp)
+  serviceInitialized = true
+  logger.info('Credo service initialized — Credo-TS PRIMARY mode')
+  return true
 }
 
 /**
@@ -103,40 +76,31 @@ export function isServiceReady(): boolean {
 }
 
 /**
- * Credo kullanılıyor mu?
+ * Credo kullanılıyor mu? — Credo-TS PRIMARY: her zaman true
  */
 export function isUsingCredo(): boolean {
-  return usingCredo
+  return serviceInitialized
 }
 
 /**
  * Issuer DID'ini getir
  */
 export async function getIssuerDid(): Promise<string | null> {
-  if (usingCredo) {
-    return await getAgentDid()
-  }
-  return null
+  return await getAgentDid()
 }
 
 /**
  * Verifier DID'ini getir
  */
 export async function getVerifierDid(): Promise<string | null> {
-  if (usingCredo) {
-    return await getAgentDid()
-  }
-  return null
+  return await getAgentDid()
 }
 
 /**
  * Holder DID'ini getir
  */
 export async function getHolderDid(): Promise<string | null> {
-  if (usingCredo) {
-    return await getAgentDid()
-  }
-  return null
+  return await getAgentDid()
 }
 
 // ==================== ISSUER METADATA ====================
@@ -145,10 +109,6 @@ export async function getHolderDid(): Promise<string | null> {
  * Get Credo issuer metadata for .well-known endpoint
  */
 export async function getCredoIssuerMetadata(): Promise<Record<string, any> | null> {
-  if (!usingCredo) {
-    return null
-  }
-
   try {
     const agent = getCredoAgent()
     if (!agent) return null
@@ -191,11 +151,6 @@ export async function createCredentialOffer(
   credentialOfferUri: string
   issuanceSession: any
 } | null> {
-  if (!usingCredo) {
-    logger.debug('Credo not available for createCredentialOffer')
-    return null
-  }
-
   return await createCredoCredentialOffer(credentialConfigurationIds, options)
 }
 
@@ -211,11 +166,6 @@ export async function createVerificationRequest(
   authorizationRequestUri: string
   verificationSession: any
 } | null> {
-  if (!usingCredo) {
-    logger.debug('Credo not available for createVerificationRequest')
-    return null
-  }
-
   return await createCredoVerificationRequest(presentationDefinition)
 }
 
@@ -223,10 +173,6 @@ export async function createVerificationRequest(
  * Verification session getir
  */
 export async function getVerificationSession(sessionId: string): Promise<any | null> {
-  if (!usingCredo) {
-    return null
-  }
-
   return await getCredoVerificationSession(sessionId)
 }
 
@@ -242,11 +188,6 @@ export async function verifyPresentation(
   holderDid?: string
   errors?: string[]
 } | null> {
-  if (!usingCredo) {
-    logger.debug('Credo not available for verifyPresentation')
-    return null
-  }
-
   const session = await getCredoVerificationSession(verificationSessionId)
   if (!session) {
     return {
@@ -281,11 +222,6 @@ export async function acceptCredentialOffer(
 ): Promise<{
   credentials: any[]
 } | null> {
-  if (!usingCredo) {
-    logger.debug('Credo not available for acceptCredentialOffer')
-    return null
-  }
-
   return await acceptCredoCredentialOffer(credentialOfferUri)
 }
 
@@ -298,11 +234,6 @@ export async function presentCredential(
   submitted: boolean
   result?: any
 } | null> {
-  if (!usingCredo) {
-    logger.debug('Credo not available for presentCredential')
-    return null
-  }
-
   return await submitCredoPresentation(authorizationRequestUri)
 }
 
@@ -316,17 +247,14 @@ export async function shutdownCredoService(): Promise<void> {
     return
   }
 
-  if (usingCredo) {
-    try {
-      await shutdownCredoAgent()
-      logger.info('Credo service shutdown successfully')
-    } catch (error) {
-      logger.error('Error shutting down Credo service', { error: (error as Error).message })
-    }
+  try {
+    await shutdownCredoAgent()
+    logger.info('Credo service shutdown successfully')
+  } catch (error) {
+    logger.error('Error shutting down Credo service', { error: (error as Error).message })
   }
 
   serviceInitialized = false
-  usingCredo = false
 }
 
 /**
@@ -334,7 +262,7 @@ export async function shutdownCredoService(): Promise<void> {
  */
 export async function healthCheck(): Promise<{
   status: 'healthy' | 'unhealthy'
-  mode: 'credo' | 'jose'
+  mode: 'credo'
   details: {
     serviceReady: boolean
     agentReady: boolean
@@ -348,7 +276,7 @@ export async function healthCheck(): Promise<{
     if (!serviceInitialized) {
       return {
         status: 'unhealthy',
-        mode: 'jose',
+        mode: 'credo',
         details: {
           serviceReady: false,
           agentReady: false,
@@ -357,35 +285,22 @@ export async function healthCheck(): Promise<{
       }
     }
 
-    if (usingCredo) {
-      const did = await getAgentDid()
+    const did = await getAgentDid()
 
-      return {
-        status: isCredoAgentReady() ? 'healthy' : 'unhealthy',
-        mode: 'credo',
-        details: {
-          serviceReady: true,
-          agentReady: isCredoAgentReady(),
-          askarAvailable: true,
-          did,
-        },
-      }
-    }
-
-    // Jose mode
     return {
-      status: 'healthy',
-      mode: 'jose',
+      status: isCredoAgentReady() ? 'healthy' : 'unhealthy',
+      mode: 'credo',
       details: {
         serviceReady: true,
-        agentReady: true,
-        askarAvailable,
+        agentReady: isCredoAgentReady(),
+        askarAvailable: true,
+        did,
       },
     }
   } catch (error) {
     return {
       status: 'unhealthy',
-      mode: usingCredo ? 'credo' : 'jose',
+      mode: 'credo',
       details: {
         serviceReady: false,
         agentReady: false,

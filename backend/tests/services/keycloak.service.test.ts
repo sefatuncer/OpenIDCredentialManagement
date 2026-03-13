@@ -2,8 +2,8 @@
  * Keycloak Service Tests — configuration, token detection, role mapping
  */
 
-jest.mock('../../src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
 import {

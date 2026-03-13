@@ -10,7 +10,7 @@
 ┌─────────────────────┐     ┌─────────────────────────┐     ┌──────────────────┐
 │  Frontend Issuer/    │     │      Backend (3000)      │     │    Web Wallet    │
 │  Verifier (5174)     │────▶│  Express + PostgreSQL    │◀────│     (5173)       │
-│  React + Vite        │     │  Credo PRIMARY / Jose FB │     │  React + Vite    │
+│  React + Vite        │     │  Credo-TS PRIMARY (Askar) │     │  React + Vite    │
 └─────────────────────┘     └─────────────────────────┘     └──────────────────┘
         │                            │                              │
         │ Bearer Token (API Key)     │ PostgreSQL (5432)            │ Client Credentials

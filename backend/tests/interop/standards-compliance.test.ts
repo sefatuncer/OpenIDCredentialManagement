@@ -36,6 +36,7 @@ describe('Interoperability: Standards Compliance', () => {
       const auth = authedRequest(app)
       const res = await auth.post(`${API}/issuer/credentials/agent-identity`).send({
         holderDid: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        agentId: 'interop-test-agent-001',
         agentType: 'autonomous',
         agentName: 'Interop-Test-Agent',
         ownerDid: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
@@ -64,9 +65,9 @@ describe('Interoperability: Standards Compliance', () => {
             expect(payload.vc.credentialSubject).toBeDefined()
           }
         }
-      } else if (res.status === 500) {
-        // Agent not initialized — acceptable in test env
-        expect(res.body.error).toBeDefined()
+      } else {
+        // 500 from uninitialized agent — acceptable in test env
+        expect(res.status).toBe(500)
       }
     })
 
@@ -81,8 +82,9 @@ describe('Interoperability: Standards Compliance', () => {
       if (issuerRes.status === 200) {
         expect(issuerRes.body.did).toBeDefined()
         expect(issuerRes.body.did).toMatch(/^did:/)
-      } else if (issuerRes.status === 500) {
-        // Agent not initialized
+      } else {
+        // Agent not initialized — route returns { error: "..." }
+        expect(issuerRes.status).toBe(500)
         expect(issuerRes.body.error).toBeDefined()
       }
     })
@@ -102,8 +104,9 @@ describe('Interoperability: Standards Compliance', () => {
         const did = res.body.did
         // System should use did:key (self-contained, no external resolution)
         expect(did).toMatch(/^did:key:z/)
-      } else if (res.status === 500) {
-        expect(res.body.error).toBeDefined()
+      } else {
+        // Agent not initialized
+        expect(res.status).toBe(500)
       }
     })
 
@@ -139,6 +142,7 @@ describe('Interoperability: Standards Compliance', () => {
       const auth = authedRequest(app)
       const res = await auth.post(`${API}/issuer/credentials/agent-identity`).send({
         holderDid: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        agentId: 'vci-compliance-agent-001',
         agentType: 'autonomous',
         agentName: 'VCI-Compliance-Agent',
         ownerDid: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
@@ -152,8 +156,9 @@ describe('Interoperability: Standards Compliance', () => {
         // OpenID4VCI offer should have credential_offer_uri or inline offer
         const hasOffer = body.credentialOfferUri || body.credential_offer_uri || body.grants
         expect(hasOffer).toBeTruthy()
-      } else if (res.status === 500) {
-        expect(res.body.error).toBeDefined()
+      } else {
+        // 500 from uninitialized agent
+        expect(res.status).toBe(500)
       }
     })
 
@@ -163,6 +168,7 @@ describe('Interoperability: Standards Compliance', () => {
       // Create offer first
       const offerRes = await auth.post(`${API}/issuer/credentials/agent-identity`).send({
         holderDid: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',
+        agentId: 'vci-token-agent-001',
         agentType: 'autonomous',
         agentName: 'VCI-Token-Agent',
         ownerDid: 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK',

@@ -7,29 +7,29 @@ import type { CredentialSchema } from '../../src/services/schemaRegistry.service
 // Shared in-memory store (survives module lazy cache)
 const store = new Map<string, CredentialSchema>()
 
-jest.mock('../../src/core/storage', () => ({
-  createStorageAdapter: jest.fn(() => ({
-    save: jest.fn(async (key: string, data: CredentialSchema) => { store.set(key, data) }),
-    get: jest.fn(async (key: string) => store.get(key) ?? null),
-    delete: jest.fn(async (key: string) => { store.delete(key) }),
-    list: jest.fn(async () => Array.from(store.values())),
-    query: jest.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
-    count: jest.fn(async () => store.size),
-    exists: jest.fn(async (key: string) => store.has(key)),
-    update: jest.fn(async (key: string, data: Partial<CredentialSchema>) => {
+vi.mock('../../src/core/storage', () => ({
+  createStorageAdapter: vi.fn(() => ({
+    save: vi.fn(async (key: string, data: CredentialSchema) => { store.set(key, data) }),
+    get: vi.fn(async (key: string) => store.get(key) ?? null),
+    delete: vi.fn(async (key: string) => { store.delete(key) }),
+    list: vi.fn(async () => Array.from(store.values())),
+    query: vi.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
+    count: vi.fn(async () => store.size),
+    exists: vi.fn(async (key: string) => store.has(key)),
+    update: vi.fn(async (key: string, data: Partial<CredentialSchema>) => {
       const existing = store.get(key)
       if (!existing) return null
       const updated = { ...existing, ...data } as CredentialSchema
       store.set(key, updated)
       return updated
     }),
-    clear: jest.fn(async () => { store.clear() }),
-    getAdapterType: jest.fn(() => 'memory'),
+    clear: vi.fn(async () => { store.clear() }),
+    getAdapterType: vi.fn(() => 'memory'),
   })),
 }))
 
-jest.mock('../../src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
 import { schemaRegistry } from '../../src/services/schemaRegistry.service'
@@ -37,7 +37,7 @@ import { schemaRegistry } from '../../src/services/schemaRegistry.service'
 describe('SchemaRegistryService', () => {
   beforeEach(() => {
     store.clear()
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('initialize', () => {
@@ -69,7 +69,7 @@ describe('SchemaRegistryService', () => {
     })
 
     it('should log the total schema count after initialization', async () => {
-      const { logger } = require('../../src/utils/logger')
+      const { logger } = await import('../../src/utils/logger') as any
       await schemaRegistry.initialize()
 
       expect(logger.info).toHaveBeenCalledWith(

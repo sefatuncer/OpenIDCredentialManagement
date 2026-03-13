@@ -7,19 +7,19 @@ import {
 } from '../security/security-helpers';
 
 // Mock webhook service
-jest.mock('../../src/services/webhook.service', () => ({
-  createSubscription: jest.fn(),
-  updateSubscription: jest.fn(),
-  deleteSubscription: jest.fn(),
-  listSubscriptions: jest.fn(),
-  getSubscription: jest.fn(),
-  testSubscription: jest.fn(),
-  getDeliveries: jest.fn(),
+vi.mock('../../src/services/webhook.service', () => ({
+  createSubscription: vi.fn(),
+  updateSubscription: vi.fn(),
+  deleteSubscription: vi.fn(),
+  listSubscriptions: vi.fn(),
+  getSubscription: vi.fn(),
+  testSubscription: vi.fn(),
+  getDeliveries: vi.fn(),
 }));
 
 import * as webhookService from '../../src/services/webhook.service';
 
-const mockedService = webhookService as jest.Mocked<typeof webhookService>;
+const mockedService = webhookService as anyed<typeof webhookService>;
 
 const mockWebhook = {
   id: 'wh-001',
@@ -46,7 +46,7 @@ describe('Webhook Routes', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // ── POST /api/v1/webhooks ─────────────────────────────────────────────

@@ -9,22 +9,22 @@ function createMockStorage<T>(): IStorageAdapter<T> & { _store: Map<string, T> }
   const store = new Map<string, T>()
   return {
     _store: store,
-    save: jest.fn(async (key: string, data: T) => { store.set(key, data) }),
-    get: jest.fn(async (key: string) => store.get(key) ?? null),
-    delete: jest.fn(async (key: string) => store.delete(key)),
-    list: jest.fn(async () => Array.from(store.values())),
-    query: jest.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
-    count: jest.fn(async () => store.size),
-    exists: jest.fn(async (key: string) => store.has(key)),
-    update: jest.fn(async (key: string, data: Partial<T>) => {
+    save: vi.fn(async (key: string, data: T) => { store.set(key, data) }),
+    get: vi.fn(async (key: string) => store.get(key) ?? null),
+    delete: vi.fn(async (key: string) => store.delete(key)),
+    list: vi.fn(async () => Array.from(store.values())),
+    query: vi.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
+    count: vi.fn(async () => store.size),
+    exists: vi.fn(async (key: string) => store.has(key)),
+    update: vi.fn(async (key: string, data: Partial<T>) => {
       const existing = store.get(key)
       if (!existing) return null
       const updated = { ...existing, ...data } as T
       store.set(key, updated)
       return updated
     }),
-    clear: jest.fn(async () => { store.clear() }),
-    getAdapterType: jest.fn(() => 'memory'),
+    clear: vi.fn(async () => { store.clear() }),
+    getAdapterType: vi.fn(() => 'memory'),
   }
 }
 
@@ -32,37 +32,37 @@ const mockCredentialStorage = createMockStorage<any>()
 const mockNotificationStorage = createMockStorage<any>()
 
 // Mock storage module before importing service
-jest.mock('../../src/core/storage', () => ({
-  createStorageAdapter: jest.fn((collection: string) => {
+vi.mock('../../src/core/storage', () => ({
+  createStorageAdapter: vi.fn((collection: string) => {
     if (collection === 'expiration_credentials') return mockCredentialStorage
     if (collection === 'expiration_notifications') return mockNotificationStorage
     return createMockStorage()
   }),
 }))
 
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }))
 
-jest.mock('../../src/services/websocket.service', () => ({
+vi.mock('../../src/services/websocket.service', () => ({
   wsService: {
-    broadcast: jest.fn(),
+    broadcast: vi.fn(),
   },
 }))
 
 import { expirationNotifier, ExpiringCredential } from '../../src/services/expirationNotifier.service'
 import { wsService } from '../../src/services/websocket.service'
 
-const mockBroadcast = wsService.broadcast as jest.Mock
+const mockBroadcast = wsService.broadcast as any
 
 describe('ExpirationNotifierService', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockCredentialStorage._store.clear()
     mockNotificationStorage._store.clear()
     expirationNotifier.stop()
@@ -74,7 +74,7 @@ describe('ExpirationNotifierService', () => {
 
   describe('start() / stop() lifecycle', () => {
     it('should start periodic checks and stop cleanly', () => {
-      jest.useFakeTimers()
+      vi.useFakeTimers()
 
       expirationNotifier.configure({ checkIntervalMinutes: 1, enabled: true, warningDays: [30, 7, 1] })
       expirationNotifier.start()
@@ -84,7 +84,7 @@ describe('ExpirationNotifierService', () => {
 
       expirationNotifier.stop()
 
-      jest.useRealTimers()
+      vi.useRealTimers()
     })
 
     it('should not start when disabled', () => {
@@ -298,7 +298,7 @@ describe('ExpirationNotifierService', () => {
 
   describe('onExpiring handler', () => {
     it('should call registered handlers when credential is expiring', async () => {
-      const handler = jest.fn()
+      const handler = vi.fn()
       expirationNotifier.onExpiring(handler)
 
       const now = Date.now()

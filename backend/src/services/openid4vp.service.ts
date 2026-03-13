@@ -10,9 +10,8 @@ import {
 } from '../core/storage'
 import { isCredentialRevoked, getRevocationStatus } from './revocation.service'
 import { saveTenantData, listTenantData } from './tenant-storage.service'
-// Credo Service import - Credo varsa onu kullan, yoksa Jose fallback
+// Credo Service import — Credo-TS PRIMARY
 import {
-  isUsingCredo,
   createVerificationRequest as credoCreateVerificationRequest,
   verifyPresentation as credoVerifyPresentation,
   getVerifierDid as credoGetVerifierDid,
@@ -376,117 +375,51 @@ export async function createAuthorizationRequest(
     throw new Error(`Unknown presentation definition: ${presentationDefinitionId}`)
   }
 
-  // Credo kullanılabilirse öncelikli olarak onu kullan
-  if (isUsingCredo()) {
-    const credoResult = await credoCreateVerificationRequest(presentationDefinition)
+  // Credo-TS PRIMARY — always use Credo
+  const credoResult = await credoCreateVerificationRequest(presentationDefinition)
 
-    if (credoResult) {
-      const sessionId = credoResult.verificationSession?.id || uuidv4()
-      const credoClientId = (await credoGetVerifierDid()) || getVerifierDid()
-
-      // Jose storage'a da kaydet (hybrid mode — session status lookup)
-      const session: VerificationSession = {
-        id: sessionId,
-        presentationDefinition,
-        nonce: uuidv4(),
-        state: sessionId, // Credo manages its own state
-        responseUri: credoResult.authorizationRequestUri,
-        clientId: credoClientId,
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + (options.expiresInSeconds || 300) * 1000),
-        status: 'pending',
-      }
-      await saveTenantData(getVPSessionsStorage(), sessionId, options.tenantId, session)
-
-      logger.info('Created authorization request via Credo', {
-        sessionId,
-        presentationDefinitionId: presentationDefinition.id,
-        mode: 'credo',
-      })
-
-      // Build informational authorization request for API response
-      // The wallet uses authorizationRequestUri directly (which contains request_uri param)
-      const authorizationRequest: AuthorizationRequest = {
-        response_type: 'vp_token',
-        response_mode: 'direct_post',
-        client_id: credoClientId,
-        client_id_scheme: 'did',
-        nonce: session.nonce,
-        state: session.state,
-        presentation_definition: presentationDefinition,
-        client_metadata: getVerifierClientMetadata(),
-      }
-
-      return {
-        sessionId,
-        authorizationRequest,
-        authorizationRequestUri: credoResult.authorizationRequestUri,
-      }
-    }
-    // Credo başarısız olursa Jose fallback'e düş
-    logger.warn('Credo verification request failed, falling back to Jose')
+  if (!credoResult) {
+    throw new Error('Credo verification request creation failed')
   }
 
-  // Jose-based implementation (fallback)
-  const baseUrl = getVerifierBaseUrl()
-  const sessionId = uuidv4()
-  const nonce = uuidv4()
-  const state = uuidv4()
-  const expiresIn = options.expiresInSeconds || 300 // 5 minutes default
+  const sessionId = credoResult.verificationSession?.id || uuidv4()
+  const credoClientId = (await credoGetVerifierDid()) || getVerifierDid()
 
-  const responseUri = `${baseUrl}/direct_post`
-
-  const authorizationRequest: AuthorizationRequest = {
-    response_type: 'vp_token',
-    response_mode: 'direct_post',
-    client_id: getVerifierDid(),
-    client_id_scheme: 'did',
-    response_uri: responseUri,
-    nonce,
-    state,
-    presentation_definition: presentationDefinition,
-    client_metadata: getVerifierClientMetadata(),
-  }
-
-  // Store session using storage adapter
+  // Store session for status lookup
   const session: VerificationSession = {
     id: sessionId,
     presentationDefinition,
-    nonce,
-    state,
-    responseUri,
-    clientId: getVerifierDid(),
+    nonce: uuidv4(),
+    state: sessionId,
+    responseUri: credoResult.authorizationRequestUri,
+    clientId: credoClientId,
     createdAt: new Date(),
-    expiresAt: new Date(Date.now() + expiresIn * 1000),
+    expiresAt: new Date(Date.now() + (options.expiresInSeconds || 300) * 1000),
     status: 'pending',
   }
   await saveTenantData(getVPSessionsStorage(), sessionId, options.tenantId, session)
 
-  // Create authorization request URI
-  const params = new URLSearchParams()
-  params.set('response_type', authorizationRequest.response_type)
-  params.set('response_mode', authorizationRequest.response_mode)
-  params.set('client_id', authorizationRequest.client_id)
-  params.set('client_id_scheme', authorizationRequest.client_id_scheme || 'did')
-  params.set('response_uri', authorizationRequest.response_uri!)
-  params.set('nonce', authorizationRequest.nonce)
-  params.set('state', authorizationRequest.state)
-  params.set('presentation_definition', JSON.stringify(presentationDefinition))
-  params.set('client_metadata', JSON.stringify(authorizationRequest.client_metadata))
-
-  const authorizationRequestUri = `openid4vp://?${params.toString()}`
-
-  logger.info('Created authorization request', {
+  logger.info('Created authorization request via Credo', {
     sessionId,
     presentationDefinitionId: presentationDefinition.id,
-    expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
-    mode: 'jose',
+    mode: 'credo',
   })
+
+  const authorizationRequest: AuthorizationRequest = {
+    response_type: 'vp_token',
+    response_mode: 'direct_post',
+    client_id: credoClientId,
+    client_id_scheme: 'did',
+    nonce: session.nonce,
+    state: session.state,
+    presentation_definition: presentationDefinition,
+    client_metadata: getVerifierClientMetadata(),
+  }
 
   return {
     sessionId,
     authorizationRequest,
-    authorizationRequestUri,
+    authorizationRequestUri: credoResult.authorizationRequestUri,
   }
 }
 

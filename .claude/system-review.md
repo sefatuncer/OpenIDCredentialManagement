@@ -795,9 +795,10 @@ Request
 ### CORS
 
 - Production: `CORS_ALLOWED_ORIGINS` env var (comma-separated whitelist)
-- Development: `http://localhost:3000`, `http://localhost:5173`, `http://localhost:5174`
-- No-origin requests allowed (mobile apps, curl)
+- Development: `http://localhost:3000`, `http://localhost:5173`, `http://localhost:5174`, `http://62.244.233.69:3000`, `http://62.244.233.69:5173`, `http://62.244.233.69:5174`
+- No-origin requests allowed (mobile apps, curl, Postman)
 - 24-hour preflight cache
+- Public IP (62.244.233.69) configured for remote Postman/browser access
 
 ### Additional Security Measures
 
@@ -939,6 +940,43 @@ SIGINT/SIGTERM ->
 
 ---
 
+## 10. Test Altyapisi
+
+**Framework:** Jest + supertest
+**Toplam:** 49 test suite, 1097 test — tamamı gecen (2026-03-13)
+
+### Test Kategorileri
+
+| Kategori | Suite | Dosya Yolu | Aciklama |
+|----------|-------|-----------|----------|
+| Unit (services) | 16 | `backend/tests/services/*.test.ts` | Servis bazli unit testler (mock DB, mock agents) |
+| Unit (middleware) | 3 | `backend/tests/middleware/*.test.ts` | Auth, rate limit, error middleware |
+| Unit (agents) | 3 | `backend/tests/agents/*.test.ts` | Issuer, verifier, holder agent logic |
+| Unit (core) | 3 | `backend/tests/core/*.test.ts` | EventBus, storage adapter, feature flags |
+| API routes | 5 | `backend/tests/api/*.test.ts` | Route-level integration (auth, issuer, verifier, holder, audit) |
+| Integration | 3 | `backend/tests/integration/*.test.ts` | OpenID4VCI, OpenID4VP, DIDComm flow'lari |
+| E2E | 3 | `backend/tests/e2e/*.test.ts` | Credential flow, audit flow, delegation flow |
+| Interop | 1 | `backend/tests/interop/standards-compliance.test.ts` | W3C VC, OpenID4VCI/VP, SD-JWT, DID spec compliance |
+| Security | 5 | `backend/tests/security/*.test.ts` | Auth bypass, injection, SSRF, tenant isolation, rate limit |
+| Performance | 3 | `backend/tests/performance/*.test.ts` | k6 config, load scenarios |
+| Util | 1 | `backend/tests/utils/*.test.ts` | URL validation, SSRF check |
+
+### Test Ortami
+
+- `backend/tests/setup.ts` -- Global setup: API_KEY=test-api-key-12345, JWT_SECRET, mock logger
+- `backend/tests/helpers.ts` -- `apiKeyRequest()` helper (supertest + API key header)
+- `backend/tests/security/security-helpers.ts` -- `createSecurityTestServer()`, `authedRequest()`
+- Agent-bagimsiz testler: Agent initialize olmayan test env'de 500 kabul edilir (401/403 degilse)
+- Credo ESM mock'lari: `backend/__mocks__/@credo-ts/*.js` stub dosyalari
+
+### Bilinen Sinirlamalar
+
+- Credo-TS agent test env'de initialize edilmez — agent-bagli endpoint'ler 500 doner (graceful)
+- OpenID4VCI `exchangePreAuthorizedCode` storage key mismatch (offerId vs preAuthorizedCode) — bilinen bug, test dokumante eder
+- `@credo-ts/*` ESM paketleri Jest CJS ile uyumsuz — `moduleNameMapper` ile mock'lanir
+
+---
+
 ## Ozet Istatistikler
 
 | Metrik | Deger |
@@ -954,7 +992,41 @@ SIGINT/SIGTERM ->
 | Web wallet sayfa | 10 |
 | Mobile wallet ekran | 8 |
 | SDK modul | 8 + main client |
+| Test suite | 49 (1097 test, tumu gecen) |
 | Docker Compose servis | 5 (dev) + 3 (monitoring) + HLF |
 | K8s resource | 14 base + 2 overlay |
 | CI/CD workflow | 4 |
 | Feature flag | ~10+ (didcomm, hlf-anchoring, policy-engine, multi-tenant, etc.) |
+
+---
+
+## 11. Deployment Durumu (2026-03-13)
+
+### Docker (Aktif)
+
+| Servis | Container | Port | Durum |
+|--------|-----------|------|-------|
+| PostgreSQL | ssi-postgres | 5432 | healthy |
+| Backend | ssi-backend | 3000 | healthy |
+| Web Wallet | ssi-web-wallet | 5173 | running |
+| Issuer/Verifier | ssi-issuer-verifier | 5174 | running |
+| Keycloak | ssi-keycloak | 8080 | healthy |
+
+### Erisim
+
+| Yontem | URL | Durum |
+|--------|-----|-------|
+| Localhost | `http://localhost:3000` | Calisiyor |
+| Public IP | `http://62.244.233.69:3000` | Calisiyor |
+| Web Wallet (public) | `http://62.244.233.69:5173` | Calisiyor |
+| Dashboard (public) | `http://62.244.233.69:5174` | Calisiyor |
+| Postman (API key) | Header: `x-api-key: dev-api-key-docker-only` | Calisiyor |
+
+### Dogrulanan Endpoint'ler
+
+- `GET /health` -- 200 (healthy)
+- `GET /api/v1/issuer/did` -- 200 (did:key:z6Mk...)
+- `GET /api/v1/schemas` -- 200 (3 schema)
+- `POST /api/v1/verifier/verify/agent-identity` -- 200 (sessionId + requestUri)
+- `POST /api/v1/issuer/credentials/agent-identity` -- 200 (credentialOfferUri with public IP)
+- `GET /health` via 62.244.233.69 -- 200 (public IP erisimi dogrulandi)

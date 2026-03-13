@@ -3,19 +3,19 @@ import { requireTenant, optionalTenant } from '../../src/api/middleware/tenant.m
 import { AuthenticatedRequest } from '../../src/api/middleware/auth.middleware';
 
 // Mock dependencies
-jest.mock('../../src/core/feature-flags', () => ({
-  isFeatureEnabled: jest.fn(),
+vi.mock('../../src/core/feature-flags', () => ({
+  isFeatureEnabled: vi.fn(),
 }));
 
-jest.mock('../../src/services/multiTenant.service', () => ({
-  extractTenantFromRequest: jest.fn(),
+vi.mock('../../src/services/multiTenant.service', () => ({
+  extractTenantFromRequest: vi.fn(),
 }));
 
 import { isFeatureEnabled } from '../../src/core/feature-flags';
 import { extractTenantFromRequest } from '../../src/services/multiTenant.service';
 
-const mockIsFeatureEnabled = isFeatureEnabled as jest.MockedFunction<typeof isFeatureEnabled>;
-const mockExtractTenant = extractTenantFromRequest as jest.MockedFunction<typeof extractTenantFromRequest>;
+const mockIsFeatureEnabled = isFeatureEnabled as anyedFunction<typeof isFeatureEnabled>;
+const mockExtractTenant = extractTenantFromRequest as anyedFunction<typeof extractTenantFromRequest>;
 
 const activeTenant = {
   id: 'tenant-001',
@@ -50,12 +50,12 @@ describe('Tenant Middleware', () => {
       originalUrl: '/api/v1/credentials',
     };
     mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
     };
-    mockNext = jest.fn();
+    mockNext = vi.fn();
 
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // ----------------------------------------------------------------
@@ -102,7 +102,7 @@ describe('Tenant Middleware', () => {
         const middleware = requireTenant();
         await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-        const body = (mockResponse.json as jest.Mock).mock.calls[0][0];
+        const body = (mockResponse.json as any).mock.calls[0][0];
         expect(body.type).toContain('tenant-required');
         expect(body.title).toBe('Tenant Required');
         expect(body.status).toBe(403);
@@ -147,7 +147,7 @@ describe('Tenant Middleware', () => {
         const middleware = requireTenant();
         await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-        const body = (mockResponse.json as jest.Mock).mock.calls[0][0];
+        const body = (mockResponse.json as any).mock.calls[0][0];
         expect(body.type).toContain('tenant-suspended');
         expect(body.title).toBe('Tenant Suspended');
         expect(body.detail).toContain('Suspended Corp');
@@ -163,7 +163,7 @@ describe('Tenant Middleware', () => {
       const middleware = requireTenant();
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      const body = (mockResponse.json as jest.Mock).mock.calls[0][0];
+      const body = (mockResponse.json as any).mock.calls[0][0];
       expect(body.requestId).toBe('req-abc');
     });
   });

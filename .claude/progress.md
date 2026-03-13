@@ -24,15 +24,19 @@ Single environment development setup - no staging/production yet.
 - [x] EdDSA signing for SD-JWT
 - [x] Key binding JWT verification
 
-### Credo-TS Integration (2026-03-09 → 2026-03-11)
+### Credo-TS Integration (2026-03-09 → 2026-03-13) ✅ TAMAMLANDI
 - [x] @credo-ts/core, @credo-ts/node, @credo-ts/openid4vc, @credo-ts/askar paketleri eklendi
-- [x] Credo PRIMARY mimarisi - Askar varsa Credo, yoksa Jose fallback
-- [x] Askar preloader Docker ve dev'de aktif (`--require register-askar.js`)
+- [x] Credo-TS PRIMARY mimari — Askar ZORUNLU, Jose fallback KALDIRILDI (2026-03-13)
+- [x] Askar preloader Docker ve dev'de aktif (`--require register-askar.js`), hata = process.exit(1)
 - [x] Credo route'ları ana Express app'e kayıtlı (`/oid4vci`, `/oid4vp` base paths)
 - [x] Boot sırası: Express → Credo init → finalizeServer (error handlers)
 - [x] Credential mapper emits audit events
 - [x] VP event listener for audit logging
-- [x] Holder API: Credo-first credential receive + presentation
+- [x] Holder API: Credo-only credential receive + presentation (~300 lines Jose fallback removed)
+- [x] `isUsingCredo()` branching tamamen kaldırıldı (6 dosya)
+- [x] Jest → Vitest migration (49 test files, 1093/1093 tests passing)
+- [x] Production wallet key enforcement (CREDO_WALLET_KEY required)
+- [x] Client-side Jose exception: web-wallet + mobile-wallet (browser/Expo can't run Askar)
 
 ### Frontend
 - [x] Web Wallet (React + Vite)

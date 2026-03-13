@@ -28,7 +28,7 @@ import {
 } from './core'
 import { initializeFeatures, getFeatureSummary } from './config/features.config'
 import { isFeatureEnabled } from './core/feature-flags'
-import { initializeCredoService, isUsingCredo, shutdownCredoService } from './services/credo.service'
+import { initializeCredoService, shutdownCredoService } from './services/credo.service'
 import { encryptionService } from './services/encryption.service'
 import { schemaRegistry } from './services/schemaRegistry.service'
 import { wsService } from './services/websocket.service'
@@ -132,14 +132,10 @@ async function main() {
     // Create Express app BEFORE Credo init (Credo needs the app for route registration)
     const app = createServer()
 
-    // Initialize Credo service (optional - enhances with full OpenID4VC support)
-    logger.info('Initializing Credo service...')
-    const credoActive = await initializeCredoService(app)
-    if (credoActive) {
-      logger.info('Credo service active - using Credo-TS for OpenID4VCI/VP')
-    } else {
-      logger.info('Credo service inactive - using Jose-based implementation')
-    }
+    // Initialize Credo service — Credo-TS PRIMARY, Askar ZORUNLU
+    logger.info('Initializing Credo service (PRIMARY mode)...')
+    await initializeCredoService(app)
+    logger.info('Credo service active — Credo-TS PRIMARY for OpenID4VCI/VP')
 
     // Finalize server: add error/404 handlers AFTER Credo route registration
     finalizeServer(app)
@@ -352,7 +348,7 @@ async function main() {
     logger.info('')
     logger.info('Core Status:')
     logger.info(`  Storage:  ${getStorageType()}`)
-    logger.info(`  SSI Mode: ${isUsingCredo() ? 'Credo-TS (full OpenID4VC)' : 'Jose (lightweight)'}`)
+    logger.info(`  SSI Mode: Credo-TS PRIMARY (full OpenID4VC)`)
     logger.info(`  Features: ${getEnabledFeatures().length} enabled`)
 
     // Graceful shutdown

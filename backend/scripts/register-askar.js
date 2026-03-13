@@ -1,6 +1,9 @@
 /**
  * Askar backend preloader - Node.js --require ile yüklenir
  * CJS/ESM modül ayrımından ÖNCE askar native binding'i kaydeder
+ *
+ * Credo-TS PRIMARY mimari: Askar ZORUNLUDUR.
+ * Askar olmadan sistem başlatılamaz.
  */
 try {
   const { registerAskar } = require('@openwallet-foundation/askar-shared')
@@ -8,6 +11,8 @@ try {
   registerAskar({ askar: askarNodeJS })
   console.log('[askar-preload] Askar backend registered successfully')
 } catch (e) {
-  // Askar yoksa sessizce devam et - Jose fallback kullanılır
-  console.log('[askar-preload] Askar not available, using Jose mode')
+  console.error('[askar-preload] FATAL: Askar native module is required but not available.')
+  console.error('[askar-preload] Ensure @openwallet-foundation/askar-nodejs is installed with native build tools (python3, make, g++).')
+  console.error('[askar-preload] Error:', e.message)
+  process.exit(1)
 }

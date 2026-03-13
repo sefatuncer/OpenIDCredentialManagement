@@ -5,20 +5,20 @@
 import * as jose from 'jose'
 
 // Mock dependencies before imports
-jest.mock('../../src/services/didResolver.service', () => ({
-  resolvePublicKeyFromDid: jest.fn(),
+vi.mock('../../src/services/didResolver.service', () => ({
+  resolvePublicKeyFromDid: vi.fn(),
 }))
 
-jest.mock('../../src/services/revocation.service', () => ({
-  isCredentialRevoked: jest.fn(),
+vi.mock('../../src/services/revocation.service', () => ({
+  isCredentialRevoked: vi.fn(),
 }))
 
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }))
 
@@ -31,8 +31,8 @@ import {
 import { resolvePublicKeyFromDid } from '../../src/services/didResolver.service'
 import { isCredentialRevoked } from '../../src/services/revocation.service'
 
-const mockResolvePublicKey = resolvePublicKeyFromDid as jest.MockedFunction<typeof resolvePublicKeyFromDid>
-const mockIsRevoked = isCredentialRevoked as jest.MockedFunction<typeof isCredentialRevoked>
+const mockResolvePublicKey = resolvePublicKeyFromDid as anyedFunction<typeof resolvePublicKeyFromDid>
+const mockIsRevoked = isCredentialRevoked as anyedFunction<typeof isCredentialRevoked>
 
 // --- Test Helpers ---
 
@@ -89,7 +89,7 @@ describe('OAuthBridgeService', () => {
   })
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockIsRevoked.mockResolvedValue(false)
   })
 

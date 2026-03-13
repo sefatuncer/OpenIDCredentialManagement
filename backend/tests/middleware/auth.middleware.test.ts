@@ -21,10 +21,10 @@ describe('Auth Middleware', () => {
       originalUrl: '/test',
     };
     mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
     };
-    mockNext = jest.fn();
+    mockNext = vi.fn();
   });
 
   describe('generateToken', () => {
@@ -113,7 +113,7 @@ describe('Auth Middleware', () => {
       middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
-      const errorResponse = (mockResponse.json as jest.Mock).mock.calls[0][0];
+      const errorResponse = (mockResponse.json as any).mock.calls[0][0];
       expect(errorResponse.detail).toContain('expired');
     });
   });

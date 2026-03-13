@@ -16,11 +16,14 @@ RUN npm install
 # Copy source
 COPY . .
 
+# Verify Askar native module compiled successfully
+RUN node -e "require('@openwallet-foundation/askar-nodejs'); console.log('Askar native module OK')"
+
 # Build TypeScript
 RUN npm run build
 
 # Expose port
 EXPOSE 3000
 
-# Start server
-CMD ["npm", "start"]
+# Start server with Askar preloader
+CMD ["node", "--require", "./scripts/register-askar.js", "dist/index.js"]

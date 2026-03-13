@@ -2,10 +2,8 @@
  * Credo Agent - Credo-TS 0.6.x tabanlı SSI agent
  * OpenID4VCI ve OpenID4VP desteği
  *
- * NOT: Bu dosya Credo entegrasyonu için hazırlanmıştır.
- * Native askar modülü için build tools gereklidir.
- *
- * Askar kurulmadan Jose-based fallback kullanılır.
+ * Credo-TS PRIMARY mimari: Askar ZORUNLU.
+ * Native askar modülü için build tools gereklidir (python3, make, g++).
  */
 
 import {
@@ -46,7 +44,7 @@ export interface CredoAgentConfig {
 
 /**
  * Askar modülünün kullanılabilirliğini kontrol et
- * NOT: Askar native modül gerektirdiğinden, kurulum zorsa Jose fallback kullanılır
+ * Credo-TS PRIMARY mimari: Askar ZORUNLUDUR.
  */
 export async function checkAskarAvailability(): Promise<boolean> {
   if (askarAvailable !== null) {
@@ -54,25 +52,25 @@ export async function checkAskarAvailability(): Promise<boolean> {
   }
 
   try {
-    // Askar modülünü dinamik olarak import et
     const askarModule = await import('@credo-ts/askar')
     const ariesAskarNodejs = await import('@openwallet-foundation/askar-nodejs')
 
     if (askarModule && ariesAskarNodejs && ariesAskarNodejs.askarNodeJS) {
-      logger.info('Askar module available - using Credo mode')
+      logger.info('Askar module available - Credo-TS PRIMARY mode')
       askarAvailable = true
       return true
     }
 
-    // Sessiz fallback - debug seviyesinde log
-    logger.debug('Askar module not fully initialized, using Jose fallback')
+    throw new Error('Askar module loaded but askarNodeJS export is missing')
+  } catch (error) {
     askarAvailable = false
-    return false
-  } catch {
-    // Sessiz fallback - Askar yoksa Jose kullanılır, bu normal bir durum
-    logger.debug('Askar not available, using Jose-based implementation')
-    askarAvailable = false
-    return false
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error('FATAL: Askar native module is required but not available', { error: msg })
+    throw new Error(
+      `Askar native module is required for Credo-TS PRIMARY mode. ` +
+      `Ensure @openwallet-foundation/askar-nodejs is installed with native build tools. ` +
+      `Original error: ${msg}`
+    )
   }
 }
 
@@ -188,20 +186,16 @@ function buildCredentialSubject(configId: string, holderDid: string): Record<str
 }
 
 /**
- * Credo Agent'ı başlat
+ * Credo Agent'ı başlat — Askar ZORUNLU
  */
-export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?: Express): Promise<Agent | null> {
+export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?: Express): Promise<Agent> {
   if (credoAgent && isInitialized) {
     logger.info('Credo agent already initialized')
     return credoAgent
   }
 
-  // Askar kullanılabilirliğini kontrol et
-  const hasAskar = await checkAskarAvailability()
-  if (!hasAskar) {
-    logger.warn('Cannot initialize Credo agent without Askar. Using Jose-based fallback.')
-    return null
-  }
+  // Askar zorunlu — hata fırlatır eğer yoksa
+  await checkAskarAvailability()
 
   logger.info('Initializing Credo agent...', { label: config.label })
 
@@ -328,7 +322,7 @@ export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?
       causeStack: err.cause?.stack,
       stack: err.stack,
     })
-    return null
+    throw error
   }
 }
 

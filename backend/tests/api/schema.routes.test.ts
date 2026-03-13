@@ -6,7 +6,7 @@ import {
 } from '../security/security-helpers'
 
 // Mock schemaRegistry service
-jest.mock('../../src/services/schemaRegistry.service', () => {
+vi.mock('../../src/services/schemaRegistry.service', () => {
   const mockSchemas = [
     {
       id: 'AIAgentIdentityCredential',
@@ -45,11 +45,11 @@ jest.mock('../../src/services/schemaRegistry.service', () => {
 
   return {
     schemaRegistry: {
-      getAllSchemas: jest.fn().mockResolvedValue(mockSchemas),
-      getSchema: jest.fn().mockImplementation(async (id: string) => {
+      getAllSchemas: vi.fn().mockResolvedValue(mockSchemas),
+      getSchema: vi.fn().mockImplementation(async (id: string) => {
         return mockSchemas.find((s) => s.id === id) || null
       }),
-      registerSchema: jest.fn().mockImplementation(async (data: any) => {
+      registerSchema: vi.fn().mockImplementation(async (data: any) => {
         if (mockSchemas.find((s) => s.id === data.id)) {
           throw new Error(`Schema '${data.id}' already exists`)
         }
@@ -59,15 +59,15 @@ jest.mock('../../src/services/schemaRegistry.service', () => {
           createdAt: new Date().toISOString(),
         }
       }),
-      updateSchema: jest.fn().mockImplementation(async (id: string, data: any) => {
+      updateSchema: vi.fn().mockImplementation(async (id: string, data: any) => {
         const existing = mockSchemas.find((s) => s.id === id)
         if (!existing) throw new Error(`Schema '${id}' not found`)
         return { ...existing, ...data }
       }),
-      deactivateSchema: jest.fn().mockImplementation(async (id: string) => {
+      deactivateSchema: vi.fn().mockImplementation(async (id: string) => {
         return mockSchemas.some((s) => s.id === id)
       }),
-      initialize: jest.fn().mockResolvedValue(undefined),
+      initialize: vi.fn().mockResolvedValue(undefined),
     },
   }
 })

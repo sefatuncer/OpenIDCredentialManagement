@@ -3,30 +3,32 @@
  */
 
 // Mock dependencies before imports
-const mockGetCredoAgent = jest.fn()
-const mockIsCredoAgentReady = jest.fn()
-const mockIsFeatureEnabled = jest.fn()
-const mockIsPrivateUrl = jest.fn()
+const { mockGetCredoAgent, mockIsCredoAgentReady, mockIsFeatureEnabled, mockIsPrivateUrl } = vi.hoisted(() => ({
+  mockGetCredoAgent: vi.fn(),
+  mockIsCredoAgentReady: vi.fn(),
+  mockIsFeatureEnabled: vi.fn(),
+  mockIsPrivateUrl: vi.fn(),
+}))
 
-jest.mock('../../src/agents/credo.agent', () => ({
+vi.mock('../../src/agents/credo.agent', () => ({
   getCredoAgent: mockGetCredoAgent,
   isCredoAgentReady: mockIsCredoAgentReady,
 }))
 
-jest.mock('../../src/core/feature-flags', () => ({
+vi.mock('../../src/core/feature-flags', () => ({
   isFeatureEnabled: mockIsFeatureEnabled,
 }))
 
-jest.mock('../../src/utils/url-validation', () => ({
+vi.mock('../../src/utils/url-validation', () => ({
   isPrivateUrl: mockIsPrivateUrl,
 }))
 
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }))
 
@@ -45,21 +47,21 @@ import {
 function createMockCredoAgent(options: { didCommLoaded?: boolean } = {}) {
   const { didCommLoaded = true } = options
 
-  const mockCreateInvitation = jest.fn().mockResolvedValue({
+  const mockCreateInvitation = vi.fn().mockResolvedValue({
     id: 'oob-123',
     outOfBandInvitation: {
-      toUrl: jest.fn(({ domain }: { domain: string }) => `${domain}?oob=base64data`),
+      toUrl: vi.fn(({ domain }: { domain: string }) => `${domain}?oob=base64data`),
     },
   })
 
-  const mockReceiveInvitationFromUrl = jest.fn().mockResolvedValue({
+  const mockReceiveInvitationFromUrl = vi.fn().mockResolvedValue({
     connectionRecord: {
       id: 'conn-456',
       state: 'invitation-received',
     },
   })
 
-  const mockGetAll = jest.fn().mockResolvedValue([
+  const mockGetAll = vi.fn().mockResolvedValue([
     {
       id: 'conn-001',
       state: 'completed',
@@ -80,7 +82,7 @@ function createMockCredoAgent(options: { didCommLoaded?: boolean } = {}) {
     },
   ])
 
-  const mockFindById = jest.fn().mockImplementation(async (id: string) => {
+  const mockFindById = vi.fn().mockImplementation(async (id: string) => {
     if (id === 'conn-001') {
       return {
         id: 'conn-001',
@@ -95,11 +97,11 @@ function createMockCredoAgent(options: { didCommLoaded?: boolean } = {}) {
     return null
   })
 
-  const mockSendMessage = jest.fn().mockResolvedValue({
+  const mockSendMessage = vi.fn().mockResolvedValue({
     id: 'msg-789',
   })
 
-  const mockFindAllByQuery = jest.fn().mockResolvedValue([
+  const mockFindAllByQuery = vi.fn().mockResolvedValue([
     {
       id: 'msg-001',
       connectionId: 'conn-001',
@@ -165,7 +167,7 @@ function disableDidComm() {
 
 describe('DIDCommService', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('isDidCommEnabled', () => {

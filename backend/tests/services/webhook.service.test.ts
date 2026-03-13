@@ -10,32 +10,32 @@ import type { IStorageAdapter } from '../../src/core/storage/IStorageAdapter'
 const store = new Map<string, WebhookSubscription>()
 
 const mockAdapter: IStorageAdapter<WebhookSubscription> = {
-  save: jest.fn(async (key: string, data: WebhookSubscription) => { store.set(key, data) }),
-  get: jest.fn(async (key: string) => store.get(key) ?? null),
-  delete: jest.fn(async (key: string) => { store.delete(key) }),
-  list: jest.fn(async () => Array.from(store.values())),
-  query: jest.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
-  count: jest.fn(async () => store.size),
-  exists: jest.fn(async (key: string) => store.has(key)),
-  update: jest.fn(async (key: string, data: Partial<WebhookSubscription>) => {
+  save: vi.fn(async (key: string, data: WebhookSubscription) => { store.set(key, data) }),
+  get: vi.fn(async (key: string) => store.get(key) ?? null),
+  delete: vi.fn(async (key: string) => { store.delete(key) }),
+  list: vi.fn(async () => Array.from(store.values())),
+  query: vi.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
+  count: vi.fn(async () => store.size),
+  exists: vi.fn(async (key: string) => store.has(key)),
+  update: vi.fn(async (key: string, data: Partial<WebhookSubscription>) => {
     const existing = store.get(key)
     if (!existing) return null
     const updated = { ...existing, ...data } as WebhookSubscription
     store.set(key, updated)
     return updated
   }),
-  clear: jest.fn(async () => { store.clear() }),
-  getAdapterType: jest.fn(() => 'memory'),
+  clear: vi.fn(async () => { store.clear() }),
+  getAdapterType: vi.fn(() => 'memory'),
 } as unknown as IStorageAdapter<WebhookSubscription>
 
 // --- Mock modules ---
 
-jest.mock('../../src/core/storage', () => ({
-  createStorageAdapter: jest.fn(() => mockAdapter),
+vi.mock('../../src/core/storage', () => ({
+  createStorageAdapter: vi.fn(() => mockAdapter),
 }))
 
-jest.mock('../../src/utils/url-validation', () => ({
-  isPrivateUrl: jest.fn((url: string) => {
+vi.mock('../../src/utils/url-validation', () => ({
+  isPrivateUrl: vi.fn((url: string) => {
     try {
       const u = new URL(url)
       const h = u.hostname
@@ -50,16 +50,16 @@ jest.mock('../../src/utils/url-validation', () => ({
   }),
 }))
 
-jest.mock('../../src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
-jest.mock('../../src/services/webhookDelivery.service', () => ({
-  deliverEvent: jest.fn(),
-  testSubscription: jest.fn(),
-  getDeliveries: jest.fn(async () => []),
-  pruneDeliveries: jest.fn(async () => 0),
-  invalidateSubscriptionCache: jest.fn(),
+vi.mock('../../src/services/webhookDelivery.service', () => ({
+  deliverEvent: vi.fn(),
+  testSubscription: vi.fn(),
+  getDeliveries: vi.fn(async () => []),
+  pruneDeliveries: vi.fn(async () => 0),
+  invalidateSubscriptionCache: vi.fn(),
 }))
 
 // --- Import under test (after mocks) ---
@@ -78,7 +78,7 @@ import { invalidateSubscriptionCache } from '../../src/services/webhookDelivery.
 describe('WebhookService', () => {
   beforeEach(() => {
     store.clear()
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   // --- createSubscription ---
@@ -190,7 +190,7 @@ describe('WebhookService', () => {
 
     it('should invalidate subscription cache on update', async () => {
       const sub = await createSubscription('https://example.com/hook', ['test'])
-      jest.clearAllMocks()
+      vi.clearAllMocks()
       await updateSubscription(sub.id, { active: false })
       expect(invalidateSubscriptionCache).toHaveBeenCalled()
     })
@@ -212,7 +212,7 @@ describe('WebhookService', () => {
 
     it('should invalidate subscription cache on delete', async () => {
       const sub = await createSubscription('https://example.com/hook', ['test'])
-      jest.clearAllMocks()
+      vi.clearAllMocks()
       await deleteSubscription(sub.id)
       expect(invalidateSubscriptionCache).toHaveBeenCalled()
     })
@@ -257,7 +257,8 @@ describe('WebhookService', () => {
   // --- deliverEvent / testSubscription ---
   describe('deliverEvent', () => {
     it('should delegate to webhookDelivery.service', async () => {
-      const { deliverEvent: mockDeliver } = jest.requireMock('../../src/services/webhookDelivery.service')
+      const mod = await import('../../src/services/webhookDelivery.service')
+      const mockDeliver = vi.mocked(mod.deliverEvent)
       await deliverEvent('test.event', { foo: 'bar' })
       expect(mockDeliver).toHaveBeenCalledWith('test.event', { foo: 'bar' }, expect.any(Function))
     })
@@ -270,7 +271,8 @@ describe('WebhookService', () => {
 
     it('should delegate to webhookDelivery.service testSubscription', async () => {
       const sub = await createSubscription('https://example.com/hook', ['test'])
-      const { testSubscription: mockTest } = jest.requireMock('../../src/services/webhookDelivery.service')
+      const mod = await import('../../src/services/webhookDelivery.service')
+      const mockTest = vi.mocked(mod.testSubscription)
       mockTest.mockResolvedValue({ success: true, responseStatus: 200, latencyMs: 42 })
       const result = await testSubscription(sub.id)
       expect(mockTest).toHaveBeenCalledWith(expect.objectContaining({ id: sub.id }))

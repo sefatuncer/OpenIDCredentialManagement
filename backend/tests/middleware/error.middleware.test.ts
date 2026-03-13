@@ -20,11 +20,11 @@ describe('Error Middleware', () => {
       method: 'GET',
     };
     mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
-      setHeader: jest.fn(),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      setHeader: vi.fn(),
     };
-    mockNext = jest.fn();
+    mockNext = vi.fn();
   });
 
   describe('requestIdMiddleware', () => {
@@ -74,7 +74,7 @@ describe('Error Middleware', () => {
       );
 
       expect(mockResponse.status).toHaveBeenCalledWith(400);
-      const errorResponse = (mockResponse.json as jest.Mock).mock.calls[0][0];
+      const errorResponse = (mockResponse.json as any).mock.calls[0][0];
       expect(errorResponse).toHaveProperty('type');
       expect(errorResponse).toHaveProperty('title', 'Bad Request');
       expect(errorResponse).toHaveProperty('status', 400);
@@ -106,7 +106,7 @@ describe('Error Middleware', () => {
         mockNext
       );
 
-      const errorResponse = (mockResponse.json as jest.Mock).mock.calls[0][0];
+      const errorResponse = (mockResponse.json as any).mock.calls[0][0];
       expect(errorResponse.code).toBe('VALIDATION_ERROR');
     });
 
@@ -127,7 +127,7 @@ describe('Error Middleware', () => {
           mockNext
         );
 
-        const errorResponse = (mockResponse.json as jest.Mock).mock.calls.pop()[0];
+        const errorResponse = (mockResponse.json as any).mock.calls.pop()[0];
         expect(errorResponse.title).toBe(title);
       });
     });
@@ -138,7 +138,7 @@ describe('Error Middleware', () => {
       notFoundMiddleware(mockRequest as Request, mockResponse as Response);
 
       expect(mockResponse.status).toHaveBeenCalledWith(404);
-      const errorResponse = (mockResponse.json as jest.Mock).mock.calls[0][0];
+      const errorResponse = (mockResponse.json as any).mock.calls[0][0];
       expect(errorResponse.type).toContain('not-found');
       expect(errorResponse.title).toBe('Not Found');
       expect(errorResponse.status).toBe(404);

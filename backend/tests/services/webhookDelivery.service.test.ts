@@ -9,27 +9,27 @@ import type { WebhookSubscription, WebhookDelivery } from '../../src/services/we
 
 const store = new Map<string, WebhookDelivery>()
 
-jest.mock('../../src/core/storage', () => ({
-  createStorageAdapter: jest.fn(() => ({
-    save: jest.fn(async (key: string, data: WebhookDelivery) => { store.set(key, data) }),
-    get: jest.fn(async (key: string) => store.get(key) ?? null),
-    delete: jest.fn(async (key: string) => { store.delete(key) }),
-    list: jest.fn(async () => Array.from(store.values())),
-    query: jest.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
-    count: jest.fn(async () => store.size),
-    exists: jest.fn(async (key: string) => store.has(key)),
-    update: jest.fn(async () => null),
-    clear: jest.fn(async () => { store.clear() }),
-    getAdapterType: jest.fn(() => 'memory'),
+vi.mock('../../src/core/storage', () => ({
+  createStorageAdapter: vi.fn(() => ({
+    save: vi.fn(async (key: string, data: WebhookDelivery) => { store.set(key, data) }),
+    get: vi.fn(async (key: string) => store.get(key) ?? null),
+    delete: vi.fn(async (key: string) => { store.delete(key) }),
+    list: vi.fn(async () => Array.from(store.values())),
+    query: vi.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
+    count: vi.fn(async () => store.size),
+    exists: vi.fn(async (key: string) => store.has(key)),
+    update: vi.fn(async () => null),
+    clear: vi.fn(async () => { store.clear() }),
+    getAdapterType: vi.fn(() => 'memory'),
   })),
 }))
 
-jest.mock('../../src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
 // Mock global fetch
-const mockFetch = jest.fn()
+const mockFetch = vi.fn()
 global.fetch = mockFetch as unknown as typeof fetch
 
 // --- Import under test ---
@@ -61,7 +61,7 @@ function makeFetchResponse(status: number, body = 'OK', ok?: boolean): Response 
   return {
     ok: ok ?? (status >= 200 && status < 300),
     status,
-    text: jest.fn(async () => body),
+    text: vi.fn(async () => body),
     headers: new Headers(),
   } as unknown as Response
 }
@@ -69,23 +69,23 @@ function makeFetchResponse(status: number, body = 'OK', ok?: boolean): Response 
 describe('WebhookDeliveryService', () => {
   beforeEach(() => {
     store.clear()
-    jest.clearAllMocks()
-    jest.useFakeTimers({ advanceTimers: true })
+    vi.clearAllMocks()
+    vi.useFakeTimers({ advanceTimers: true })
     invalidateSubscriptionCache()
     mockFetch.mockResolvedValue(makeFetchResponse(200))
   })
 
   afterEach(() => {
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
   // --- HMAC-SHA256 signature ---
   describe('HMAC-SHA256 signature', () => {
     it('should send X-Webhook-Signature header with sha256= prefix', async () => {
       const sub = makeSubscription()
-      const listFn = jest.fn(async () => [sub])
+      const listFn = vi.fn(async () => [sub])
       await deliverEvent('credential.issued', { id: 'vc-1' }, listFn)
-      await jest.advanceTimersByTimeAsync(100)
+      await vi.advanceTimersByTimeAsync(100)
       expect(mockFetch).toHaveBeenCalledTimes(1)
       const [, options] = mockFetch.mock.calls[0]
       expect(options.headers['X-Webhook-Signature']).toMatch(/^sha256=[a-f0-9]{64}$/)
@@ -94,7 +94,7 @@ describe('WebhookDeliveryService', () => {
     it('should produce valid HMAC that can be verified with the secret', async () => {
       const sub = makeSubscription()
       await deliverEvent('credential.issued', { id: 'vc-1' }, async () => [sub])
-      await jest.advanceTimersByTimeAsync(100)
+      await vi.advanceTimersByTimeAsync(100)
       const [, options] = mockFetch.mock.calls[0]
       const signature = options.headers['X-Webhook-Signature'].replace('sha256=', '')
       const expected = crypto.createHmac('sha256', sub.secret).update(options.body).digest('hex')
@@ -104,7 +104,7 @@ describe('WebhookDeliveryService', () => {
     it('should include X-Webhook-Id and X-Delivery-Id headers', async () => {
       const sub = makeSubscription()
       await deliverEvent('credential.issued', { id: 'vc-1' }, async () => [sub])
-      await jest.advanceTimersByTimeAsync(100)
+      await vi.advanceTimersByTimeAsync(100)
       const [, options] = mockFetch.mock.calls[0]
       expect(options.headers['X-Webhook-Id']).toBe(sub.id)
       expect(options.headers['X-Delivery-Id']).toMatch(/^del_/)
@@ -113,7 +113,7 @@ describe('WebhookDeliveryService', () => {
     it('should include User-Agent header', async () => {
       const sub = makeSubscription()
       await deliverEvent('credential.issued', {}, async () => [sub])
-      await jest.advanceTimersByTimeAsync(100)
+      await vi.advanceTimersByTimeAsync(100)
       const [, options] = mockFetch.mock.calls[0]
       expect(options.headers['User-Agent']).toBe('OIDCM-Webhook/1.0')
     })
@@ -125,14 +125,14 @@ describe('WebhookDeliveryService', () => {
       const sub1 = makeSubscription({ events: ['credential.issued'] })
       const sub2 = makeSubscription({ events: ['credential.revoked'] })
       await deliverEvent('credential.issued', { id: 'vc-1' }, async () => [sub1, sub2])
-      await jest.advanceTimersByTimeAsync(100)
+      await vi.advanceTimersByTimeAsync(100)
       expect(mockFetch).toHaveBeenCalledTimes(1)
     })
 
     it('should not deliver to inactive subscriptions', async () => {
       const sub = makeSubscription({ active: false, events: ['credential.issued'] })
       await deliverEvent('credential.issued', {}, async () => [sub])
-      await jest.advanceTimersByTimeAsync(100)
+      await vi.advanceTimersByTimeAsync(100)
       expect(mockFetch).not.toHaveBeenCalled()
     })
 
@@ -140,13 +140,13 @@ describe('WebhookDeliveryService', () => {
       const sub1 = makeSubscription({ events: ['credential.issued'] })
       const sub2 = makeSubscription({ events: ['credential.issued'] })
       await deliverEvent('credential.issued', {}, async () => [sub1, sub2])
-      await jest.advanceTimersByTimeAsync(100)
+      await vi.advanceTimersByTimeAsync(100)
       expect(mockFetch).toHaveBeenCalledTimes(2)
     })
 
     it('should skip when no subscriptions match', async () => {
       await deliverEvent('credential.issued', {}, async () => [])
-      await jest.advanceTimersByTimeAsync(100)
+      await vi.advanceTimersByTimeAsync(100)
       expect(mockFetch).not.toHaveBeenCalled()
     })
   })
@@ -156,7 +156,7 @@ describe('WebhookDeliveryService', () => {
     it('should wrap data in event envelope', async () => {
       const sub = makeSubscription()
       await deliverEvent('credential.issued', { credentialId: 'abc' }, async () => [sub])
-      await jest.advanceTimersByTimeAsync(100)
+      await vi.advanceTimersByTimeAsync(100)
       const [, options] = mockFetch.mock.calls[0]
       const body = JSON.parse(options.body)
       expect(body.event).toBe('credential.issued')
@@ -171,7 +171,7 @@ describe('WebhookDeliveryService', () => {
       mockFetch.mockResolvedValue(makeFetchResponse(200))
       const sub = makeSubscription()
       await deliverEvent('credential.issued', {}, async () => [sub])
-      await jest.advanceTimersByTimeAsync(500)
+      await vi.advanceTimersByTimeAsync(500)
       const deliveries = Array.from(store.values())
       expect(deliveries).toHaveLength(1)
       expect(deliveries[0].status).toBe('success')
@@ -182,7 +182,7 @@ describe('WebhookDeliveryService', () => {
       mockFetch.mockResolvedValue(makeFetchResponse(500, 'Error'))
       const sub = makeSubscription()
       await deliverEvent('credential.issued', {}, async () => [sub])
-      await jest.advanceTimersByTimeAsync(500)
+      await vi.advanceTimersByTimeAsync(500)
       const deliveries = Array.from(store.values())
       expect(deliveries).toHaveLength(1)
       expect(deliveries[0].status).toBe('pending')
@@ -192,7 +192,7 @@ describe('WebhookDeliveryService', () => {
     it('should record delivery with correct fields', async () => {
       const sub = makeSubscription({ events: ['test.event'] })
       await deliverEvent('test.event', { data: 123 }, async () => [sub])
-      await jest.advanceTimersByTimeAsync(500)
+      await vi.advanceTimersByTimeAsync(500)
       const deliveries = Array.from(store.values())
       expect(deliveries.length).toBeGreaterThanOrEqual(1)
       expect(deliveries[0].id).toMatch(/^del_/)
@@ -207,11 +207,11 @@ describe('WebhookDeliveryService', () => {
       mockFetch.mockResolvedValue(makeFetchResponse(500, 'Error'))
       const sub = makeSubscription()
       await deliverEvent('credential.issued', {}, async () => [sub])
-      await jest.advanceTimersByTimeAsync(500)
+      await vi.advanceTimersByTimeAsync(500)
       expect(mockFetch).toHaveBeenCalledTimes(1)
 
       // Advance 1s for retry
-      await jest.advanceTimersByTimeAsync(1100)
+      await vi.advanceTimersByTimeAsync(1100)
       expect(mockFetch).toHaveBeenCalledTimes(2)
     })
 
@@ -223,10 +223,10 @@ describe('WebhookDeliveryService', () => {
       const sub = makeSubscription()
       await deliverEvent('credential.issued', {}, async () => [sub])
       // Initial attempt
-      await jest.advanceTimersByTimeAsync(500)
+      await vi.advanceTimersByTimeAsync(500)
       expect(mockFetch).toHaveBeenCalledTimes(1)
       // After 1s retry delay
-      await jest.advanceTimersByTimeAsync(1500)
+      await vi.advanceTimersByTimeAsync(1500)
       expect(mockFetch).toHaveBeenCalledTimes(2)
       // Should now be successful
       const deliveries = Array.from(store.values())

@@ -7,19 +7,19 @@ import {
 } from '../security/security-helpers';
 
 // Mock delegation service
-jest.mock('../../src/services/delegation.service', () => ({
-  createDelegation: jest.fn(),
-  getDelegationById: jest.fn(),
-  getDelegations: jest.fn(),
-  revokeDelegation: jest.fn(),
-  verifyDelegation: jest.fn(),
-  createSubDelegation: jest.fn(),
-  getDelegationChain: jest.fn(),
+vi.mock('../../src/services/delegation.service', () => ({
+  createDelegation: vi.fn(),
+  getDelegationById: vi.fn(),
+  getDelegations: vi.fn(),
+  revokeDelegation: vi.fn(),
+  verifyDelegation: vi.fn(),
+  createSubDelegation: vi.fn(),
+  getDelegationChain: vi.fn(),
 }));
 
 import * as delegationService from '../../src/services/delegation.service';
 
-const mockedService = delegationService as jest.Mocked<typeof delegationService>;
+const mockedService = delegationService as anyed<typeof delegationService>;
 
 const VALID_DID = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
 const VALID_DID_2 = 'did:key:z6MkpTHR8VNs5zYQ3B5LdTKzXHE5g5hFz4Z9vWbGHcJ8KfNL';
@@ -54,7 +54,7 @@ describe('Delegation Routes', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // ── POST /api/v1/delegations ──────────────────────────────────────────

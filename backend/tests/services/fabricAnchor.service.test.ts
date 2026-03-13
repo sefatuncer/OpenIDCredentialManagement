@@ -5,18 +5,18 @@
 import { createHash } from 'crypto'
 
 // Mock dependencies before imports
-jest.mock('../../src/database/connection')
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/database/connection')
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
   },
 }))
 
 import { query } from '../../src/database/connection'
 
-const mockQuery = query as jest.MockedFunction<typeof query>
+const mockQuery = query as vi.MockedFunction<typeof query>
 
 // Helper to create mock QueryResult
 const mockQueryResult = (rows: any[], rowCount?: number) =>
@@ -33,16 +33,16 @@ let fabricAnchorService: typeof import('../../src/services/fabricAnchor.service'
 
 describe('FabricAnchorService', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     // Reset the module to clear internal state (fabricConnected, fabricConfig)
-    jest.resetModules()
+    vi.resetModules()
     // Re-mock after reset
-    jest.mock('../../src/database/connection')
-    jest.mock('../../src/utils/logger', () => ({
+    vi.mock('../../src/database/connection')
+    vi.mock('../../src/utils/logger', () => ({
       logger: {
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
       },
     }))
   })
@@ -55,7 +55,7 @@ describe('FabricAnchorService', () => {
   describe('anchorRecord', () => {
     it('should write-ahead to DB with pending status when Fabric not connected', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       const mockRow = {
         id: 'anchor-1',
@@ -94,7 +94,7 @@ describe('FabricAnchorService', () => {
 
     it('should compute deterministic SHA-256 hash', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       const payload = { credentialId: 'cred-1', reason: 'test' }
       const expectedHash = computeExpectedHash('revocation', 'ref-123', payload)
@@ -123,7 +123,7 @@ describe('FabricAnchorService', () => {
 
     it('should handle delegation_created record type', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       const mockRow = {
         id: 'anchor-3',
@@ -149,7 +149,7 @@ describe('FabricAnchorService', () => {
 
     it('should handle delegation_revoked record type', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       const mockRow = {
         id: 'anchor-4',
@@ -174,7 +174,7 @@ describe('FabricAnchorService', () => {
 
     it('should parse JSON payload from DB row', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       const payload = { key1: 'value1', nested: { a: 1 } }
       const mockRow = {
@@ -202,7 +202,7 @@ describe('FabricAnchorService', () => {
   describe('verifyAnchor', () => {
     it('should return verified: false when no records found', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq.mockResolvedValue(mockQueryResult([]))
 
@@ -214,7 +214,7 @@ describe('FabricAnchorService', () => {
 
     it('should return verified: false when only pending records exist', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq.mockResolvedValue(mockQueryResult([{
         id: 'anchor-10',
@@ -240,7 +240,7 @@ describe('FabricAnchorService', () => {
 
     it('should return verified: false with localHash when confirmed records exist but Fabric not connected', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq.mockResolvedValue(mockQueryResult([{
         id: 'anchor-11',
@@ -268,7 +268,7 @@ describe('FabricAnchorService', () => {
 
     it('should return multiple records ordered by created_at', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq.mockResolvedValue(mockQueryResult([
         {
@@ -312,7 +312,7 @@ describe('FabricAnchorService', () => {
   describe('getAnchorStatus', () => {
     it('should return records for a given reference ID', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq.mockResolvedValue(mockQueryResult([{
         id: 'anchor-30',
@@ -344,7 +344,7 @@ describe('FabricAnchorService', () => {
 
     it('should return empty array when no records exist', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq.mockResolvedValue(mockQueryResult([]))
 
@@ -355,7 +355,7 @@ describe('FabricAnchorService', () => {
 
     it('should return multiple records for same reference', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq.mockResolvedValue(mockQueryResult([
         {
@@ -384,7 +384,7 @@ describe('FabricAnchorService', () => {
   describe('listAnchors', () => {
     it('should return paginated records with total count', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq
         .mockResolvedValueOnce(mockQueryResult([{ total: 100 }])) // COUNT query
@@ -415,7 +415,7 @@ describe('FabricAnchorService', () => {
 
     it('should use default limit and offset', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq
         .mockResolvedValueOnce(mockQueryResult([{ total: 0 }]))
@@ -431,7 +431,7 @@ describe('FabricAnchorService', () => {
 
     it('should pass custom limit and offset', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq
         .mockResolvedValueOnce(mockQueryResult([{ total: 200 }]))
@@ -445,7 +445,7 @@ describe('FabricAnchorService', () => {
 
     it('should return empty records with total 0', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq
         .mockResolvedValueOnce(mockQueryResult([{ total: 0 }]))
@@ -470,7 +470,7 @@ describe('FabricAnchorService', () => {
 
     it('should return 0 when no pending/failed records with retry_count < 3', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       // Simulate initialize with SDK not available (stays disconnected)
       // We need fabricConnected = true for retry to proceed
@@ -491,7 +491,7 @@ describe('FabricAnchorService', () => {
   describe('initialize', () => {
     it('should gracefully degrade when HLF SDK is not available', async () => {
       const svc = await loadService()
-      const { logger: mockLogger } = require('../../src/utils/logger')
+      const { logger: mockLogger } = await import('../../src/utils/logger') as any
 
       const config = {
         peerEndpoint: 'localhost:7051',
@@ -513,7 +513,7 @@ describe('FabricAnchorService', () => {
 
     it('should log initialization info', async () => {
       const svc = await loadService()
-      const { logger: mockLogger } = require('../../src/utils/logger')
+      const { logger: mockLogger } = await import('../../src/utils/logger') as any
 
       const config = {
         peerEndpoint: 'peer0.org1.example.com:7051',
@@ -538,7 +538,7 @@ describe('FabricAnchorService', () => {
   describe('mapRecord (via public API)', () => {
     it('should map snake_case DB columns to camelCase fields', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq.mockResolvedValue(mockQueryResult([{
         id: 'map-1',
@@ -575,7 +575,7 @@ describe('FabricAnchorService', () => {
 
     it('should handle payload as object (already parsed)', async () => {
       const svc = await loadService()
-      const { query: mq } = require('../../src/database/connection')
+      const { query: mq } = await import('../../src/database/connection') as any
 
       mq.mockResolvedValue(mockQueryResult([{
         id: 'map-2',

@@ -26,17 +26,17 @@ import {
 import { IStorageAdapter, QueryResult } from '../../src/core/storage/IStorageAdapter'
 
 // Mock dependencies
-jest.mock('../../src/core/storage', () => {
+vi.mock('../../src/core/storage', () => {
   const mockTenantsStorage = createMockStorage<Tenant>()
   const mockUsageStorage = createMockStorage<TenantUsage>()
 
   return {
-    createStorageAdapter: jest.fn((collection: string) => {
+    createStorageAdapter: vi.fn((collection: string) => {
       if (collection === 'tenants') return mockTenantsStorage
       if (collection === 'tenant_usage') return mockUsageStorage
       return createMockStorage()
     }),
-    getStorageFactory: jest.fn(() => ({
+    getStorageFactory: vi.fn(() => ({
       getStorageType: () => 'memory',
     })),
     __mockTenantsStorage: mockTenantsStorage,
@@ -44,32 +44,32 @@ jest.mock('../../src/core/storage', () => {
   }
 })
 
-jest.mock('../../src/core/event-bus', () => ({
+vi.mock('../../src/core/event-bus', () => ({
   eventBus: {
-    emit: jest.fn(),
+    emit: vi.fn(),
   },
 }))
 
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
   },
 }))
 
 /** Helper: create a mock IStorageAdapter backed by an in-memory Map */
-function createMockStorage<T>(): jest.Mocked<IStorageAdapter<T>> {
+function createMockStorage<T>(): vi.Mocked<IStorageAdapter<T>> {
   const store = new Map<string, T>()
 
   return {
-    save: jest.fn(async (key: string, data: T) => {
+    save: vi.fn(async (key: string, data: T) => {
       store.set(key, data)
     }),
-    get: jest.fn(async (key: string) => store.get(key) ?? null),
-    delete: jest.fn(async (key: string) => store.delete(key)),
-    list: jest.fn(async () => Array.from(store.values())),
-    query: jest.fn(async (filter) => {
+    get: vi.fn(async (key: string) => store.get(key) ?? null),
+    delete: vi.fn(async (key: string) => store.delete(key)),
+    list: vi.fn(async () => Array.from(store.values())),
+    query: vi.fn(async (filter) => {
       let results = Array.from(store.values())
       if (filter.where) {
         results = results.filter((item: any) =>
@@ -79,41 +79,40 @@ function createMockStorage<T>(): jest.Mocked<IStorageAdapter<T>> {
       if (filter.limit) results = results.slice(0, filter.limit)
       return { data: results, total: results.length, hasMore: false } as QueryResult<T>
     }),
-    count: jest.fn(async () => store.size),
-    exists: jest.fn(async (key: string) => store.has(key)),
-    update: jest.fn(async (key: string, data: Partial<T>) => {
+    count: vi.fn(async () => store.size),
+    exists: vi.fn(async (key: string) => store.has(key)),
+    update: vi.fn(async (key: string, data: Partial<T>) => {
       const existing = store.get(key)
       if (!existing) return null
       const updated = { ...existing, ...data }
       store.set(key, updated)
       return updated
     }),
-    clear: jest.fn(async () => store.clear()),
-    getAdapterType: jest.fn(() => 'mock'),
+    clear: vi.fn(async () => store.clear()),
+    getAdapterType: vi.fn(() => 'mock'),
     // Expose internals for test assertions
     __store: store,
   } as any
 }
 
 // Get references to mock storage
-function getMockStorages() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const storage = require('../../src/core/storage')
+async function getMockStorages() {
+  const storage = await import('../../src/core/storage') as any
   return {
-    tenantsStorage: storage.__mockTenantsStorage as jest.Mocked<IStorageAdapter<Tenant>> & { __store: Map<string, Tenant> },
-    usageStorage: storage.__mockUsageStorage as jest.Mocked<IStorageAdapter<TenantUsage>> & { __store: Map<string, TenantUsage> },
+    tenantsStorage: storage.__mockTenantsStorage as vi.Mocked<IStorageAdapter<Tenant>> & { __store: Map<string, Tenant> },
+    usageStorage: storage.__mockUsageStorage as vi.Mocked<IStorageAdapter<TenantUsage>> & { __store: Map<string, TenantUsage> },
   }
 }
 
-const { eventBus } = require('../../src/core/event-bus')
+const { eventBus } = await import('../../src/core/event-bus') as any
 
 describe('MultiTenantService', () => {
   let tenantsStorage: ReturnType<typeof getMockStorages>['tenantsStorage']
   let usageStorage: ReturnType<typeof getMockStorages>['usageStorage']
 
-  beforeEach(() => {
-    jest.clearAllMocks()
-    const storages = getMockStorages()
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    const storages = await getMockStorages()
     tenantsStorage = storages.tenantsStorage
     usageStorage = storages.usageStorage
     // Clear in-memory stores between tests
@@ -265,7 +264,7 @@ describe('MultiTenantService', () => {
 
     it('should emit tenant.updated event', async () => {
       const t = await createTenant('Evt', 'evt')
-      jest.clearAllMocks()
+      vi.clearAllMocks()
       await updateTenant(t.id, { name: 'Updated' })
       expect(eventBus.emit).toHaveBeenCalledWith('tenant.updated', expect.objectContaining({
         tenant: expect.objectContaining({ name: 'Updated' }),
@@ -322,7 +321,7 @@ describe('MultiTenantService', () => {
 
     it('should emit tenant.suspended event', async () => {
       const t = await createTenant('Suspendable', 'suspendable')
-      jest.clearAllMocks()
+      vi.clearAllMocks()
       await suspendTenant(t.id, 'abuse')
       expect(eventBus.emit).toHaveBeenCalledWith('tenant.suspended', {
         tenant: expect.objectContaining({ status: 'suspended' }),
@@ -357,7 +356,7 @@ describe('MultiTenantService', () => {
     it('should emit tenant.activated event', async () => {
       const t = await createTenant('Act', 'act')
       await suspendTenant(t.id)
-      jest.clearAllMocks()
+      vi.clearAllMocks()
       await activateTenant(t.id)
       expect(eventBus.emit).toHaveBeenCalledWith('tenant.activated', {
         tenant: expect.objectContaining({ status: 'active' }),

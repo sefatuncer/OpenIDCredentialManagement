@@ -2,24 +2,24 @@
  * Revocation Service Tests
  * Tests for Status List 2021 implementation
  *
- * Uses jest.isolateModules to ensure clean state for each test
+ * Uses vi.resetModules + dynamic import to ensure clean state for each test
  */
 
 // Mock logger first (before any imports)
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
   },
 }))
 
 // Mock event bus
-jest.mock('../../src/core/event-bus', () => ({
+vi.mock('../../src/core/event-bus', () => ({
   eventBus: {
-    emit: jest.fn(),
-    on: jest.fn(),
-    off: jest.fn(),
+    emit: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
   },
 }))
 
@@ -34,20 +34,20 @@ describe('RevocationService', () => {
   let revocationService: RevocationModule
   let featureFlags: FeatureFlagsModule
 
-  beforeEach(() => {
-    jest.resetModules()
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.clearAllMocks()
 
     // Mock feature flags before importing revocation service
-    jest.doMock('../../src/core/feature-flags', () => ({
-      isFeatureEnabled: jest.fn().mockReturnValue(true),
-      requireFeature: jest.fn(),
-      getFeatureFlags: jest.fn().mockReturnValue({}),
+    vi.doMock('../../src/core/feature-flags', () => ({
+      isFeatureEnabled: vi.fn().mockReturnValue(true),
+      requireFeature: vi.fn(),
+      getFeatureFlags: vi.fn().mockReturnValue({}),
     }))
 
     // Import fresh modules
-    revocationService = require('../../src/services/revocation.service')
-    featureFlags = require('../../src/core/feature-flags')
+    revocationService = await import('../../src/services/revocation.service')
+    featureFlags = await import('../../src/core/feature-flags')
   })
 
   describe('createStatusList', () => {
@@ -73,7 +73,7 @@ describe('RevocationService', () => {
     })
 
     it('should throw if revocation feature is disabled', async () => {
-      const mockRequireFeature = featureFlags.requireFeature as jest.Mock
+      const mockRequireFeature = featureFlags.requireFeature as any
       mockRequireFeature.mockImplementation(() => {
         throw new Error('Feature module.revocation is disabled')
       })
@@ -103,7 +103,7 @@ describe('RevocationService', () => {
     })
 
     it('should return dummy list if revocation is disabled', async () => {
-      const mockIsFeatureEnabled = featureFlags.isFeatureEnabled as jest.Mock
+      const mockIsFeatureEnabled = featureFlags.isFeatureEnabled as any
       mockIsFeatureEnabled.mockReturnValue(false)
 
       const result = await revocationService.getOrCreateStatusList(testIssuerId)
@@ -256,7 +256,7 @@ describe('RevocationService', () => {
     })
 
     it('should return false if revocation is disabled', async () => {
-      const mockIsFeatureEnabled = featureFlags.isFeatureEnabled as jest.Mock
+      const mockIsFeatureEnabled = featureFlags.isFeatureEnabled as any
       mockIsFeatureEnabled.mockReturnValue(false)
 
       const result = await revocationService.isCredentialRevoked(testCredentialId)

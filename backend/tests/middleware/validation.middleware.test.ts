@@ -19,10 +19,10 @@ describe('Validation Middleware', () => {
       originalUrl: '/test',
     };
     mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
     };
-    mockNext = jest.fn();
+    mockNext = vi.fn();
   });
 
   describe('validateBody', () => {
@@ -58,7 +58,7 @@ describe('Validation Middleware', () => {
       const middleware = validateBody(testSchema);
       middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      const errorResponse = (mockResponse.json as jest.Mock).mock.calls[0][0];
+      const errorResponse = (mockResponse.json as any).mock.calls[0][0];
       expect(errorResponse).toHaveProperty('type');
       expect(errorResponse).toHaveProperty('title', 'Validation Error');
       expect(errorResponse).toHaveProperty('status', 400);
@@ -72,7 +72,7 @@ describe('Validation Middleware', () => {
       const middleware = validateBody(testSchema);
       middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      const errorResponse = (mockResponse.json as jest.Mock).mock.calls[0][0];
+      const errorResponse = (mockResponse.json as any).mock.calls[0][0];
       expect(errorResponse.errors.length).toBeGreaterThan(0);
       expect(errorResponse.errors[0]).toHaveProperty('path');
       expect(errorResponse.errors[0]).toHaveProperty('message');

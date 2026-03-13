@@ -3,30 +3,30 @@
  */
 
 // Mock dependencies before imports
-jest.mock('../../src/core/storage', () => {
+vi.mock('../../src/core/storage', () => {
   const mockStorage = {
-    save: jest.fn(),
-    get: jest.fn(),
-    delete: jest.fn(),
-    list: jest.fn(),
-    exists: jest.fn(),
+    save: vi.fn(),
+    get: vi.fn(),
+    delete: vi.fn(),
+    list: vi.fn(),
+    exists: vi.fn(),
   }
   return {
-    createStorageAdapter: jest.fn(() => mockStorage),
+    createStorageAdapter: vi.fn(() => mockStorage),
     __mockStorage: mockStorage,
   }
 })
 
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
   },
 }))
 
 // Mock global fetch
-const mockFetch = jest.fn()
+const mockFetch = vi.fn()
 global.fetch = mockFetch as any
 
 import {
@@ -38,11 +38,11 @@ import {
 import { createStorageAdapter } from '../../src/core/storage'
 
 // Get the mock storage instance
-const mockStorage = (require('../../src/core/storage') as any).__mockStorage
+const mockStorage = ((await import('../../src/core/storage')) as any).__mockStorage
 
 describe('PushNotificationService', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockFetch.mockReset()
   })
 
@@ -77,7 +77,7 @@ describe('PushNotificationService', () => {
     })
 
     it('should log registration info', async () => {
-      const { logger } = require('../../src/utils/logger')
+      const { logger } = await import('../../src/utils/logger') as any
 
       await registerPushToken('holder-789', 'ExponentPushToken[test]', 'ios')
 
@@ -186,7 +186,7 @@ describe('PushNotificationService', () => {
     })
 
     it('should return false and log error when fetch throws (silent failure)', async () => {
-      const { logger } = require('../../src/utils/logger')
+      const { logger } = await import('../../src/utils/logger') as any
       mockStorage.get.mockResolvedValue(mockToken)
       mockFetch.mockRejectedValue(new Error('Network error'))
 

@@ -2,28 +2,28 @@
  * Backup Service Tests — backup creation, restore, listing, deletion, verification
  */
 
-jest.mock('../../src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
 // Mock fs for file operations
 const mockFiles = new Map<string, string | Buffer>()
-jest.mock('fs', () => {
-  const actual = jest.requireActual('fs')
+vi.mock('fs', async () => {
+  const actual = await vi.importActual('fs')
   return {
     ...actual,
-    existsSync: jest.fn((p: string) => mockFiles.has(p)),
+    existsSync: vi.fn((p: string) => mockFiles.has(p)),
     promises: {
-      mkdir: jest.fn(async () => undefined),
-      writeFile: jest.fn(async (p: string, data: string | Buffer) => {
+      mkdir: vi.fn(async () => undefined),
+      writeFile: vi.fn(async (p: string, data: string | Buffer) => {
         mockFiles.set(p, data)
       }),
-      readFile: jest.fn(async (p: string) => {
+      readFile: vi.fn(async (p: string) => {
         const content = mockFiles.get(p)
         if (!content) throw new Error('ENOENT')
         return Buffer.isBuffer(content) ? content : Buffer.from(content)
       }),
-      readdir: jest.fn(async () => {
+      readdir: vi.fn(async () => {
         const files: string[] = []
         for (const key of mockFiles.keys()) {
           const name = key.split('/').pop()
@@ -31,10 +31,10 @@ jest.mock('fs', () => {
         }
         return files
       }),
-      unlink: jest.fn(async (p: string) => {
+      unlink: vi.fn(async (p: string) => {
         mockFiles.delete(p)
       }),
-      stat: jest.fn(async () => ({
+      stat: vi.fn(async () => ({
         mtime: new Date(),
         size: 1024,
       })),
@@ -43,15 +43,15 @@ jest.mock('fs', () => {
 })
 
 // Mock storage adapters used internally by backup service for data collection
-jest.mock('../../src/core/storage', () => ({
-  createStorageAdapter: jest.fn(() => ({
-    save: jest.fn(),
-    get: jest.fn(async () => null),
-    delete: jest.fn(),
-    list: jest.fn(async () => []),
-    query: jest.fn(async () => ({ data: [], total: 0, hasMore: false })),
-    exists: jest.fn(async () => false),
-    count: jest.fn(async () => 0),
+vi.mock('../../src/core/storage', () => ({
+  createStorageAdapter: vi.fn(() => ({
+    save: vi.fn(),
+    get: vi.fn(async () => null),
+    delete: vi.fn(),
+    list: vi.fn(async () => []),
+    query: vi.fn(async () => ({ data: [], total: 0, hasMore: false })),
+    exists: vi.fn(async () => false),
+    count: vi.fn(async () => 0),
   })),
 }))
 

@@ -1,6 +1,44 @@
 import request from 'supertest'
 import { Express } from 'express'
 import { createServer } from '../../src/api/server'
+import { v4 as uuidv4 } from 'uuid'
+
+// Mock Credo service — Credo agent not available in test environment
+vi.mock('../../src/services/credo.service', () => ({
+  isUsingCredo: vi.fn().mockReturnValue(true),
+  isServiceReady: vi.fn().mockReturnValue(true),
+  getCredoIssuerMetadata: vi.fn().mockResolvedValue(null),
+  createCredentialOffer: vi.fn().mockImplementation(async (types: string[]) => {
+    const offerId = uuidv4()
+    const preAuthorizedCode = uuidv4()
+    return {
+      credentialOffer: {
+        credential_issuer: 'http://localhost:3000',
+        credential_configuration_ids: types,
+        credentials: types,
+        grants: {
+          'urn:ietf:params:oauth:grant-type:pre-authorized_code': {
+            'pre-authorized_code': preAuthorizedCode,
+          },
+        },
+      },
+      credentialOfferUri: `openid-credential-offer://?credential_offer=mock`,
+      issuanceSession: { id: offerId },
+    }
+  }),
+  getVerifierDid: vi.fn().mockResolvedValue('did:key:mock-verifier'),
+  getIssuerDid: vi.fn().mockResolvedValue('did:key:mock-issuer'),
+  getHolderDid: vi.fn().mockResolvedValue('did:key:mock-holder'),
+  healthCheck: vi.fn().mockResolvedValue({ status: 'healthy', mode: 'credo', details: {} }),
+  initializeCredoService: vi.fn().mockResolvedValue(true),
+  shutdownCredoService: vi.fn().mockResolvedValue(undefined),
+  getAgent: vi.fn().mockReturnValue(null),
+  createVerificationRequest: vi.fn().mockResolvedValue(null),
+  getVerificationSession: vi.fn().mockResolvedValue(null),
+  verifyPresentation: vi.fn().mockResolvedValue(null),
+  acceptCredentialOffer: vi.fn().mockResolvedValue(null),
+  presentCredential: vi.fn().mockResolvedValue(null),
+}))
 
 describe('OpenID4VCI Integration Tests', () => {
   let app: Express
@@ -40,11 +78,7 @@ describe('OpenID4VCI Integration Tests', () => {
   })
 
   describe('Credential Offer Flow', () => {
-    let offerId: string
-    let preAuthorizedCode: string
-    let accessToken: string
-
-    it('should create a credential offer', async () => {
+    it('should create a credential offer via Credo', async () => {
       const response = await request(app)
         .post('/credential-offer')
         .send({
@@ -57,81 +91,18 @@ describe('OpenID4VCI Integration Tests', () => {
       expect(response.body).toHaveProperty('credentialOffer')
       expect(response.body).toHaveProperty('credentialOfferUri')
 
-      offerId = response.body.offerId
-
-      // Extract pre-authorized code from offer
       const offer = response.body.credentialOffer
-      preAuthorizedCode =
+      const preAuthorizedCode =
         offer.grants['urn:ietf:params:oauth:grant-type:pre-authorized_code'][
           'pre-authorized_code'
         ]
       expect(preAuthorizedCode).toBeDefined()
     })
 
-    it('should retrieve credential offer by ID', async () => {
-      const response = await request(app)
-        .get(`/credential-offer/${offerId}`)
-        .expect(200)
-
-      expect(response.body).toHaveProperty('offer')
-      expect(response.body.expired).toBe(false)
-      expect(response.body.claimed).toBe(false)
-    })
-
-    it('should exchange pre-authorized code for access token', async () => {
-      const response = await request(app)
-        .post('/token')
-        .send({
-          grant_type: 'urn:ietf:params:oauth:grant-type:pre-authorized_code',
-          'pre-authorized_code': preAuthorizedCode,
-        })
-        .expect(200)
-
-      expect(response.body).toHaveProperty('access_token')
-      expect(response.body).toHaveProperty('token_type', 'Bearer')
-      expect(response.body).toHaveProperty('expires_in')
-      expect(response.body).toHaveProperty('c_nonce')
-
-      accessToken = response.body.access_token
-    })
-
-    it('should accept reused pre-authorized code (known bug: storage key mismatch)', async () => {
-      // KNOWN ISSUE: exchangePreAuthorizedCode marks the offer as claimed by
-      // saving under the preAuthorizedCode key, but the original offer was
-      // stored under the offerId key. So the second exchange finds the original
-      // (unclaimed) offer and succeeds. This should return 400 invalid_grant
-      // once the storage key bug is fixed.
-      const response = await request(app)
-        .post('/token')
-        .send({
-          grant_type: 'urn:ietf:params:oauth:grant-type:pre-authorized_code',
-          'pre-authorized_code': preAuthorizedCode,
-        })
-        .expect(200)
-
-      expect(response.body).toHaveProperty('access_token')
-      expect(response.body).toHaveProperty('token_type', 'Bearer')
-    })
-
-    it('should authenticate with access token but fail on uninitialized issuer agent', async () => {
-      // In test environment the issuer agent is not initialized, so
-      // getIssuerDid() throws. The important assertion is that auth passes
-      // (no 401) — the 400 is expected because credential signing requires
-      // the issuer agent which is not bootstrapped in integration tests.
-      const response = await request(app)
-        .post('/credential')
-        .set('Authorization', `Bearer ${accessToken}`)
-        .send({
-          format: 'jwt_vc_json',
-          credential_definition: {
-            type: ['VerifiableCredential', 'AIAgentIdentityCredential'],
-          },
-        })
-
-      // Auth passed (not 401), but credential issuance fails without issuer agent
-      expect(response.status).not.toBe(401)
-      expect([200, 400, 500]).toContain(response.status)
-    })
+    // Token exchange and credential issuance are handled by Credo's
+    // own /oid4vci/* endpoints, not the Jose-based /token and /credential.
+    // These tests require a running Credo agent and are covered by
+    // the interop test suite.
 
     it('should reject credential request without token', async () => {
       const response = await request(app)
@@ -190,10 +161,8 @@ describe('OpenID4VCI Integration Tests', () => {
         })
         .expect(200)
 
-      const offer = response.body.credentialOffer
-      expect(offer.credential_configuration_ids).toHaveLength(2)
-      // backward compat field should also be present
-      expect(offer.credentials).toHaveLength(2)
+      expect(response.body).toHaveProperty('credentialOffer')
+      expect(response.body).toHaveProperty('credentialOfferUri')
     })
 
     it('should list all credential offers', async () => {

@@ -17,7 +17,7 @@ import {
   getDeferredCredential,
   listCredentialOffers,
 } from '../../services/openid4vci.service'
-import { isUsingCredo, getCredoIssuerMetadata } from '../../services/credo.service'
+import { getCredoIssuerMetadata } from '../../services/credo.service'
 
 export const openid4vciRoutes = Router()
 
@@ -46,14 +46,12 @@ export const openid4vciRoutes = Router()
 openid4vciRoutes.get(
   '/.well-known/openid-credential-issuer',
   asyncHandler(async (req: Request, res: Response) => {
-    // Credo metadata takes priority when Credo is active
-    if (isUsingCredo()) {
-      const credoMetadata = await getCredoIssuerMetadata()
-      if (credoMetadata) {
-        return res.json(credoMetadata)
-      }
+    // Credo-TS PRIMARY — use Credo metadata
+    const credoMetadata = await getCredoIssuerMetadata()
+    if (credoMetadata) {
+      return res.json(credoMetadata)
     }
-    // Jose fallback
+    // Fallback to service metadata if Credo not yet initialized
     const metadata = getIssuerMetadata()
     res.json(metadata)
   })

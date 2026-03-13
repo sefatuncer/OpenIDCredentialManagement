@@ -7,21 +7,21 @@ import {
 } from '../security/security-helpers';
 
 // Mock multi-tenant service
-jest.mock('../../src/services/multiTenant.service', () => ({
-  createTenant: jest.fn(),
-  getTenant: jest.fn(),
-  listTenants: jest.fn(),
-  updateTenant: jest.fn(),
-  suspendTenant: jest.fn(),
-  activateTenant: jest.fn(),
-  deleteTenant: jest.fn(),
-  getUsage: jest.fn(),
-  getStats: jest.fn(),
+vi.mock('../../src/services/multiTenant.service', () => ({
+  createTenant: vi.fn(),
+  getTenant: vi.fn(),
+  listTenants: vi.fn(),
+  updateTenant: vi.fn(),
+  suspendTenant: vi.fn(),
+  activateTenant: vi.fn(),
+  deleteTenant: vi.fn(),
+  getUsage: vi.fn(),
+  getStats: vi.fn(),
 }));
 
 import * as tenantService from '../../src/services/multiTenant.service';
 
-const mockedService = tenantService as jest.Mocked<typeof tenantService>;
+const mockedService = tenantService as anyed<typeof tenantService>;
 
 const mockTenant = {
   id: 'tenant-001',
@@ -52,7 +52,7 @@ describe('Tenant Routes', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   // ── POST /api/v1/tenants ──────────────────────────────────────────────

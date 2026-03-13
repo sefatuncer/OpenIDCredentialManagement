@@ -8,7 +8,7 @@ import {
 import { setFeature } from '../../src/core/feature-flags'
 
 // Mock the policy service
-jest.mock('../../src/services/policy.service', () => {
+vi.mock('../../src/services/policy.service', () => {
   const mockPolicies = [
     {
       id: 'policy-admin',
@@ -37,30 +37,30 @@ jest.mock('../../src/services/policy.service', () => {
   ]
 
   return {
-    listPolicies: jest.fn().mockResolvedValue(mockPolicies),
-    getPolicy: jest.fn().mockImplementation(async (id: string) => {
+    listPolicies: vi.fn().mockResolvedValue(mockPolicies),
+    getPolicy: vi.fn().mockImplementation(async (id: string) => {
       return mockPolicies.find((p) => p.id === id) || null
     }),
-    createPolicy: jest.fn().mockImplementation(async (data: any) => ({
+    createPolicy: vi.fn().mockImplementation(async (data: any) => ({
       id: 'policy-new-123',
       ...data,
       builtIn: false,
       createdAt: new Date().toISOString(),
     })),
-    updatePolicy: jest.fn().mockImplementation(async (id: string, data: any) => {
+    updatePolicy: vi.fn().mockImplementation(async (id: string, data: any) => {
       const existing = mockPolicies.find((p) => p.id === id)
       if (!existing) return null
       if (existing.builtIn) throw new Error('Cannot modify built-in policy')
       return { ...existing, ...data }
     }),
-    deletePolicy: jest.fn().mockImplementation(async (id: string) => {
+    deletePolicy: vi.fn().mockImplementation(async (id: string) => {
       const existing = mockPolicies.find((p) => p.id === id)
       if (!existing) return false
       if (existing.builtIn) throw new Error('Cannot delete built-in policy')
       return true
     }),
-    initializePolicies: jest.fn().mockResolvedValue(undefined),
-    evaluatePolicy: jest.fn().mockReturnValue({ allowed: true, reason: 'wildcard' }),
+    initializePolicies: vi.fn().mockResolvedValue(undefined),
+    evaluatePolicy: vi.fn().mockReturnValue({ allowed: true, reason: 'wildcard' }),
   }
 })
 

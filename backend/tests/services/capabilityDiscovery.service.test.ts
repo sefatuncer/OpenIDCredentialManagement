@@ -9,37 +9,37 @@ function createMockStorage<T>(): IStorageAdapter<T> & { _store: Map<string, T> }
   const store = new Map<string, T>()
   return {
     _store: store,
-    save: jest.fn(async (key: string, data: T) => { store.set(key, data) }),
-    get: jest.fn(async (key: string) => store.get(key) ?? null),
-    delete: jest.fn(async (key: string) => store.delete(key)),
-    list: jest.fn(async () => Array.from(store.values())),
-    query: jest.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
-    count: jest.fn(async () => store.size),
-    exists: jest.fn(async (key: string) => store.has(key)),
-    update: jest.fn(async (key: string, data: Partial<T>) => {
+    save: vi.fn(async (key: string, data: T) => { store.set(key, data) }),
+    get: vi.fn(async (key: string) => store.get(key) ?? null),
+    delete: vi.fn(async (key: string) => store.delete(key)),
+    list: vi.fn(async () => Array.from(store.values())),
+    query: vi.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
+    count: vi.fn(async () => store.size),
+    exists: vi.fn(async (key: string) => store.has(key)),
+    update: vi.fn(async (key: string, data: Partial<T>) => {
       const existing = store.get(key)
       if (!existing) return null
       const updated = { ...existing, ...data } as T
       store.set(key, updated)
       return updated
     }),
-    clear: jest.fn(async () => { store.clear() }),
-    getAdapterType: jest.fn(() => 'memory'),
+    clear: vi.fn(async () => { store.clear() }),
+    getAdapterType: vi.fn(() => 'memory'),
   }
 }
 
 const mockAgentStorage = createMockStorage<any>()
 
-jest.mock('../../src/core/storage', () => ({
-  createStorageAdapter: jest.fn(() => mockAgentStorage),
+vi.mock('../../src/core/storage', () => ({
+  createStorageAdapter: vi.fn(() => mockAgentStorage),
 }))
 
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }))
 
@@ -67,7 +67,7 @@ function makeProfile(overrides: Partial<AgentProfile> = {}): AgentProfile {
 
 describe('CapabilityDiscoveryService', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockAgentStorage._store.clear()
   })
 

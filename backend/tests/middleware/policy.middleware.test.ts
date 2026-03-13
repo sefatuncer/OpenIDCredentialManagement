@@ -3,19 +3,19 @@ import { enforcePolicy } from '../../src/api/middleware/policy.middleware';
 import { AuthenticatedRequest } from '../../src/api/middleware/auth.middleware';
 
 // Mock dependencies
-jest.mock('../../src/core/feature-flags', () => ({
-  isFeatureEnabled: jest.fn(),
+vi.mock('../../src/core/feature-flags', () => ({
+  isFeatureEnabled: vi.fn(),
 }));
 
-jest.mock('../../src/services/policy.service', () => ({
-  evaluatePolicy: jest.fn(),
+vi.mock('../../src/services/policy.service', () => ({
+  evaluatePolicy: vi.fn(),
 }));
 
 import { isFeatureEnabled } from '../../src/core/feature-flags';
 import { evaluatePolicy } from '../../src/services/policy.service';
 
-const mockIsFeatureEnabled = isFeatureEnabled as jest.MockedFunction<typeof isFeatureEnabled>;
-const mockEvaluatePolicy = evaluatePolicy as jest.MockedFunction<typeof evaluatePolicy>;
+const mockIsFeatureEnabled = isFeatureEnabled as anyedFunction<typeof isFeatureEnabled>;
+const mockEvaluatePolicy = evaluatePolicy as anyedFunction<typeof evaluatePolicy>;
 
 describe('Policy Middleware — enforcePolicy', () => {
   let mockRequest: Partial<AuthenticatedRequest>;
@@ -29,12 +29,12 @@ describe('Policy Middleware — enforcePolicy', () => {
       method: 'POST',
     };
     mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
     };
-    mockNext = jest.fn();
+    mockNext = vi.fn();
 
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('feature flag disabled (pass-through)', () => {
@@ -72,7 +72,7 @@ describe('Policy Middleware — enforcePolicy', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockNext).not.toHaveBeenCalled();
 
-      const body = (mockResponse.json as jest.Mock).mock.calls[0][0];
+      const body = (mockResponse.json as any).mock.calls[0][0];
       expect(body.error).toBe('Not authenticated');
       expect(body.requestId).toBeDefined();
     });
@@ -83,7 +83,7 @@ describe('Policy Middleware — enforcePolicy', () => {
       const middleware = enforcePolicy('credential:issue', 'credentials');
       middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      const body = (mockResponse.json as jest.Mock).mock.calls[0][0];
+      const body = (mockResponse.json as any).mock.calls[0][0];
       expect(body.requestId).toBe('req-123');
     });
   });
@@ -160,7 +160,7 @@ describe('Policy Middleware — enforcePolicy', () => {
       const middleware = enforcePolicy('credential:issue', 'credentials');
       middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      const body = (mockResponse.json as jest.Mock).mock.calls[0][0];
+      const body = (mockResponse.json as any).mock.calls[0][0];
       expect(body.error).toBe('Policy denied');
       expect(body.detail).toBe('Denied by policy: restricted-access');
       expect(body.action).toBe('credential:issue');

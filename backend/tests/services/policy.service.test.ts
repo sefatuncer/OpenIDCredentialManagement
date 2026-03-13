@@ -16,40 +16,40 @@ import {
 
 // Mock dependencies
 const mockStorage = {
-  save: jest.fn().mockResolvedValue(undefined),
-  get: jest.fn().mockResolvedValue(null),
-  delete: jest.fn().mockResolvedValue(true),
-  list: jest.fn().mockResolvedValue([]),
-  query: jest.fn().mockResolvedValue({ items: [], total: 0 }),
-  count: jest.fn().mockResolvedValue(0),
-  exists: jest.fn().mockResolvedValue(false),
-  update: jest.fn().mockResolvedValue(null),
-  clear: jest.fn().mockResolvedValue(undefined),
-  getAdapterType: jest.fn().mockReturnValue('mock'),
+  save: vi.fn().mockResolvedValue(undefined),
+  get: vi.fn().mockResolvedValue(null),
+  delete: vi.fn().mockResolvedValue(true),
+  list: vi.fn().mockResolvedValue([]),
+  query: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+  count: vi.fn().mockResolvedValue(0),
+  exists: vi.fn().mockResolvedValue(false),
+  update: vi.fn().mockResolvedValue(null),
+  clear: vi.fn().mockResolvedValue(undefined),
+  getAdapterType: vi.fn().mockReturnValue('mock'),
 }
 
-jest.mock('../../src/core/storage', () => ({
-  createStorageAdapter: jest.fn(() => mockStorage),
+vi.mock('../../src/core/storage', () => ({
+  createStorageAdapter: vi.fn(() => mockStorage),
 }))
 
 let mockFeatureEnabled = true
-jest.mock('../../src/core/feature-flags', () => ({
-  isFeatureEnabled: jest.fn((flag: string) => {
+vi.mock('../../src/core/feature-flags', () => ({
+  isFeatureEnabled: vi.fn((flag: string) => {
     if (flag === 'security.policy-engine') return mockFeatureEnabled
     return false
   }),
 }))
 
-jest.mock('../../src/services/audit.service', () => ({
-  createAuditLog: jest.fn().mockResolvedValue(undefined),
+vi.mock('../../src/services/audit.service', () => ({
+  createAuditLog: vi.fn().mockResolvedValue(undefined),
 }))
 
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }))
 
@@ -165,7 +165,7 @@ async function warmCache(policies: PolicyRule[]): Promise<void> {
 
 describe('PolicyService', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockFeatureEnabled = true
   })
 
@@ -708,7 +708,7 @@ describe('PolicyService', () => {
 
       // Simulate time passing beyond 30s TTL
       const realNow = Date.now
-      Date.now = jest.fn().mockReturnValue(realNow() + 31_000)
+      Date.now = vi.fn().mockReturnValue(realNow() + 31_000)
 
       evaluatePolicy(buildContext({ principal: { sub: 'a', role: 'admin' } }))
       // Should have triggered a list() call due to expired cache

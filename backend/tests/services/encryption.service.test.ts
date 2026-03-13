@@ -1,23 +1,23 @@
-jest.mock('../../src/core/storage', () => {
+vi.mock('../../src/core/storage', () => {
   const store = new Map<string, unknown>()
   return {
-    createStorageAdapter: jest.fn(() => ({
-      save: jest.fn(async (key: string, data: unknown) => { store.set(key, data) }),
-      get: jest.fn(async (key: string) => store.get(key) ?? null),
-      delete: jest.fn(async (key: string) => store.delete(key)),
-      list: jest.fn(async () => Array.from(store.values())),
-      query: jest.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
-      count: jest.fn(async () => store.size),
-      exists: jest.fn(async (key: string) => store.has(key)),
-      update: jest.fn(async () => null),
-      clear: jest.fn(async () => { store.clear() }),
-      getAdapterType: jest.fn(() => 'memory'),
+    createStorageAdapter: vi.fn(() => ({
+      save: vi.fn(async (key: string, data: unknown) => { store.set(key, data) }),
+      get: vi.fn(async (key: string) => store.get(key) ?? null),
+      delete: vi.fn(async (key: string) => store.delete(key)),
+      list: vi.fn(async () => Array.from(store.values())),
+      query: vi.fn(async () => ({ data: Array.from(store.values()), total: store.size, hasMore: false })),
+      count: vi.fn(async () => store.size),
+      exists: vi.fn(async (key: string) => store.has(key)),
+      update: vi.fn(async () => null),
+      clear: vi.fn(async () => { store.clear() }),
+      getAdapterType: vi.fn(() => 'memory'),
     })),
   }
 })
 
-jest.mock('../../src/utils/logger', () => ({
-  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+vi.mock('../../src/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
 // Set a test encryption key (32 bytes hex = 64 chars)

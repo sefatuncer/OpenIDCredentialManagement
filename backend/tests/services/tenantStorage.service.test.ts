@@ -23,17 +23,17 @@ interface TestRecord {
 }
 
 /** Create a mock IStorageAdapter backed by an in-memory Map */
-function createMockStorage(): jest.Mocked<IStorageAdapter<TestRecord>> & { __store: Map<string, TestRecord> } {
+function createMockStorage(): vi.Mocked<IStorageAdapter<TestRecord>> & { __store: Map<string, TestRecord> } {
   const store = new Map<string, TestRecord>()
 
   return {
-    save: jest.fn(async (key: string, data: TestRecord) => {
+    save: vi.fn(async (key: string, data: TestRecord) => {
       store.set(key, data)
     }),
-    get: jest.fn(async (key: string) => store.get(key) ?? null),
-    delete: jest.fn(async (key: string) => store.delete(key)),
-    list: jest.fn(async () => Array.from(store.values())),
-    query: jest.fn(async (filter: QueryFilter) => {
+    get: vi.fn(async (key: string) => store.get(key) ?? null),
+    delete: vi.fn(async (key: string) => store.delete(key)),
+    list: vi.fn(async () => Array.from(store.values())),
+    query: vi.fn(async (filter: QueryFilter) => {
       let results = Array.from(store.values())
       if (filter.where) {
         results = results.filter((item: any) =>
@@ -43,17 +43,17 @@ function createMockStorage(): jest.Mocked<IStorageAdapter<TestRecord>> & { __sto
       if (filter.limit) results = results.slice(0, filter.limit)
       return { data: results, total: results.length, hasMore: false } as QueryResult<TestRecord>
     }),
-    count: jest.fn(async () => store.size),
-    exists: jest.fn(async (key: string) => store.has(key)),
-    update: jest.fn(async (key: string, data: Partial<TestRecord>) => {
+    count: vi.fn(async () => store.size),
+    exists: vi.fn(async (key: string) => store.has(key)),
+    update: vi.fn(async (key: string, data: Partial<TestRecord>) => {
       const existing = store.get(key)
       if (!existing) return null
       const updated = { ...existing, ...data }
       store.set(key, updated)
       return updated
     }),
-    clear: jest.fn(async () => store.clear()),
-    getAdapterType: jest.fn(() => 'mock'),
+    clear: vi.fn(async () => store.clear()),
+    getAdapterType: vi.fn(() => 'mock'),
     __store: store,
   } as any
 }

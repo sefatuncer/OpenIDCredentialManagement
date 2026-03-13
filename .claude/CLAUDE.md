@@ -139,6 +139,10 @@ cd web-wallet && npm run dev
 - **[2026-03-13] Security:** STRIDE analizi feature bazlı değil, mimari katman bazlı (API Gateway → Auth → Issuance → Verification → Delegation → Storage → External) yapılmalı — cross-cutting threat'leri yakalamak için. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
 - **[2026-03-13] Security:** Node.js `new URL()` IPv6 normalization'ı: `[::ffff:127.0.0.1]` → `[::ffff:7f00:1]` (bracket korunur, IP hex'e dönüşür). SSRF check'lerde bracket-aware IPv6 parsing gerekli. Bkz: `.claude/solutions/stride-threat-model-security-hardening.md`
 - **[2026-03-13] Testing:** Credo-TS ESM modülleri Jest ile uyumsuz. `moduleNameMapper` ile `__mocks__/@credo-ts/*.js` stub dosyalarına yönlendir. `transformIgnorePatterns` tek başına yetmez.
+- **[2026-03-13] Architecture:** Dual-engine branching (`isUsingCredo()`) ile feature parity sağlamak sürdürülemez. Tek engine seç, API contract'ı koru, internal engine'i swap et (thin wrapper strategy). Bkz: `.claude/solutions/credo-ts-primary-migration.md`
+- **[2026-03-13] Testing:** Jest→Vitest migration'da `require()` çağrıları `vi.resetModules()` ile uyumsuz. `await import()` ile değiştir, `beforeEach` async yap. `vi.hoisted()` ile mock variable'ları factory dışına taşı.
+- **[2026-03-13] Architecture:** Native binding zorunlu ise (Askar gibi) baştan mandatory yap. Optional fallback dual code path yaratır ve her yeni feature'da divergence riski doğurur.
+- **[2026-03-13] Security:** Credo wallet key production'da zorunlu (`CREDO_WALLET_KEY`). Dev'de fallback key uyarı ile kullanılır, production'da `throw` ile başlatma engellenir.
 - **[2026-03-13] CI/CD:** `workflow_run` trigger'ında commit SHA için `github.event.workflow_run.head_sha` kullan, `github.sha` değil. `github.sha` event dispatch anındaki default branch HEAD'i gösterir. Bkz: `.claude/solutions/cicd-pipeline-enhancement.md`
 - **[2026-03-13] CI/CD:** Güvenlik testlerini ayrı CI job olarak çalıştır (step değil) — CI dashboard'da bağımsız görünür, hata izolasyonu sağlar. Job-level `env:` ile ortam değişkenlerini DRY tut.
 
@@ -146,7 +150,8 @@ cd web-wallet && npm run dev
 
 | Pattern | Açıklama | Dosya |
 |---------|----------|-------|
-| Jose PRIMARY + Credo Optional | Native modül gerektirmeyen SSI mimarisi | `.claude/solutions/jose-primary-credo-optional.md` |
+| Credo-TS PRIMARY Migration | Dual-engine → single-engine migration, Jest→Vitest, thin wrapper strategy | `.claude/solutions/credo-ts-primary-migration.md` |
+| Jose PRIMARY + Credo Optional | Native modül gerektirmeyen SSI mimarisi (DEPRECATED — Credo PRIMARY aktif) | `.claude/solutions/jose-primary-credo-optional.md` |
 | DID:key Encoding | Ed25519'dan DID:key oluşturma | `.claude/solutions/did-key-multibase-encoding.md` |
 | SD-JWT Selective Disclosure UI | Client-side parsing + claim selection UI | `.claude/solutions/sdjwt-selective-disclosure-ui.md` |
 | OpenID4VC Spec Migration | Draft 11→13+ field migration with backward compat | `.claude/solutions/openid4vc-spec-compliance-migration.md` |

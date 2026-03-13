@@ -1,5 +1,7 @@
-// Jest setup file
+// Vitest setup file
 // This file runs before each test file
+
+import { vi, expect } from 'vitest'
 
 export {}; // Make this file a module to enable global augmentation
 
@@ -9,14 +11,11 @@ process.env.JWT_SECRET = 'test-jwt-secret-for-testing-only';
 process.env.API_KEY = 'test-api-key-12345';
 process.env.DEMO_CLIENT_SECRET = 'test-demo-secret';
 
-// Increase timeout for async operations
-jest.setTimeout(30000);
-
 // Global test utilities
 beforeAll(() => {
   // Silence console during tests (optional)
-  // jest.spyOn(console, 'log').mockImplementation(() => {});
-  // jest.spyOn(console, 'error').mockImplementation(() => {});
+  // vi.spyOn(console, 'log').mockImplementation(() => {});
+  // vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterAll(() => {
@@ -38,10 +37,11 @@ expect.extend({
 });
 
 // Declare custom matchers for TypeScript
-declare global {
-  namespace jest {
-    interface Matchers<R> {
-      toBeValidDid(): R;
-    }
+declare module 'vitest' {
+  interface Assertion<T = any> {
+    toBeValidDid(): T;
+  }
+  interface AsymmetricMatchersContaining {
+    toBeValidDid(): any;
   }
 }

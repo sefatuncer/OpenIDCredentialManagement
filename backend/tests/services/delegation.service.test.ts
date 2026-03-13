@@ -14,21 +14,21 @@ import { query, queryOne } from '../../src/database/connection'
 import { getAgentByDid, logAgentActivity } from '../../src/services/agent.service'
 
 // Mock dependencies
-jest.mock('../../src/database/connection')
-jest.mock('../../src/services/agent.service')
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/database/connection')
+vi.mock('../../src/services/agent.service')
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   },
 }))
 
-const mockQuery = query as jest.MockedFunction<typeof query>
-const mockQueryOne = queryOne as jest.MockedFunction<typeof queryOne>
-const mockGetAgentByDid = getAgentByDid as jest.MockedFunction<typeof getAgentByDid>
-const mockLogAgentActivity = logAgentActivity as jest.MockedFunction<typeof logAgentActivity>
+const mockQuery = query as anyedFunction<typeof query>
+const mockQueryOne = queryOne as anyedFunction<typeof queryOne>
+const mockGetAgentByDid = getAgentByDid as anyedFunction<typeof getAgentByDid>
+const mockLogAgentActivity = logAgentActivity as anyedFunction<typeof logAgentActivity>
 
 // Helper to create mock QueryResult
 const mockQueryResult = (rows: any[], rowCount?: number) =>
@@ -40,7 +40,7 @@ describe('DelegationService', () => {
   const testAgentId = 'agent-uuid-123'
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('createDelegation', () => {

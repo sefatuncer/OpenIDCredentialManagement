@@ -9,7 +9,7 @@ import {
 const TEST_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-testing-only'
 
 // Mock oauth-bridge service
-jest.mock('../../src/services/oauth-bridge.service', () => {
+vi.mock('../../src/services/oauth-bridge.service', () => {
   class OAuthBridgeError extends Error {
     statusCode: number
     errorCode: string
@@ -24,7 +24,7 @@ jest.mock('../../src/services/oauth-bridge.service', () => {
 
   return {
     OAuthBridgeError,
-    exchangeVCForToken: jest.fn().mockImplementation(async (subjectToken: string, scope?: string) => {
+    exchangeVCForToken: vi.fn().mockImplementation(async (subjectToken: string, scope?: string) => {
       if (subjectToken === 'invalid-vc-token') {
         throw new OAuthBridgeError(400, 'invalid_grant', 'Invalid verifiable credential')
       }
@@ -36,14 +36,14 @@ jest.mock('../../src/services/oauth-bridge.service', () => {
         issued_token_type: 'urn:ietf:params:oauth:token-type:access_token',
       }
     }),
-    getScopeMappings: jest.fn().mockReturnValue({
+    getScopeMappings: vi.fn().mockReturnValue({
       mappings: {
         AIAgentIdentityCredential: ['agent:read', 'agent:write'],
         DelegationCredential: ['delegation:read'],
         CapabilityCredential: ['capability:execute'],
       },
     }),
-    mapCredentialToScopes: jest.fn().mockReturnValue(['agent:read']),
+    mapCredentialToScopes: vi.fn().mockReturnValue(['agent:read']),
   }
 })
 
