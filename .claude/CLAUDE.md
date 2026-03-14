@@ -147,6 +147,9 @@ cd web-wallet && npm run dev
 - **[2026-03-13] Architecture:** Credential signing tek entry point'ten yapılmalı (`signCredentialDirect()`). Offer flow, batch issuance ve agent claim hepsi aynı fonksiyonu çağırmalı — birden fazla signing path field inconsistency yaratır.
 - **[2026-03-13] CI/CD:** `workflow_run` trigger'ında commit SHA için `github.event.workflow_run.head_sha` kullan, `github.sha` değil. `github.sha` event dispatch anındaki default branch HEAD'i gösterir. Bkz: `.claude/solutions/cicd-pipeline-enhancement.md`
 - **[2026-03-13] CI/CD:** Güvenlik testlerini ayrı CI job olarak çalıştır (step değil) — CI dashboard'da bağımsız görünür, hata izolasyonu sağlar. Job-level `env:` ile ortam değişkenlerini DRY tut.
+- **[2026-03-14] Architecture:** Dosya bölme sırasında `require()` ile circular dep çözmeye çalışma — test ortamında (Vitest) çalışmaz. Top-level `import` kullan, function-only export circular dep'i runtime'da sorunsuz çözer. Bkz: `.claude/solutions/service-file-splitting-thin-wrapper.md`
+- **[2026-03-14] Architecture:** Class-based servisler split etmek zor. Standalone function API tercih et. Class split gerekirse, class method standalone function'a delegate etsin (`verifyPresentation → verifySDJWTPresentation`).
+- **[2026-03-14] Architecture:** Cross-module dependency'lerde (verification→storage) dependency injection (function parameters) kullan — `{ getSessionByState, getStorage }` pattern'i circular import'u önler.
 
 ## Pattern Library
 
@@ -178,3 +181,4 @@ cd web-wallet && npm run dev
 | Automated Security Pentest Suite | 3-round pentest: auth bypass, injection, SSRF, tenant isolation, rate limits | `backend/tests/security/` |
 | CI/CD Pipeline Enhancement | Security test job, npm audit, Kustomize deploy, workflow_run SHA reference | `.claude/solutions/cicd-pipeline-enhancement.md` |
 | k6 Performance Test Framework | Issuance/verification/mixed k6 scenarios, profile selection, baseline runner | `.claude/solutions/k6-performance-test-framework.md` |
+| Service File Splitting | Concern-based split, barrel re-export, dep injection for circular avoidance | `.claude/solutions/service-file-splitting-thin-wrapper.md` |

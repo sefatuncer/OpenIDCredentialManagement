@@ -1,31 +1,33 @@
+/**
+ * OpenID4VP Service — Config, Sessions, and Barrel
+ *
+ * Implements the OpenID for Verifiable Presentations specification.
+ * https://openid.net/specs/openid-4-verifiable-presentations-1_0.html
+ *
+ * Verification engine extracted to openid4vp-verification.service.ts.
+ */
+
 import { v4 as uuidv4 } from 'uuid'
-import * as jose from 'jose'
 import { logger } from '../utils/logger'
 import { getVerifierDid } from '../agents/verifier.agent'
-import { resolvePublicKeyFromDid } from './didResolver.service'
 import {
   IStorageAdapter,
   createStorageAdapter,
   getStorageType,
 } from '../core/storage'
-import { isCredentialRevoked, getRevocationStatus } from './revocation.service'
 import { saveTenantData, listTenantData } from './tenant-storage.service'
-// Credo Service import — Credo-TS PRIMARY
 import {
   createVerificationRequest as credoCreateVerificationRequest,
-  verifyPresentation as credoVerifyPresentation,
   getVerifierDid as credoGetVerifierDid,
 } from './credo.service'
+import {
+  handleDirectPost as handleDirectPostImpl,
+  getVerificationResult as getVerificationResultImpl,
+} from './openid4vp-verification.service'
 
-/**
- * OpenID4VP Service
- *
- * Implements the OpenID for Verifiable Presentations specification
- * https://openid.net/specs/openid-4-verifiable-presentations-1_0.html
- */
+// ==================== Types ====================
 
-// Verification session storage type
-interface VerificationSession {
+export interface VerificationSession {
   id: string
   presentationDefinition: PresentationDefinition
   nonce: string
@@ -37,17 +39,6 @@ interface VerificationSession {
   status: 'pending' | 'submitted' | 'verified' | 'rejected' | 'expired'
   presentation?: string
   verificationResult?: VerificationResult
-}
-
-// Storage adapter (initialized lazily)
-let vpSessionsStorage: IStorageAdapter<VerificationSession> | null = null
-
-function getVPSessionsStorage(): IStorageAdapter<VerificationSession> {
-  if (!vpSessionsStorage) {
-    vpSessionsStorage = createStorageAdapter<VerificationSession>('vp_sessions')
-    logger.info('VP sessions storage initialized', { type: getStorageType() })
-  }
-  return vpSessionsStorage
 }
 
 export interface PresentationDefinition {
@@ -141,7 +132,20 @@ export interface PresentationSubmission {
   }>
 }
 
-// Predefined presentation definitions
+// ==================== Storage ====================
+
+let vpSessionsStorage: IStorageAdapter<VerificationSession> | null = null
+
+function getVPSessionsStorage(): IStorageAdapter<VerificationSession> {
+  if (!vpSessionsStorage) {
+    vpSessionsStorage = createStorageAdapter<VerificationSession>('vp_sessions')
+    logger.info('VP sessions storage initialized', { type: getStorageType() })
+  }
+  return vpSessionsStorage
+}
+
+// ==================== Presentation Definitions ====================
+
 export const PRESENTATION_DEFINITIONS: Record<string, PresentationDefinition> = {
   'agent-identity': {
     id: 'agent-identity-verification',
@@ -154,40 +158,12 @@ export const PRESENTATION_DEFINITIONS: Record<string, PresentationDefinition> = 
         purpose: 'Prove agent identity',
         constraints: {
           fields: [
-            {
-              path: ['$.type'],
-              filter: {
-                type: 'array',
-                const: ['VerifiableCredential', 'AIAgentIdentityCredential'],
-              },
-            },
-            {
-              path: ['$.credentialSubject.agent_id'],
-              name: 'Agent ID',
-              purpose: 'Unique identifier for the agent',
-            },
-            {
-              path: ['$.credentialSubject.agent_type'],
-              name: 'Agent Type',
-              purpose: 'Type of the AI agent',
-            },
-            {
-              path: ['$.credentialSubject.owner_did'],
-              name: 'Owner DID',
-              purpose: 'DID of the agent owner',
-            },
-            {
-              path: ['$.credentialSubject.capabilities'],
-              name: 'Capabilities',
-              purpose: 'Agent capabilities',
-              optional: true,
-            },
-            {
-              path: ['$.credentialSubject.trust_level'],
-              name: 'Trust Level',
-              purpose: 'Agent trust level',
-              optional: true,
-            },
+            { path: ['$.type'], filter: { type: 'array', const: ['VerifiableCredential', 'AIAgentIdentityCredential'] } },
+            { path: ['$.credentialSubject.agent_id'], name: 'Agent ID', purpose: 'Unique identifier for the agent' },
+            { path: ['$.credentialSubject.agent_type'], name: 'Agent Type', purpose: 'Type of the AI agent' },
+            { path: ['$.credentialSubject.owner_did'], name: 'Owner DID', purpose: 'DID of the agent owner' },
+            { path: ['$.credentialSubject.capabilities'], name: 'Capabilities', purpose: 'Agent capabilities', optional: true },
+            { path: ['$.credentialSubject.trust_level'], name: 'Trust Level', purpose: 'Agent trust level', optional: true },
           ],
         },
       },
@@ -204,31 +180,11 @@ export const PRESENTATION_DEFINITIONS: Record<string, PresentationDefinition> = 
         purpose: 'Prove delegation authority',
         constraints: {
           fields: [
-            {
-              path: ['$.type'],
-              filter: {
-                type: 'array',
-                const: ['VerifiableCredential', 'DelegationCredential'],
-              },
-            },
-            {
-              path: ['$.credentialSubject.delegator_did'],
-              name: 'Delegator DID',
-            },
-            {
-              path: ['$.credentialSubject.delegate_did'],
-              name: 'Delegate DID',
-            },
-            {
-              path: ['$.credentialSubject.scope'],
-              name: 'Scope',
-              purpose: 'Delegated permissions',
-            },
-            {
-              path: ['$.credentialSubject.valid_until'],
-              name: 'Valid Until',
-              purpose: 'Delegation expiration',
-            },
+            { path: ['$.type'], filter: { type: 'array', const: ['VerifiableCredential', 'DelegationCredential'] } },
+            { path: ['$.credentialSubject.delegator_did'], name: 'Delegator DID' },
+            { path: ['$.credentialSubject.delegate_did'], name: 'Delegate DID' },
+            { path: ['$.credentialSubject.scope'], name: 'Scope', purpose: 'Delegated permissions' },
+            { path: ['$.credentialSubject.valid_until'], name: 'Valid Until', purpose: 'Delegation expiration' },
           ],
         },
       },
@@ -245,25 +201,10 @@ export const PRESENTATION_DEFINITIONS: Record<string, PresentationDefinition> = 
         purpose: 'Prove granted capability',
         constraints: {
           fields: [
-            {
-              path: ['$.type'],
-              filter: {
-                type: 'array',
-                const: ['VerifiableCredential', 'CapabilityCredential'],
-              },
-            },
-            {
-              path: ['$.credentialSubject.capability_type'],
-              name: 'Capability Type',
-            },
-            {
-              path: ['$.credentialSubject.resource'],
-              name: 'Resource',
-            },
-            {
-              path: ['$.credentialSubject.actions'],
-              name: 'Actions',
-            },
+            { path: ['$.type'], filter: { type: 'array', const: ['VerifiableCredential', 'CapabilityCredential'] } },
+            { path: ['$.credentialSubject.capability_type'], name: 'Capability Type' },
+            { path: ['$.credentialSubject.resource'], name: 'Resource' },
+            { path: ['$.credentialSubject.actions'], name: 'Actions' },
           ],
         },
       },
@@ -281,12 +222,8 @@ export const PRESENTATION_DEFINITIONS: Record<string, PresentationDefinition> = 
         group: ['identity'],
         constraints: {
           fields: [
-            {
-              path: ['$.credentialSubject.agent_id'],
-            },
-            {
-              path: ['$.credentialSubject.owner_did'],
-            },
+            { path: ['$.credentialSubject.agent_id'] },
+            { path: ['$.credentialSubject.owner_did'] },
           ],
         },
       },
@@ -297,63 +234,39 @@ export const PRESENTATION_DEFINITIONS: Record<string, PresentationDefinition> = 
         group: ['delegation'],
         constraints: {
           fields: [
-            {
-              path: ['$.credentialSubject.delegate_did'],
-            },
-            {
-              path: ['$.credentialSubject.scope'],
-            },
+            { path: ['$.credentialSubject.delegate_did'] },
+            { path: ['$.credentialSubject.scope'] },
           ],
         },
       },
     ],
     submission_requirements: [
-      {
-        name: 'Identity and Delegation',
-        rule: 'all',
-        from: 'identity',
-      },
-      {
-        name: 'Identity and Delegation',
-        rule: 'all',
-        from: 'delegation',
-      },
+      { name: 'Identity and Delegation', rule: 'all', from: 'identity' },
+      { name: 'Identity and Delegation', rule: 'all', from: 'delegation' },
     ],
   },
 }
 
-/**
- * Get verifier base URL
- */
+// ==================== Config ====================
+
 export function getVerifierBaseUrl(): string {
-  // Use API Gateway URL for direct_post endpoint (not the verifier agent directly)
-  // This is required because the direct_post endpoint is on the API gateway
   return process.env.API_GATEWAY_URL || process.env.VERIFIER_BASE_URL || 'http://localhost:3000'
 }
 
-/**
- * Get verifier client metadata
- */
 export function getVerifierClientMetadata(): ClientMetadata {
   return {
     client_name: 'AI Agent Identity Verifier',
     logo_uri: `${getVerifierBaseUrl()}/logo.png`,
     client_purpose: 'Verify AI agent credentials',
     vp_formats: {
-      jwt_vp: {
-        alg: ['EdDSA', 'ES256'],
-      },
-      jwt_vc: {
-        alg: ['EdDSA', 'ES256'],
-      },
+      jwt_vp: { alg: ['EdDSA', 'ES256'] },
+      jwt_vc: { alg: ['EdDSA', 'ES256'] },
     },
   }
 }
 
-/**
- * Create an authorization request for credential verification
- * Credo varsa Credo'yu, yoksa Jose-based implementation'ı kullanır
- */
+// ==================== Session Management ====================
+
 export async function createAuthorizationRequest(
   presentationDefinitionId: string,
   options: {
@@ -367,7 +280,6 @@ export async function createAuthorizationRequest(
   authorizationRequest: AuthorizationRequest
   authorizationRequestUri: string
 }> {
-  // Get presentation definition
   const presentationDefinition =
     options.customDefinition || PRESENTATION_DEFINITIONS[presentationDefinitionId]
 
@@ -375,7 +287,6 @@ export async function createAuthorizationRequest(
     throw new Error(`Unknown presentation definition: ${presentationDefinitionId}`)
   }
 
-  // Credo-TS PRIMARY — always use Credo
   const credoResult = await credoCreateVerificationRequest(presentationDefinition)
 
   if (!credoResult) {
@@ -385,7 +296,6 @@ export async function createAuthorizationRequest(
   const sessionId = credoResult.verificationSession?.id || uuidv4()
   const credoClientId = (await credoGetVerifierDid()) || getVerifierDid()
 
-  // Store session for status lookup
   const session: VerificationSession = {
     id: sessionId,
     presentationDefinition,
@@ -423,9 +333,6 @@ export async function createAuthorizationRequest(
   }
 }
 
-/**
- * Get session by state parameter
- */
 export async function getSessionByState(state: string): Promise<VerificationSession | undefined> {
   const result = await getVPSessionsStorage().query({
     where: { state },
@@ -434,9 +341,6 @@ export async function getSessionByState(state: string): Promise<VerificationSess
   return result.data[0]
 }
 
-/**
- * Get verification session
- */
 export async function getVerificationSession(sessionId: string): Promise<{
   session: VerificationSession
   expired: boolean
@@ -452,9 +356,8 @@ export async function getVerificationSession(sessionId: string): Promise<{
   }
 }
 
-/**
- * Handle direct_post submission of VP token
- */
+// ==================== Delegated to Verification Module ====================
+
 export async function handleDirectPost(
   vpToken: string,
   presentationSubmission: PresentationSubmission,
@@ -464,287 +367,18 @@ export async function handleDirectPost(
   error?: string
   error_description?: string
 }> {
-  // Find session by state
-  const session = await getSessionByState(state)
-  if (!session) {
-    return {
-      error: 'invalid_request',
-      error_description: 'Invalid state parameter',
-    }
-  }
-
-  // Check if expired
-  if (new Date() > new Date(session.expiresAt)) {
-    await getVPSessionsStorage().update(session.id, { status: 'expired' })
-    return {
-      error: 'expired_request',
-      error_description: 'Authorization request has expired',
-    }
-  }
-
-  // Check if already submitted
-  if (session.status !== 'pending') {
-    return {
-      error: 'invalid_request',
-      error_description: 'Request already processed',
-    }
-  }
-
-  try {
-    // Verify the VP token
-    const verificationResult = await verifyVPToken(vpToken, session)
-
-    if (verificationResult.verified) {
-      await getVPSessionsStorage().update(session.id, {
-        status: 'verified',
-        presentation: vpToken,
-        verificationResult,
-      })
-      logger.info('Presentation verified successfully', { sessionId: session.id })
-    } else {
-      await getVPSessionsStorage().update(session.id, {
-        status: 'rejected',
-        presentation: vpToken,
-        verificationResult,
-      })
-      logger.warn('Presentation verification failed', {
-        sessionId: session.id,
-        errors: verificationResult.errors,
-      })
-    }
-
-    return {}
-  } catch (error) {
-    logger.error('Error processing presentation', { error })
-    await getVPSessionsStorage().update(session.id, {
-      status: 'rejected',
-      verificationResult: {
-        verified: false,
-        errors: [(error as Error).message],
-      },
-    })
-
-    return {
-      error: 'invalid_presentation',
-      error_description: (error as Error).message,
-    }
-  }
+  return handleDirectPostImpl(vpToken, presentationSubmission, state, {
+    getSessionByState,
+    getStorage: getVPSessionsStorage,
+  })
 }
 
-/**
- * Verify VP token using Jose-based verification
- */
-async function verifyVPToken(
-  vpToken: string,
-  session: VerificationSession
-): Promise<VerificationResult> {
-  try {
-    // Parse JWT
-    const parts = vpToken.split('.')
-    if (parts.length !== 3) {
-      throw new Error('Invalid JWT format')
-    }
-
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
-
-    // Check nonce
-    if (payload.nonce !== session.nonce) {
-      return {
-        verified: false,
-        errors: ['Nonce mismatch'],
-      }
-    }
-
-    // Check expiration
-    if (payload.exp && payload.exp < Date.now() / 1000) {
-      return {
-        verified: false,
-        errors: ['Presentation expired'],
-      }
-    }
-
-    // Verify VP signature using universal DID resolution
-    const holderDid = payload.iss
-    let vpSignatureVerified = false
-    const warnings: string[] = []
-
-    if (holderDid && holderDid.startsWith('did:')) {
-      try {
-        const publicKey = await resolvePublicKeyFromDid(holderDid)
-        if (publicKey) {
-          await jose.jwtVerify(vpToken, publicKey)
-          vpSignatureVerified = true
-          logger.info('VP signature verified successfully', { holderDid })
-        } else {
-          warnings.push('Could not resolve holder DID public key')
-        }
-      } catch (sigError) {
-        warnings.push('VP signature verification failed: ' + (sigError as Error).message)
-      }
-    } else {
-      warnings.push('Missing or invalid holder DID: ' + holderDid)
-    }
-
-    // Extract credential info from VP
-    const vp = payload.vp || payload
-    const credentials = vp.verifiableCredential || []
-
-    // Verify embedded VC signatures
-    let vcSignatureVerified = false
-    let credentialSubject: Record<string, unknown> | undefined
-    let issuerDid: string | undefined
-    let issuanceDate: string | undefined
-    let expirationDate: string | undefined
-
-    for (const credential of credentials) {
-      if (typeof credential === 'string') {
-        try {
-          const credParts = credential.split('.')
-          if (credParts.length === 3) {
-            const credPayload = JSON.parse(Buffer.from(credParts[1], 'base64url').toString())
-
-            // Check credential expiration
-            if (credPayload.exp && credPayload.exp < Date.now() / 1000) {
-              warnings.push('Embedded credential expired')
-              continue
-            }
-
-            // Verify VC signature using universal DID resolution
-            const vcIssuerDid = credPayload.iss
-            if (vcIssuerDid && vcIssuerDid.startsWith('did:')) {
-              const vcPublicKey = await resolvePublicKeyFromDid(vcIssuerDid)
-              if (vcPublicKey) {
-                try {
-                  await jose.jwtVerify(credential, vcPublicKey)
-                  vcSignatureVerified = true
-                  logger.info('VC signature verified successfully', { issuerDid: vcIssuerDid })
-                } catch (vcSigError) {
-                  warnings.push('VC signature verification failed: ' + (vcSigError as Error).message)
-                }
-              } else {
-                warnings.push('Could not resolve VC issuer public key: ' + vcIssuerDid)
-              }
-            }
-
-            // Check credential revocation status - CRITICAL security check
-            const credentialId = credPayload.jti || credPayload.vc?.id
-            if (credentialId) {
-              try {
-                const revoked = await isCredentialRevoked(credentialId)
-                if (revoked) {
-                  logger.warn('Credential has been revoked', { credentialId })
-                  return {
-                    verified: false,
-                    errors: ['Credential has been revoked'],
-                    credentialSubject: credPayload.vc?.credentialSubject,
-                    issuerDid: vcIssuerDid,
-                    holderDid,
-                  }
-                }
-
-                // Also check StatusList2021 if credential has credentialStatus
-                const credentialStatus = credPayload.vc?.credentialStatus
-                if (credentialStatus && credentialStatus.type === 'StatusList2021Entry') {
-                  const statusResult = await getRevocationStatus(
-                    credentialStatus.statusListCredential,
-                    credentialStatus.statusListIndex
-                  )
-                  if (statusResult.revoked) {
-                    logger.warn('Credential revoked via StatusList2021', {
-                      credentialId,
-                      statusListIndex: credentialStatus.statusListIndex
-                    })
-                    return {
-                      verified: false,
-                      errors: ['Credential has been revoked (StatusList2021)'],
-                      credentialSubject: credPayload.vc?.credentialSubject,
-                      issuerDid: vcIssuerDid,
-                      holderDid,
-                    }
-                  }
-                }
-
-                logger.info('Credential revocation check passed', { credentialId })
-              } catch (revocationError) {
-                // Log but don't fail on revocation check errors (optional endpoint)
-                logger.warn('Revocation check failed, continuing with verification', {
-                  error: (revocationError as Error).message,
-                  credentialId
-                })
-              }
-            }
-
-            // Extract credential data
-            credentialSubject = credPayload.vc?.credentialSubject || credPayload.credentialSubject
-            issuerDid = vcIssuerDid
-            issuanceDate = credPayload.iat ? new Date(credPayload.iat * 1000).toISOString() : undefined
-            expirationDate = credPayload.exp ? new Date(credPayload.exp * 1000).toISOString() : undefined
-          }
-        } catch (parseError) {
-          warnings.push('Failed to parse embedded credential: ' + (parseError as Error).message)
-        }
-      }
-    }
-
-    // Determine overall verification status
-    const verified = vpSignatureVerified && vcSignatureVerified
-
-    if (verified) {
-      return {
-        verified: true,
-        credentialSubject,
-        issuerDid,
-        holderDid,
-        issuanceDate,
-        expirationDate,
-        warnings: warnings.length > 0 ? warnings : undefined,
-      }
-    } else {
-      return {
-        verified: false,
-        errors: warnings.length > 0 ? warnings : ['Signature verification failed'],
-        credentialSubject,
-        issuerDid,
-        holderDid,
-      }
-    }
-  } catch (error) {
-    return {
-      verified: false,
-      errors: ['Failed to verify presentation: ' + (error as Error).message],
-    }
-  }
-}
-
-/**
- * Get verification result for a session
- */
 export async function getVerificationResult(sessionId: string): Promise<VerificationResult | null> {
-  const session = await getVPSessionsStorage().get(sessionId)
-  if (!session) {
-    return null
-  }
-
-  if (session.status === 'pending') {
-    return {
-      verified: false,
-      errors: ['Presentation not yet submitted'],
-    }
-  }
-
-  if (session.status === 'expired') {
-    return {
-      verified: false,
-      errors: ['Session expired'],
-    }
-  }
-
-  return session.verificationResult || null
+  return getVerificationResultImpl(sessionId, getVPSessionsStorage)
 }
 
-/**
- * List all verification sessions (admin)
- */
+// ==================== Admin ====================
+
 export async function listVerificationSessions(tenantId?: string): Promise<Array<{
   sessionId: string
   presentationDefinitionId: string
@@ -766,9 +400,6 @@ export async function listVerificationSessions(tenantId?: string): Promise<Array
   }))
 }
 
-/**
- * Get available presentation definitions
- */
 export function getAvailablePresentationDefinitions(): Array<{
   id: string
   name?: string
@@ -781,9 +412,8 @@ export function getAvailablePresentationDefinitions(): Array<{
   }))
 }
 
-/**
- * Cleanup expired sessions
- */
+// ==================== Cleanup ====================
+
 export async function cleanupExpiredSessions(): Promise<{ removed: number }> {
   let removed = 0
   const now = new Date()
@@ -795,12 +425,10 @@ export async function cleanupExpiredSessions(): Promise<{ removed: number }> {
     const sessionExpiresAt = new Date(session.expiresAt)
     const sessionCreatedAt = new Date(session.createdAt)
 
-    // Mark as expired if pending and past expiration
     if (now > sessionExpiresAt && session.status === 'pending') {
       await getVPSessionsStorage().update(session.id, { status: 'expired' })
     }
 
-    // Remove sessions older than 1 hour
     if (sessionCreatedAt < oneHourAgo) {
       const deleted = await getVPSessionsStorage().delete(session.id)
       if (deleted) removed++

@@ -1,18 +1,25 @@
-import * as jose from 'jose'
-import { logger } from '../utils/logger'
-import { resolveDidKey as resolveDidKeyToPublicKey } from '../agents/base.agent'
-import { isPrivateUrl } from '../utils/url-validation'
-
 /**
- * Universal DID Resolver Service
+ * Universal DID Resolver Service — Public API + Key Resolution
  *
  * Supports multiple DID methods:
  * - did:key - Self-certifying DIDs using public keys
  * - did:web - Web-based DIDs
  * - did:peer - Peer DIDs for private connections
+ *
+ * DID document building extracted to didResolver-documents.service.ts.
  */
 
-// JsonWebKey interface for DID documents
+import * as jose from 'jose'
+import { logger } from '../utils/logger'
+import { resolveDidKey as resolveDidKeyToPublicKey } from '../agents/base.agent'
+import {
+  resolveDidKey,
+  resolveDidWeb,
+  resolveDidPeer,
+} from './didResolver-documents.service'
+
+// ==================== Types ====================
+
 export interface JsonWebKey {
   kty: string
   crv?: string
@@ -79,12 +86,15 @@ export interface DIDResolutionMetadata {
   duration?: number
 }
 
-// Cache for resolved DIDs
+// ==================== Cache ====================
+
 const didCache = new Map<
   string,
   { result: DIDResolutionResult; timestamp: number }
 >()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+// ==================== Resolution ====================
 
 /**
  * Resolve a DID to its DID Document
@@ -92,7 +102,6 @@ const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 export async function resolveDID(did: string): Promise<DIDResolutionResult> {
   const startTime = Date.now()
 
-  // Check cache
   const cached = didCache.get(did)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     logger.debug('DID resolved from cache', { did })
@@ -100,7 +109,6 @@ export async function resolveDID(did: string): Promise<DIDResolutionResult> {
   }
 
   try {
-    // Parse DID to get method
     const parsed = parseDID(did)
     if (!parsed) {
       return {
@@ -116,7 +124,6 @@ export async function resolveDID(did: string): Promise<DIDResolutionResult> {
 
     let result: DIDResolutionResult
 
-    // Resolve based on method
     switch (parsed.method) {
       case 'key':
         result = await resolveDidKey(did, parsed.methodSpecificId)
@@ -141,7 +148,6 @@ export async function resolveDID(did: string): Promise<DIDResolutionResult> {
 
     result.didResolutionMetadata.duration = Date.now() - startTime
 
-    // Cache successful resolutions
     if (result.didDocument) {
       didCache.set(did, { result, timestamp: Date.now() })
     }
@@ -185,333 +191,6 @@ export function parseDID(
 }
 
 /**
- * Resolve did:key
- * https://w3c-ccg.github.io/did-method-key/
- */
-async function resolveDidKey(
-  did: string,
-  methodSpecificId: string
-): Promise<DIDResolutionResult> {
-  // did:key uses the multibase-encoded public key as the method-specific identifier
-  // The key type is determined by the multicodec prefix
-
-  if (!methodSpecificId.startsWith('z')) {
-    return {
-      didDocument: null,
-      didDocumentMetadata: {},
-      didResolutionMetadata: {
-        error: 'invalidDid',
-        message: 'did:key must start with multibase prefix "z"',
-      },
-    }
-  }
-
-  // Determine key type from multicodec prefix
-  const keyType = getKeyTypeFromMultibase(methodSpecificId)
-
-  const verificationMethodId = `${did}#${methodSpecificId}`
-
-  const didDocument: DIDDocument = {
-    '@context': [
-      'https://www.w3.org/ns/did/v1',
-      'https://w3id.org/security/suites/ed25519-2020/v1',
-      'https://w3id.org/security/suites/x25519-2020/v1',
-    ],
-    id: did,
-    verificationMethod: [
-      {
-        id: verificationMethodId,
-        type: keyType.verificationMethodType,
-        controller: did,
-        publicKeyMultibase: methodSpecificId,
-      },
-    ],
-    authentication: [verificationMethodId],
-    assertionMethod: [verificationMethodId],
-    capabilityInvocation: [verificationMethodId],
-    capabilityDelegation: [verificationMethodId],
-  }
-
-  // Add keyAgreement for X25519 keys
-  if (keyType.supportsKeyAgreement) {
-    const keyAgreementId = `${did}#${methodSpecificId}-key-agreement`
-    didDocument.keyAgreement = [keyAgreementId]
-  }
-
-  return {
-    didDocument,
-    didDocumentMetadata: {
-      created: new Date().toISOString(),
-    },
-    didResolutionMetadata: {
-      contentType: 'application/did+ld+json',
-    },
-  }
-}
-
-/**
- * Resolve did:web
- * https://w3c-ccg.github.io/did-method-web/
- */
-async function resolveDidWeb(
-  did: string,
-  methodSpecificId: string
-): Promise<DIDResolutionResult> {
-  // Convert method-specific identifier to URL
-  // did:web:example.com -> https://example.com/.well-known/did.json
-  // did:web:example.com:path:to:doc -> https://example.com/path/to/doc/did.json
-
-  const parts = methodSpecificId.split(':')
-  const domain = decodeURIComponent(parts[0])
-  const path = parts.slice(1).map(decodeURIComponent).join('/')
-
-  let url: string
-  if (path) {
-    url = `https://${domain}/${path}/did.json`
-  } else {
-    url = `https://${domain}/.well-known/did.json`
-  }
-
-  // SSRF protection: block resolution of private/internal URLs
-  if (isPrivateUrl(url)) {
-    return {
-      didDocument: null,
-      didDocumentMetadata: {},
-      didResolutionMetadata: {
-        error: 'invalidDid',
-        message: 'DID:web resolution to private/internal URLs is not allowed',
-      },
-    }
-  }
-
-  try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 5000)
-    const response = await fetch(url, {
-      headers: {
-        Accept: 'application/did+ld+json, application/json',
-      },
-      signal: controller.signal,
-    })
-    clearTimeout(timeout)
-
-    if (!response.ok) {
-      return {
-        didDocument: null,
-        didDocumentMetadata: {},
-        didResolutionMetadata: {
-          error: 'notFound',
-          message: `Failed to fetch DID document: ${response.status}`,
-        },
-      }
-    }
-
-    const didDocument = (await response.json()) as DIDDocument
-
-    // Verify the DID in the document matches
-    if (didDocument.id !== did) {
-      return {
-        didDocument: null,
-        didDocumentMetadata: {},
-        didResolutionMetadata: {
-          error: 'invalidDid',
-          message: 'DID in document does not match requested DID',
-        },
-      }
-    }
-
-    return {
-      didDocument,
-      didDocumentMetadata: {},
-      didResolutionMetadata: {
-        contentType: response.headers.get('content-type') || 'application/json',
-      },
-    }
-  } catch (error) {
-    return {
-      didDocument: null,
-      didDocumentMetadata: {},
-      didResolutionMetadata: {
-        error: 'notFound',
-        message: `Failed to resolve did:web: ${(error as Error).message}`,
-      },
-    }
-  }
-}
-
-/**
- * Resolve did:peer (simplified implementation)
- * https://identity.foundation/peer-did-method-spec/
- */
-async function resolveDidPeer(
-  did: string,
-  methodSpecificId: string
-): Promise<DIDResolutionResult> {
-  // did:peer has multiple numeric methods (0, 1, 2, 3, 4)
-  const numAlgo = methodSpecificId.charAt(0)
-
-  if (numAlgo === '0') {
-    // numalgo 0: inception key only
-    const keyMultibase = methodSpecificId.substring(1)
-    return resolveDidPeer0(did, keyMultibase)
-  } else if (numAlgo === '2') {
-    // numalgo 2: multiple keys and services
-    return resolveDidPeer2(did, methodSpecificId)
-  }
-
-  return {
-    didDocument: null,
-    didDocumentMetadata: {},
-    didResolutionMetadata: {
-      error: 'methodNotSupported',
-      message: `did:peer numalgo ${numAlgo} is not supported`,
-    },
-  }
-}
-
-/**
- * Resolve did:peer numalgo 0
- */
-function resolveDidPeer0(
-  did: string,
-  keyMultibase: string
-): DIDResolutionResult {
-  const verificationMethodId = `${did}#${keyMultibase}`
-
-  const didDocument: DIDDocument = {
-    '@context': ['https://www.w3.org/ns/did/v1'],
-    id: did,
-    verificationMethod: [
-      {
-        id: verificationMethodId,
-        type: 'Ed25519VerificationKey2020',
-        controller: did,
-        publicKeyMultibase: keyMultibase,
-      },
-    ],
-    authentication: [verificationMethodId],
-    assertionMethod: [verificationMethodId],
-  }
-
-  return {
-    didDocument,
-    didDocumentMetadata: {},
-    didResolutionMetadata: {
-      contentType: 'application/did+ld+json',
-    },
-  }
-}
-
-/**
- * Resolve did:peer numalgo 2 (simplified)
- */
-function resolveDidPeer2(
-  did: string,
-  methodSpecificId: string
-): DIDResolutionResult {
-  // Parse the encoded elements
-  // Format: 2.E<encnumbasis>.V<encnumbasis>.S<service>...
-
-  const didDocument: DIDDocument = {
-    '@context': ['https://www.w3.org/ns/did/v1'],
-    id: did,
-    verificationMethod: [],
-    authentication: [],
-    keyAgreement: [],
-    service: [],
-  }
-
-  const parts = methodSpecificId.substring(1).split('.')
-
-  for (const part of parts) {
-    if (!part) continue
-
-    const purpose = part.charAt(0)
-    const value = part.substring(1)
-
-    if (purpose === 'E' || purpose === 'V') {
-      // Encryption or Verification key
-      const keyId = `${did}#key-${didDocument.verificationMethod!.length + 1}`
-      didDocument.verificationMethod!.push({
-        id: keyId,
-        type: purpose === 'E' ? 'X25519KeyAgreementKey2020' : 'Ed25519VerificationKey2020',
-        controller: did,
-        publicKeyMultibase: value,
-      })
-
-      if (purpose === 'E') {
-        didDocument.keyAgreement!.push(keyId)
-      } else {
-        didDocument.authentication!.push(keyId)
-      }
-    } else if (purpose === 'S') {
-      // Service
-      try {
-        const serviceData = JSON.parse(
-          Buffer.from(value, 'base64url').toString()
-        )
-        didDocument.service!.push({
-          id: `${did}#service-${didDocument.service!.length + 1}`,
-          type: serviceData.t || 'DIDCommMessaging',
-          serviceEndpoint: serviceData.s || serviceData.serviceEndpoint,
-        })
-      } catch {
-        // Skip invalid service
-      }
-    }
-  }
-
-  return {
-    didDocument,
-    didDocumentMetadata: {},
-    didResolutionMetadata: {
-      contentType: 'application/did+ld+json',
-    },
-  }
-}
-
-/**
- * Get key type from multibase-encoded key
- */
-function getKeyTypeFromMultibase(multibase: string): {
-  verificationMethodType: string
-  supportsKeyAgreement: boolean
-} {
-  // Decode multibase to get multicodec prefix
-  // z = base58btc
-  // Common prefixes:
-  // 0xed01 = Ed25519 public key
-  // 0xec01 = X25519 public key
-  // 0x1200 = P-256 public key
-  // 0x1201 = P-384 public key
-  // 0x1202 = P-521 public key
-
-  // For simplicity, assume Ed25519 for z6Mk... prefixes
-  if (multibase.startsWith('z6Mk')) {
-    return {
-      verificationMethodType: 'Ed25519VerificationKey2020',
-      supportsKeyAgreement: true,
-    }
-  } else if (multibase.startsWith('z6LS')) {
-    return {
-      verificationMethodType: 'X25519KeyAgreementKey2020',
-      supportsKeyAgreement: true,
-    }
-  } else if (multibase.startsWith('zDn')) {
-    return {
-      verificationMethodType: 'EcdsaSecp256k1VerificationKey2019',
-      supportsKeyAgreement: false,
-    }
-  }
-
-  // Default to Ed25519
-  return {
-    verificationMethodType: 'Ed25519VerificationKey2020',
-    supportsKeyAgreement: true,
-  }
-}
-
-/**
  * Validate a DID
  */
 export function isValidDID(did: string): boolean {
@@ -550,6 +229,8 @@ export function getDIDCacheStats(): {
   return { size: didCache.size, entries }
 }
 
+// ==================== Dereferencing ====================
+
 /**
  * Dereference a DID URL (DID + path/query/fragment)
  */
@@ -558,25 +239,21 @@ export async function dereferenceDIDURL(didUrl: string): Promise<{
   contentMetadata: DIDDocumentMetadata | Record<string, string>
   dereferencingMetadata: Record<string, string | undefined>
 }> {
-  // Parse DID URL
   const hashIndex = didUrl.indexOf('#')
   const queryIndex = didUrl.indexOf('?')
 
   let did: string
   let fragment: string | null = null
-  let queryString: string | null = null
 
   if (hashIndex !== -1) {
     did = didUrl.substring(0, hashIndex)
     fragment = didUrl.substring(hashIndex + 1)
   } else if (queryIndex !== -1) {
     did = didUrl.substring(0, queryIndex)
-    queryString = didUrl.substring(queryIndex + 1)
   } else {
     did = didUrl
   }
 
-  // Resolve the DID
   const resolution = await resolveDID(did)
 
   if (!resolution.didDocument) {
@@ -590,11 +267,9 @@ export async function dereferenceDIDURL(didUrl: string): Promise<{
     }
   }
 
-  // If there's a fragment, return the referenced element
   if (fragment) {
     const targetId = `${did}#${fragment}`
 
-    // Check verification methods
     const verificationMethod = resolution.didDocument.verificationMethod?.find(
       (vm) => vm.id === targetId || vm.id === `#${fragment}`
     )
@@ -606,7 +281,6 @@ export async function dereferenceDIDURL(didUrl: string): Promise<{
       }
     }
 
-    // Check services
     const service = resolution.didDocument.service?.find(
       (s) => s.id === targetId || s.id === `#${fragment}`
     )
@@ -628,7 +302,6 @@ export async function dereferenceDIDURL(didUrl: string): Promise<{
     }
   }
 
-  // Return the full DID document
   return {
     contentStream: resolution.didDocument,
     contentMetadata: resolution.didDocumentMetadata,
@@ -636,9 +309,10 @@ export async function dereferenceDIDURL(didUrl: string): Promise<{
   }
 }
 
+// ==================== Public Key Resolution ====================
+
 /**
  * Resolve public key from any supported DID method
- * Supports: did:key, did:web, did:peer
  * Returns a jose.KeyLike suitable for JWT signature verification
  */
 export async function resolvePublicKeyFromDid(did: string): Promise<jose.KeyLike | null> {
@@ -655,11 +329,9 @@ export async function resolvePublicKeyFromDid(did: string): Promise<jose.KeyLike
       return null
     }
 
-    // Extract verification method from DID document
     const verificationMethods = resolution.didDocument.verificationMethod || []
     const authenticationMethods = resolution.didDocument.authentication || []
 
-    // Find the first usable verification method
     for (const vm of verificationMethods) {
       const method = typeof vm === 'string'
         ? verificationMethods.find((m): m is VerificationMethod => typeof m !== 'string' && m.id === vm)
@@ -693,7 +365,6 @@ export async function resolvePublicKeyFromDid(did: string): Promise<jose.KeyLike
       }
     }
 
-    // Check authentication methods as fallback
     for (const auth of authenticationMethods) {
       if (typeof auth === 'string') {
         const refMethod = verificationMethods.find((m): m is VerificationMethod => typeof m !== 'string' && m.id === auth)

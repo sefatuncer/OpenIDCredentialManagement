@@ -1,9 +1,10 @@
 /**
- * Credo Agent - Credo-TS 0.6.x tabanlı SSI agent
- * OpenID4VCI ve OpenID4VP desteği
+ * Credo Agent — Lifecycle + Init + Re-exports
  *
+ * Credo-TS 0.6.x tabanlı SSI agent. OpenID4VCI ve OpenID4VP desteği.
  * Credo-TS PRIMARY mimari: Askar ZORUNLU.
- * Native askar modülü için build tools gereklidir (python3, make, g++).
+ *
+ * API wrappers extracted to credo-api.agent.ts.
  */
 
 import {
@@ -25,10 +26,19 @@ import { logger } from '../utils/logger'
 import { eventBus } from '../core/event-bus'
 import { isFeatureEnabled } from '../core/feature-flags'
 
-// Type imports
 import type { Express } from 'express'
 
-// Credo Agent instance
+// Re-export API wrappers for backward compat
+export {
+  createCredoCredentialOffer,
+  createCredoVerificationRequest,
+  getCredoVerificationSession,
+  acceptCredoCredentialOffer,
+  submitCredoPresentation,
+} from './credo-api.agent'
+
+// ==================== State ====================
+
 let credoAgent: Agent | null = null
 let isInitialized = false
 let askarAvailable: boolean | null = null
@@ -42,9 +52,10 @@ export interface CredoAgentConfig {
   endpoints?: string[]
 }
 
+// ==================== Askar Check ====================
+
 /**
- * Askar modülünün kullanılabilirliğini kontrol et
- * Credo-TS PRIMARY mimari: Askar ZORUNLUDUR.
+ * Askar modülünün kullanılabilirliğini kontrol et — ZORUNLU
  */
 export async function checkAskarAvailability(): Promise<boolean> {
   if (askarAvailable !== null) {
@@ -74,8 +85,10 @@ export async function checkAskarAvailability(): Promise<boolean> {
   }
 }
 
+// ==================== Credential Mapper ====================
+
 /**
- * Credential request mapper - Credo callback
+ * Credential request mapper — Credo callback
  */
 async function credentialRequestToCredentialMapper(
   options: OpenId4VciCredentialRequestToCredentialMapperOptions
@@ -84,7 +97,6 @@ async function credentialRequestToCredentialMapper(
 
   logger.debug('Credential mapper called', { credentialConfigurationId })
 
-  // Holder DID'ini al - discriminated union'a göre
   let holderDid = 'unknown'
   if (holderBinding.bindingMethod === 'did' && holderBinding.keys.length > 0) {
     holderDid = holderBinding.keys[0].didUrl
@@ -93,10 +105,8 @@ async function credentialRequestToCredentialMapper(
   const now = new Date()
   const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
 
-  // Credential subject oluştur
   const credentialSubject = buildCredentialSubject(credentialConfigurationId, holderDid)
 
-  // W3cCredential oluştur
   const credential = new W3cCredential({
     context: ['https://www.w3.org/2018/credentials/v1'],
     type: ['VerifiableCredential', credentialConfigurationId],
@@ -106,7 +116,6 @@ async function credentialRequestToCredentialMapper(
     credentialSubject,
   })
 
-  // Emit credential issuance event for audit
   eventBus.emit('credential.issued', {
     credentialType: credentialConfigurationId,
     issuerDid: issuanceSession.issuerId,
@@ -125,7 +134,7 @@ async function credentialRequestToCredentialMapper(
     format: ClaimFormat.JwtVc,
     credentials: [
       {
-        verificationMethod: '', // Agent tarafından otomatik ayarlanacak
+        verificationMethod: '',
         credential,
       },
     ],
@@ -185,6 +194,8 @@ function buildCredentialSubject(configId: string, holderDid: string): Record<str
   }
 }
 
+// ==================== Init ====================
+
 /**
  * Credo Agent'ı başlat — Askar ZORUNLU
  */
@@ -194,40 +205,31 @@ export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?
     return credoAgent
   }
 
-  // Askar zorunlu — hata fırlatır eğer yoksa
   await checkAskarAvailability()
 
   logger.info('Initializing Credo agent...', { label: config.label })
 
   try {
-    // Askar modülünü dinamik olarak import et
     const { AskarModule } = await import('@credo-ts/askar')
     const { askarNodeJS } = await import('@openwallet-foundation/askar-nodejs')
     const { registerAskar } = await import('@openwallet-foundation/askar-shared')
 
-    // Askar backend'i kaydet - agent oluşturmadan ÖNCE yapılmalı
     registerAskar({ askar: askarNodeJS as any })
 
-    // Use the provided Express app (main server) or create a standalone one as fallback
     const credoApp = expressApp || express()
 
-    // Import Credo logger for debug visibility
     const { ConsoleLogger, LogLevel } = await import('@credo-ts/core')
     const credoLogLevel = process.env.CREDO_LOG_LEVEL === 'debug' ? LogLevel.debug
       : process.env.CREDO_LOG_LEVEL === 'info' ? LogLevel.info
       : process.env.CREDO_LOG_LEVEL === 'warn' ? LogLevel.warn
       : LogLevel.error
 
-    // Agent configuration - v0.6.x'de label InitConfig'den kaldırıldı
     const agentConfig: InitConfig = {
-      // Allow HTTP URLs in development (Credo enforces HTTPS by default)
       allowInsecureHttpUrls: process.env.NODE_ENV !== 'production',
       logger: new ConsoleLogger(credoLogLevel),
     }
 
-    // Build modules object — DIDComm conditionally added
     const agentModules: Record<string, unknown> = {
-      // Askar wallet module - v0.6.x'de 'askar' ve 'store' gerekli
       askar: new AskarModule({
         askar: askarNodeJS as any,
         store: {
@@ -235,12 +237,8 @@ export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?
           key: config.walletKey,
         },
       }),
-      // DID modülü
       dids: new DidsModule(),
-      // W3C Credentials
       w3cCredentials: new W3cCredentialsModule(),
-      // OpenID4VC modülü (issuer + verifier + holder)
-      // Issuer and verifier MUST use different base paths to avoid route conflicts
       openId4Vc: new OpenId4VcModule({
         app: credoApp as any,
         issuer: {
@@ -276,18 +274,16 @@ export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?
       }
     }
 
-    // Agent oluştur
     credoAgent = new Agent({
       config: agentConfig,
       dependencies: agentDependencies,
       modules: agentModules as any,
     })
 
-    // Agent'ı başlat
     await credoAgent.initialize()
     isInitialized = true
 
-    // Listen for VP verification events for audit logging
+    // VP verification event listener for audit
     try {
       const { OpenId4VcVerificationSessionState } = await import('@credo-ts/openid4vc')
       credoAgent.events.on('OpenId4VcVerificationSessionStateChanged', async (event: any) => {
@@ -305,7 +301,6 @@ export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?
       logger.debug('Could not register Credo VP event listener (non-critical)')
     }
 
-    // DID oluştur (eğer yoksa)
     await ensureAgentDid(credoAgent)
 
     logger.info('Credo agent initialized successfully', {
@@ -326,12 +321,13 @@ export async function initializeCredoAgent(config: CredoAgentConfig, expressApp?
   }
 }
 
+// ==================== DID Management ====================
+
 /**
  * Agent için DID oluştur (did:key)
  */
 async function ensureAgentDid(agent: Agent): Promise<string> {
   try {
-    // Mevcut DID'leri kontrol et
     const existingDids = await agent.dids.getCreatedDids({ method: 'key' })
 
     if (existingDids.length > 0) {
@@ -340,7 +336,6 @@ async function ensureAgentDid(agent: Agent): Promise<string> {
       return did
     }
 
-    // Yeni DID oluştur - v0.6.x: önce KMS ile key oluştur, sonra keyId ile DID oluştur
     const keyResult = await agent.kms.createKey({ type: { kty: 'OKP', crv: 'Ed25519' } })
     logger.debug('KMS key created', { keyId: keyResult.keyId })
 
@@ -369,23 +364,16 @@ async function ensureAgentDid(agent: Agent): Promise<string> {
   }
 }
 
-/**
- * Credo Agent'ı getir
- */
+// ==================== Getters ====================
+
 export function getCredoAgent(): Agent | null {
   return credoAgent
 }
 
-/**
- * Credo Agent hazır mı?
- */
 export function isCredoAgentReady(): boolean {
   return isInitialized && credoAgent !== null
 }
 
-/**
- * Agent DID'ini getir
- */
 export async function getAgentDid(): Promise<string | null> {
   if (!credoAgent) {
     return null
@@ -403,9 +391,6 @@ export async function getAgentDid(): Promise<string | null> {
   }
 }
 
-/**
- * Agent'ı kapat
- */
 export async function shutdownCredoAgent(): Promise<void> {
   if (credoAgent && isInitialized) {
     try {
@@ -417,253 +402,6 @@ export async function shutdownCredoAgent(): Promise<void> {
       credoAgent = null
       isInitialized = false
     }
-  }
-}
-
-// ==================== ISSUER API ====================
-
-/**
- * Credential offer oluştur
- */
-export async function createCredoCredentialOffer(
-  credentialConfigurationIds: string[],
-  options?: {
-    preAuthorizedCodeFlowConfig?: {
-      txCode?: { inputMode?: string; length?: number }
-    }
-  }
-): Promise<{
-  credentialOffer: any
-  credentialOfferUri: string
-  issuanceSession: any
-} | null> {
-  if (!credoAgent || !isInitialized) {
-    return null
-  }
-
-  try {
-    const issuerApi = credoAgent.modules.openId4Vc.issuer
-
-    // İlk önce bir issuer kaydı olmalı
-    const issuers = await issuerApi.getAllIssuers()
-    let issuer = issuers[0]
-
-    if (!issuer) {
-      // Issuer oluştur
-      issuer = await issuerApi.createIssuer({
-        credentialConfigurationsSupported: {
-          AIAgentIdentityCredential: {
-            format: ClaimFormat.JwtVc,
-            credential_definition: {
-              type: ['VerifiableCredential', 'AIAgentIdentityCredential'],
-            },
-          },
-          DelegationCredential: {
-            format: ClaimFormat.JwtVc,
-            credential_definition: {
-              type: ['VerifiableCredential', 'DelegationCredential'],
-            },
-          },
-          CapabilityCredential: {
-            format: ClaimFormat.JwtVc,
-            credential_definition: {
-              type: ['VerifiableCredential', 'CapabilityCredential'],
-            },
-          },
-        },
-      })
-    }
-
-    // Always provide preAuthorizedCodeFlowConfig (Credo requires at least one flow config)
-    const result = await issuerApi.createCredentialOffer({
-      issuerId: issuer.issuerId,
-      credentialConfigurationIds,
-      preAuthorizedCodeFlowConfig: options?.preAuthorizedCodeFlowConfig || {},
-    })
-
-    // Credo returns credentialOffer as a URI string (openid-credential-offer://...)
-    // Fetch the actual offer object from the Credo offer endpoint for consistent response shape
-    const credentialOfferUri = result.credentialOffer
-    let credentialOfferObject: any = null
-
-    try {
-      // Extract the credential_offer_uri and fetch the offer JSON
-      const offerUrl = new URL(credentialOfferUri)
-      const offerEndpoint = offerUrl.searchParams.get('credential_offer_uri')
-      if (offerEndpoint) {
-        const response = await fetch(offerEndpoint)
-        if (response.ok) {
-          credentialOfferObject = await response.json()
-        }
-      }
-    } catch {
-      // If fetching fails, parse what we can from the URI
-      logger.debug('Could not fetch Credo offer endpoint, using URI directly')
-    }
-
-    logger.info('Credential offer created via Credo', {
-      credentialConfigurationIds,
-    })
-
-    return {
-      credentialOffer: credentialOfferObject || credentialOfferUri,
-      credentialOfferUri,
-      issuanceSession: result.issuanceSession,
-    }
-  } catch (error) {
-    logger.error('Failed to create credential offer via Credo', { error: (error as Error).message })
-    return null
-  }
-}
-
-// ==================== VERIFIER API ====================
-
-/**
- * Verification request oluştur
- */
-export async function createCredoVerificationRequest(
-  presentationDefinition: any
-): Promise<{
-  authorizationRequest: any
-  authorizationRequestUri: string
-  verificationSession: any
-} | null> {
-  if (!credoAgent || !isInitialized) {
-    return null
-  }
-
-  try {
-    const verifierApi = credoAgent.modules.openId4Vc.verifier
-
-    // İlk önce bir verifier kaydı olmalı
-    const verifiers = await verifierApi.getAllVerifiers()
-    let verifier = verifiers[0]
-
-    if (!verifier) {
-      verifier = await verifierApi.createVerifier({})
-    }
-
-    // Get agent DID for request signing
-    const agentDid = await ensureAgentDid(credoAgent!)
-    const dids = await credoAgent!.dids.getCreatedDids({ method: 'key' })
-    const didRecord = dids[0]
-    const verificationMethodId = didRecord?.did ? `${didRecord.did}#${didRecord.did.split(':').pop()}` : agentDid
-
-    const result = await verifierApi.createAuthorizationRequest({
-      verifierId: verifier.verifierId,
-      // v1.draft24 supports presentationExchange; v1 only supports dcql
-      version: 'v1.draft24' as any,
-      requestSigner: {
-        method: 'did',
-        didUrl: verificationMethodId,
-      },
-      presentationExchange: {
-        definition: presentationDefinition,
-      },
-      responseMode: 'direct_post' as any,
-    })
-
-    const authorizationRequestUri = result.authorizationRequest
-
-    logger.info('Verification request created via Credo', {
-      definitionId: presentationDefinition.id,
-    })
-
-    return {
-      authorizationRequest: result.authorizationRequest,
-      authorizationRequestUri,
-      verificationSession: result.verificationSession,
-    }
-  } catch (error) {
-    logger.error('Failed to create verification request via Credo', { error: (error as Error).message })
-    return null
-  }
-}
-
-/**
- * Verification session getir
- */
-export async function getCredoVerificationSession(sessionId: string): Promise<any | null> {
-  if (!credoAgent || !isInitialized) {
-    return null
-  }
-
-  try {
-    const verifierApi = credoAgent.modules.openId4Vc.verifier
-    return await verifierApi.getVerificationSessionById(sessionId)
-  } catch (error) {
-    logger.error('Failed to get verification session', { error: (error as Error).message })
-    return null
-  }
-}
-
-// ==================== HOLDER API ====================
-
-/**
- * Credential offer kabul et
- */
-export async function acceptCredoCredentialOffer(
-  credentialOfferUri: string
-): Promise<{
-  credentials: any[]
-} | null> {
-  if (!credoAgent || !isInitialized) {
-    return null
-  }
-
-  try {
-    const holderApi = credoAgent.modules.openId4Vc.holder
-
-    // v0.6.x: resolveCredentialOffer → requestToken → requestCredentials
-    const resolvedOffer = await holderApi.resolveCredentialOffer(credentialOfferUri)
-    const tokenResponse = await holderApi.requestToken({
-      resolvedCredentialOffer: resolvedOffer,
-    })
-    const credentialResponse = await holderApi.requestCredentials({
-      resolvedCredentialOffer: resolvedOffer,
-      ...tokenResponse,
-    })
-
-    logger.info('Credential received via Credo', { count: credentialResponse.length })
-
-    return { credentials: credentialResponse }
-  } catch (error) {
-    logger.error('Failed to accept credential offer via Credo', { error: (error as Error).message })
-    return null
-  }
-}
-
-/**
- * Presentation oluştur ve gönder
- */
-export async function submitCredoPresentation(
-  authorizationRequestUri: string
-): Promise<{
-  submitted: boolean
-  result?: any
-} | null> {
-  if (!credoAgent || !isInitialized) {
-    return null
-  }
-
-  try {
-    const holderApi = credoAgent.modules.openId4Vc.holder
-
-    // v0.6.x: resolveOpenId4VpAuthorizationRequest → acceptOpenId4VpAuthorizationRequest
-    const resolvedRequest = await holderApi.resolveOpenId4VpAuthorizationRequest(authorizationRequestUri)
-    const result = await holderApi.acceptOpenId4VpAuthorizationRequest({
-      authorizationRequest: resolvedRequest,
-    })
-
-    logger.info('Presentation submitted via Credo')
-
-    return {
-      submitted: true,
-      result,
-    }
-  } catch (error) {
-    logger.error('Failed to submit presentation via Credo', { error: (error as Error).message })
-    return null
   }
 }
 
